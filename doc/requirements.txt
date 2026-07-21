@@ -1,0 +1,3 @@
+Sphinx>=8,<9
+nbsphinx>=0.9,<1
+sphinx-rtd-theme>=3,<4

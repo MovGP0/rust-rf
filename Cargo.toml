@@ -1,0 +1,224 @@
+[package]
+name = "rust-rf"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "A Rust port of scikit-rf for RF and microwave engineering"
+license = "BSD-3-Clause"
+repository = "https://github.com/MovGP0/rust-rf"
+
+[features]
+default = []
+dataframe = ["dep:polars"]
+full = ["dataframe", "plot", "visa", "xlsx"]
+plot = ["dep:plotters"]
+visa = ["dep:visa_rs"]
+xlsx = ["dep:rust_xlsxwriter"]
+
+[dependencies]
+chrono = "0.4.45"
+csv = "1.4.0"
+encoding_rs = "0.8.35"
+faer = "0.24.4"
+libm = "0.2.16"
+ndarray = { version = "0.17.2", features = ["approx", "rayon", "serde"] }
+ndarray-npy = "0.10.0"
+num-complex = { version = "0.4.6", features = ["serde"] }
+num-traits = "0.2.19"
+petgraph = "0.8.3"
+rand = "0.10.0"
+rand_distr = "0.6.0"
+realfft = "3.5.0"
+regex = "1.13.1"
+rustfft = "6.4.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0.19"
+zip = { version = "7.2.0", default-features = false, features = ["deflate"] }
+
+plotters = { version = "0.3.7", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "point_series", "svg_backend"], optional = true }
+polars = { version = "0.54.4", default-features = false, features = ["fmt", "rows"], optional = true }
+rust_xlsxwriter = { version = "0.96.0", optional = true }
+
+[target.'cfg(any(all(windows, any(target_arch = "x86", target_arch = "x86_64")), all(target_os = "macos", any(target_arch = "x86_64", target_arch = "aarch64"))))'.dependencies]
+visa_rs = { package = "visa-rs", version = "0.6.2", optional = true }
+
+[dev-dependencies]
+approx = "0.5.1"
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+strip = true
+opt-level = "s"
+lto = true
+codegen-units = 1
+
+[[bin]]
+name = "plot-touchstone"
+path = "src/programs/plot_touchstone.rs"
+required-features = ["plot"]
+
+[[test]]
+name = "citi"
+path = "src/io/tests/test_citi.rs"
+
+[[test]]
+name = "csv"
+path = "src/io/tests/test_csv.rs"
+
+[[test]]
+name = "general_io"
+path = "src/io/tests/test_io.rs"
+
+[[test]]
+name = "mdif"
+path = "src/io/tests/test_mdif.rs"
+
+[[test]]
+name = "touchstone"
+path = "src/io/tests/test_touchstone.rs"
+
+[[test]]
+name = "touchstone_spec"
+path = "src/io/tests/test_ts_spec.rs"
+
+[[test]]
+name = "calibration"
+path = "src/calibration/tests/test_calibration.rs"
+
+[[test]]
+name = "calibration_set"
+path = "src/calibration/tests/test_calibration_set.rs"
+
+[[test]]
+name = "deembedding"
+path = "src/calibration/tests/test_deembedding.rs"
+
+[[test]]
+name = "all_construction"
+path = "src/media/tests/test_all_construction.rs"
+
+[[test]]
+name = "coaxial"
+path = "src/media/tests/test_coaxial.rs"
+
+[[test]]
+name = "cpw"
+path = "src/media/tests/test_cpw.rs"
+
+[[test]]
+name = "definedaeptandz0"
+path = "src/media/tests/test_definedaeptandz0.rs"
+
+[[test]]
+name = "distributed_circuit"
+path = "src/media/tests/test_distributed_circuit.rs"
+
+[[test]]
+name = "media"
+path = "src/media/tests/test_media.rs"
+
+[[test]]
+name = "mline"
+path = "src/media/tests/test_mline.rs"
+
+[[test]]
+name = "rectangular_waveguide"
+path = "src/media/tests/test_rectangular_waveguide.rs"
+
+[[test]]
+name = "circuit"
+path = "src/tests/test_circuit.rs"
+
+[[test]]
+name = "convenience"
+path = "src/tests/test_convenience.rs"
+
+[[test]]
+name = "frequency"
+path = "src/tests/test_frequency.rs"
+
+[[test]]
+name = "package_surface"
+path = "src/tests/test_init.rs"
+
+[[test]]
+name = "math"
+path = "src/tests/test_math_functions.rs"
+
+[[test]]
+name = "network_set"
+path = "src/tests/test_network_set.rs"
+
+[[test]]
+name = "network"
+path = "src/tests/test_network.rs"
+
+[[test]]
+name = "plotting"
+path = "src/tests/test_plotting.rs"
+
+[[test]]
+name = "qfactor"
+path = "src/tests/test_qfactor.rs"
+
+[[test]]
+name = "static_data"
+path = "src/tests/test_static_data.rs"
+
+[[test]]
+name = "taper"
+path = "src/tests/test_taper.rs"
+
+[[test]]
+name = "transmission_line"
+path = "src/tests/test_tline_functions.rs"
+
+[[test]]
+name = "util"
+path = "src/tests/test_util.rs"
+
+[[test]]
+name = "vector_fitting"
+path = "src/tests/test_vector_fitting.rs"
+
+[[test]]
+name = "validators"
+path = "src/vi/tests/test_validators.rs"
+
+[[test]]
+name = "vna"
+path = "src/vi/tests/test_vna.rs"
+
+[[test]]
+name = "hp8510c"
+path = "src/vi/vna/hp/tests/test_8510c.rs"
+
+[[test]]
+name = "hp8510c_sweep_plan"
+path = "src/vi/vna/hp/tests/test_8510c_sweep_plan.rs"
+
+[[test]]
+name = "hp8720b"
+path = "src/vi/vna/hp/tests/test_hp8720b.rs"
+
+[[test]]
+name = "fieldfox"
+path = "src/vi/vna/keysight/tests/test_fieldfox.rs"
+
+[[test]]
+name = "pna"
+path = "src/vi/vna/keysight/tests/test_pna.rs"
+
+[[test]]
+name = "zna"
+path = "src/vi/vna/rohde_schwarz/tests/test_zna.rs"
+
+[[test]]
+name = "zva"
+path = "src/vi/vna/rohde_schwarz/tests/test_zva.rs"

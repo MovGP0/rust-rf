@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Format, lint, and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+          rustup default stable
+
+      - name: Cache Cargo data
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-test-
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Apply Clippy suggestions to production code
+        run: >-
+          cargo clippy --fix --locked --lib --bins --all-features --allow-no-vcs --
+          -W clippy::pedantic
+          -W clippy::nursery
+          -W clippy::unwrap_used
+          -W clippy::expect_used
+
+      - name: Lint tests
+        run: >-
+          cargo clippy --locked --tests --all-features --
+          -W clippy::pedantic
+          -W clippy::nursery
+          -A clippy::dbg_macro
+          -A clippy::expect_used
+          -A clippy::indexing_slicing
+          -A clippy::large_stack_frames
+          -A clippy::panic
+          -A clippy::print_stderr
+          -A clippy::print_stdout
+          -A clippy::unwrap_used
+          -A clippy::useless_vec
+
+      - name: Run tests
+        run: cargo test --locked --all-features

@@ -25,3 +25,6 @@ target
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Temporary files
+.temp/
