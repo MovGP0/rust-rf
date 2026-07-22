@@ -1,0 +1,4959 @@
+{
+  "name": "scikit-rf",
+  "description": "Object Oriented Microwave Engineering. Note: this project has over 100 source files; consider scoping analysis to a subdirectory for faster results.",
+  "languages": [
+    "batch",
+    "cal",
+    "cff",
+    "chx",
+    "css",
+    "csv",
+    "cti",
+    "dat",
+    "dpl",
+    "html",
+    "in",
+    "ipynb",
+    "json",
+    "makefile",
+    "markdown",
+    "mdf",
+    "mplstyle",
+    "ntwk",
+    "p",
+    "python",
+    "s10p",
+    "s11p",
+    "s12p",
+    "s13p",
+    "s14p",
+    "s15p",
+    "s16p",
+    "s17p",
+    "s18p",
+    "s19p",
+    "s1p",
+    "s20p",
+    "s21p",
+    "s22p",
+    "s2p",
+    "s32p",
+    "s3p",
+    "s4p",
+    "s5p",
+    "s6p",
+    "s7p",
+    "s8p",
+    "s9p",
+    "sch",
+    "sp",
+    "toml",
+    "txt",
+    "typescript",
+    "unknown",
+    "yaml"
+  ],
+  "frameworks": [
+    "GitHub Actions",
+    "pytest"
+  ],
+  "files": [
+    {
+      "path": ".github/dependabot.yml",
+      "language": "yaml",
+      "sizeLines": 21,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".github/FUNDING.yml",
+      "language": "yaml",
+      "sizeLines": 1,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "language": "markdown",
+      "sizeLines": 32,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "language": "markdown",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/general-issue-.md",
+      "language": "markdown",
+      "sizeLines": 8,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".github/labeler.yml",
+      "language": "yaml",
+      "sizeLines": 50,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "language": "yaml",
+      "sizeLines": 74,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/linting.yml",
+      "language": "yaml",
+      "sizeLines": 29,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/PR_labeler.yml",
+      "language": "yaml",
+      "sizeLines": 16,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/publish.yml",
+      "language": "yaml",
+      "sizeLines": 35,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/testing_notebooks.yml",
+      "language": "yaml",
+      "sizeLines": 32,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/testing.yml",
+      "language": "yaml",
+      "sizeLines": 98,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/urlchecker.yml",
+      "language": "yaml",
+      "sizeLines": 36,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".pre-commit-config.yaml",
+      "language": "yaml",
+      "sizeLines": 18,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".readthedocs.yml",
+      "language": "yaml",
+      "sizeLines": 29,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".understand-anything/.understandignore",
+      "language": "unknown",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".understand-anything/config.json",
+      "language": "json",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": "apps/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "CITATION.cff",
+      "language": "cff",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "conda.recipe/meta.yaml",
+      "language": "yaml",
+      "sizeLines": 61,
+      "fileCategory": "config"
+    },
+    {
+      "path": "doc/gh-pages.py",
+      "language": "python",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/make.bat",
+      "language": "batch",
+      "sizeLines": 35,
+      "fileCategory": "script"
+    },
+    {
+      "path": "doc/Makefile",
+      "language": "makefile",
+      "sizeLines": 143,
+      "fileCategory": "infra"
+    },
+    {
+      "path": "doc/README.txt",
+      "language": "txt",
+      "sizeLines": 4,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/_static/scipy.css",
+      "language": "css",
+      "sizeLines": 197,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "doc/source/_templates/autosummary/class.rst",
+      "language": "markdown",
+      "sizeLines": 33,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/_templates/indexsidebar.html",
+      "language": "html",
+      "sizeLines": 5,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "doc/source/_templates/layout.html",
+      "language": "html",
+      "sizeLines": 28,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "doc/source/api/calibration/deembedding.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/calibration/index.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/circuit.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/constants.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/data/index.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/frequency.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/index.rst",
+      "language": "markdown",
+      "sizeLines": 35,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/instances.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/io/index.rst",
+      "language": "markdown",
+      "sizeLines": 22,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/mathFunctions.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/media/device.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/media/index.rst",
+      "language": "markdown",
+      "sizeLines": 20,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/network.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/networkSet.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/plotting.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/qfactor.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/taper.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/time.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/tlineFunctions.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/util.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/vectorFitting.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/vi/index.rst",
+      "language": "markdown",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/vi/vna.rst",
+      "language": "markdown",
+      "sizeLines": 0,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/citations_ack/acknowledging.rst",
+      "language": "markdown",
+      "sizeLines": 41,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/citations_ack/citations.rst",
+      "language": "markdown",
+      "sizeLines": 159,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/citations_ack/index.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/conf.py",
+      "language": "python",
+      "sizeLines": 198,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/contributing/index.rst",
+      "language": "markdown",
+      "sizeLines": 209,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_Coaxial_T.s3p",
+      "language": "s3p",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_Designer_Currents.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_Designer_Voltages.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_HFSS_Currents.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_HFSS_Voltages.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/designer_bandpass_filter_450_550MHz.s2p",
+      "language": "s2p",
+      "sizeLines": 3021,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/designer_capacitor_30_80MHz_adv.s2p",
+      "language": "s2p",
+      "sizeLines": 1520,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/designer_capacitor_30_80MHz_simple.s2p",
+      "language": "s2p",
+      "sizeLines": 1519,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/Lumped Element Circuits.ipynb",
+      "language": "ipynb",
+      "sizeLines": 342,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/Voltages and Currents in Circuits.ipynb",
+      "language": "ipynb",
+      "sizeLines": 544,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/Wilkinson Power Splitter.ipynb",
+      "language": "ipynb",
+      "sizeLines": 284,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/index.rst",
+      "language": "markdown",
+      "sizeLines": 116,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/instrumentcontrol/VNA Control.ipynb",
+      "language": "ipynb",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/interactive/Interact Transmission Lines.ipynb",
+      "language": "ipynb",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/interactive/Interactive Coaxial Properties.ipynb",
+      "language": "ipynb",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/interactive/Interactive Mismatched Line.ipynb",
+      "language": "ipynb",
+      "sizeLines": 169,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/LICENSE.txt",
+      "language": "txt",
+      "sizeLines": 28,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/matching/Impedance Matching.ipynb",
+      "language": "ipynb",
+      "sizeLines": 301,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Calibration With Three Receivers.ipynb",
+      "language": "ipynb",
+      "sizeLines": 367,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_match_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_open_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_short_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_thru_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_12.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_13.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_14.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_21.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_23.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_24.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_31.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_32.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_34.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_41.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_42.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_43.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/MiniCircuits_ZX10Q-2-19-S+___Plus25degC.s4p",
+      "language": "s4p",
+      "sizeLines": 6377,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/LRRM.ipynb",
+      "language": "ipynb",
+      "sizeLines": 559,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Measuring a Mutiport Device with a 2-Port Network Analyzer.ipynb",
+      "language": "ipynb",
+      "sizeLines": 555,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Multi-port Calibration.ipynb",
+      "language": "ipynb",
+      "sizeLines": 292,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Multiline TRL.ipynb",
+      "language": "ipynb",
+      "sizeLines": 882,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/DUT.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/gamma_f.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/gamma_r.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/line2p3mm.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/linep3mm.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/reflect.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/res_50ohm.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/NanoVNA_V2_4port-splitter.ipynb",
+      "language": "ipynb",
+      "sizeLines": 223,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/One Port Tiered Calibration.ipynb",
+      "language": "ipynb",
+      "sizeLines": 304,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/probe.s2p",
+      "language": "s2p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ds.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/load.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ro.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/short.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ds.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/load.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ro.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/short.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds1.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds2.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds3.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds4.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds5.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds1,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds2,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds3,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds4,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds5,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/probe.s2p",
+      "language": "s2p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/SOLT Calibration Standards Creation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 1719,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/SOLT.ipynb",
+      "language": "ipynb",
+      "sizeLines": 379,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/attenuator (forward).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/attenuator (reverse).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/load.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/quarter wave delay short.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/short.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/simulation.s2p",
+      "language": "s2p",
+      "sizeLines": 1618,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (forward).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (reverse).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/.s2p",
+      "language": "unknown",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/A.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/B.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/forward switch term.s1p",
+      "language": "s1p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/line.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/mismatched line.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/reflect.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/reverse switch term.s1p",
+      "language": "s1p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/TRL.ipynb",
+      "language": "ipynb",
+      "sizeLines": 167,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/TwoPortOnePath, EnhancedResponse, and FakeFlip.ipynb",
+      "language": "ipynb",
+      "sizeLines": 251,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/Mixed Mode Basics.ipynb",
+      "language": "ipynb",
+      "sizeLines": 306,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/Mixed Mode S and Impedance Transformation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 147,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_se.s4p",
+      "language": "s4p",
+      "sizeLines": 8013,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_truemode_balbal.s4p",
+      "language": "s4p",
+      "sizeLines": 8029,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/mixedmodeSandZtransform_files/EP2C+_Plus25DegC_Unit1.S3P",
+      "language": "s3p",
+      "sizeLines": 525,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networks/Compute Error Between S Parameter Matrices.ipynb",
+      "language": "ipynb",
+      "sizeLines": 98,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networks/Export Network as Touchstone File.ipynb",
+      "language": "ipynb",
+      "sizeLines": 303,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networksets/Export Network Set as MDIF File.ipynb",
+      "language": "ipynb",
+      "sizeLines": 194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networksets/Interpolating Network Sets.ipynb",
+      "language": "ipynb",
+      "sizeLines": 174,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networksets/Sorting Network Sets.ipynb",
+      "language": "ipynb",
+      "sizeLines": 296,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Balanced Network De-embedding.ipynb",
+      "language": "ipynb",
+      "sizeLines": 257,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Balun_Transformer_Designs.ipynb",
+      "language": "ipynb",
+      "sizeLines": 399,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Balun_Transformer_Designs/Ideal_4port_xformer_hi_res.s4p",
+      "language": "s4p",
+      "sizeLines": 40153,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/BFU520_05V0_010mA_NF_SP.s2p",
+      "language": "s2p",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Correlating microstripline model to measurement.ipynb",
+      "language": "ipynb",
+      "sizeLines": 421,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/CPW media example.ipynb",
+      "language": "ipynb",
+      "sizeLines": 276,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/CPWG100.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/CPWG200.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/DC Extrapolation for Time Domain .ipynb",
+      "language": "ipynb",
+      "sizeLines": 216,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/DefinedAEpTandZ0 media example.ipynb",
+      "language": "ipynb",
+      "sizeLines": 366,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/IEEEP370 Deembedding.ipynb",
+      "language": "ipynb",
+      "sizeLines": 1188,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_NZC_diff_fdf_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_ZC_diff_fdf_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_NZC_se_fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 1002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_ZC_se_fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 1002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4011,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dat",
+      "language": "dat",
+      "sizeLines": 19039,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dpl",
+      "language": "dpl",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.s4p",
+      "language": "s4p",
+      "sizeLines": 4001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.sch",
+      "language": "sch",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dat",
+      "language": "dat",
+      "sizeLines": 19039,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.s4p",
+      "language": "s4p",
+      "sizeLines": 4001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.sch",
+      "language": "sch",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4011,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dat",
+      "language": "dat",
+      "sizeLines": 17035,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.s4p",
+      "language": "s4p",
+      "sizeLines": 4001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.sch",
+      "language": "sch",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/se_2xthru.s2p",
+      "language": "s2p",
+      "sizeLines": 1003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/se_fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 1003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/LNA Example.ipynb",
+      "language": "ipynb",
+      "sizeLines": 333,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/MSL100.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/MSL200.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Properties of Rectangular Waveguides.ipynb",
+      "language": "ipynb",
+      "sizeLines": 256,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Renormalizing S-parameters.ipynb",
+      "language": "ipynb",
+      "sizeLines": 190,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Load_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Open_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Short_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Stepped_140-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_100-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_200-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Load_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Open_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Short_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/readme.txt",
+      "language": "txt",
+      "sizeLines": 3,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/SetupFile#2.chx",
+      "language": "chx",
+      "sizeLines": 15946,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Stepped_140-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Thru_100-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Time domain reflectometry, measurement vs simulation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 899,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Time Domain.ipynb",
+      "language": "ipynb",
+      "sizeLines": 416,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Transmission Line Losses.ipynb",
+      "language": "ipynb",
+      "sizeLines": 463,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Transmission Line Properties and Manipulations.ipynb",
+      "language": "ipynb",
+      "sizeLines": 730,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Transmission Lines and SWR.ipynb",
+      "language": "ipynb",
+      "sizeLines": 286,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Working with Complex Characteristic Impedances.ipynb",
+      "language": "ipynb",
+      "sizeLines": 249,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/plotting/Modeling RG-58.ipynb",
+      "language": "ipynb",
+      "sizeLines": 122,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/plotting/XKCD styling.ipynb",
+      "language": "ipynb",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/data/resonator_144mm.s2p",
+      "language": "s2p",
+      "sizeLines": 4012,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/data/resonator_36mm.s2p",
+      "language": "s2p",
+      "sizeLines": 412,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/data/resonator_72mm.s2p",
+      "language": "s2p",
+      "sizeLines": 4012,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/Finding_Dk_Df_from_resonance_fitting.ipynb",
+      "language": "ipynb",
+      "sizeLines": 456,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/README.md",
+      "language": "markdown",
+      "sizeLines": 6,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/taper/ANSYS_Circuit_taper_exponential_s_mag.csv",
+      "language": "csv",
+      "sizeLines": 192,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/taper/ANSYS_Circuit_taper_linear_s_mag.csv",
+      "language": "csv",
+      "sizeLines": 192,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/taper/tapered_transmission_lines.ipynb",
+      "language": "ipynb",
+      "sizeLines": 233,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/190ghz_tx_measured.S2P",
+      "language": "s2p",
+      "sizeLines": 810,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/Agilent_E5071B.s4p",
+      "language": "s4p",
+      "sizeLines": 828,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex1_ringslot.ipynb",
+      "language": "ipynb",
+      "sizeLines": 168,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex2_190ghz_active.ipynb",
+      "language": "ipynb",
+      "sizeLines": 151,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex3_Agilent_E5071B.ipynb",
+      "language": "ipynb",
+      "sizeLines": 265,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex4_passivity.ipynb",
+      "language": "ipynb",
+      "sizeLines": 253,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_problems.ipynb",
+      "language": "ipynb",
+      "sizeLines": 261,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/glossary.rst",
+      "language": "markdown",
+      "sizeLines": 25,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/index.rst",
+      "language": "markdown",
+      "sizeLines": 33,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/license.rst",
+      "language": "markdown",
+      "sizeLines": 37,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/Makefile",
+      "language": "makefile",
+      "sizeLines": 8,
+      "fileCategory": "infra"
+    },
+    {
+      "path": "doc/source/tutorials/BFU520_05V0_010mA_NF_SP.s2p",
+      "language": "s2p",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Calibration.ipynb",
+      "language": "ipynb",
+      "sizeLines": 267,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Circuit.ipynb",
+      "language": "ipynb",
+      "sizeLines": 475,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Connecting_Networks.ipynb",
+      "language": "ipynb",
+      "sizeLines": 365,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ring slot.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ro,1.s1p",
+      "language": "s1p",
+      "sizeLines": 206,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ro,2.s1p",
+      "language": "s1p",
+      "sizeLines": 206,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ro,3.s1p",
+      "language": "s1p",
+      "sizeLines": 206,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Deembedding.ipynb",
+      "language": "ipynb",
+      "sizeLines": 278,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/index.rst",
+      "language": "markdown",
+      "sizeLines": 26,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/tutorials/Installation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 158,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Introduction.ipynb",
+      "language": "ipynb",
+      "sizeLines": 791,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Media.ipynb",
+      "language": "ipynb",
+      "sizeLines": 840,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Networks.ipynb",
+      "language": "ipynb",
+      "sizeLines": 1009,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/NetworkSet.ipynb",
+      "language": "ipynb",
+      "sizeLines": 589,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Plotting.ipynb",
+      "language": "ipynb",
+      "sizeLines": 555,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Q-Factor.ipynb",
+      "language": "ipynb",
+      "sizeLines": 465,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/VectorFitting.ipynb",
+      "language": "ipynb",
+      "sizeLines": 296,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/VirtualInstruments.ipynb",
+      "language": "ipynb",
+      "sizeLines": 237,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/sphinxext/LICENSE.txt",
+      "language": "txt",
+      "sizeLines": 96,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/sphinxext/MANIFEST.in",
+      "language": "in",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/sphinxext/README.txt",
+      "language": "txt",
+      "sizeLines": 45,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/sphinxext/tests/test_docscrape.py",
+      "language": "python",
+      "sizeLines": 615,
+      "fileCategory": "code"
+    },
+    {
+      "path": "INSTALL.txt",
+      "language": "txt",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "LICENSE.txt",
+      "language": "txt",
+      "sizeLines": 30,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "pyproject.toml",
+      "language": "toml",
+      "sizeLines": 158,
+      "fileCategory": "config"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 70,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/__init__.py",
+      "language": "python",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/__init__.py",
+      "language": "python",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/calibration.py",
+      "language": "python",
+      "sizeLines": 6986,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/calibrationSet.py",
+      "language": "python",
+      "sizeLines": 142,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/deembedding.py",
+      "language": "python",
+      "sizeLines": 4913,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind2.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind3.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind4.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind5.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind6.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind7.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_ind8.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_open.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_open2.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_open7.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_short.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_short2.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_short8.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_thru3.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_thru4.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_thru5.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/deemb_thru6.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/deembed/s2xthru.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/delay short.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/embedingNetwork.s2p",
+      "language": "s2p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/match.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/open.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/short.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/test_calibration.py",
+      "language": "python",
+      "sizeLines": 2397,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/test_calibrationSet.py",
+      "language": "python",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/calibration/tests/test_deembedding.py",
+      "language": "python",
+      "sizeLines": 590,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/circuit.py",
+      "language": "python",
+      "sizeLines": 2154,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/constants.py",
+      "language": "python",
+      "sizeLines": 221,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/__init__.py",
+      "language": "python",
+      "sizeLines": 177,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/delay_short.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ieeetrans.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ind.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/line.s2p",
+      "language": "s2p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/one_port.cal",
+      "language": "cal",
+      "sizeLines": 241,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/open.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ring slot measured.s1p",
+      "language": "s1p",
+      "sizeLines": 205,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ring slot.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ro,1.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ro,2.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/ro,3.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/short.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/short.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/skrf_wide.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/skrf.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/skrf2_wide.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/skrf2.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/skrfSesh.p",
+      "language": "p",
+      "sizeLines": 346,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/tee.s3p",
+      "language": "s3p",
+      "sizeLines": 609,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/wr1p5,line.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/wr1p5,short.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/wr2p2,delayshort.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/wr2p2,line.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/wr2p2,line1.s2p",
+      "language": "s2p",
+      "sizeLines": 104,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/data/wr2p2,short.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/frequency.py",
+      "language": "python",
+      "sizeLines": 807,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/instances.py",
+      "language": "python",
+      "sizeLines": 372,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/__init__.py",
+      "language": "python",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/citi.py",
+      "language": "python",
+      "sizeLines": 319,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/csv.py",
+      "language": "python",
+      "sizeLines": 928,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/general.py",
+      "language": "python",
+      "sizeLines": 881,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/mdif.py",
+      "language": "python",
+      "sizeLines": 558,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/metas.py",
+      "language": "python",
+      "sizeLines": 74,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ansys_modal_data.s2p",
+      "language": "s2p",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ansys_terminal_data.s4p",
+      "language": "s4p",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/comments.s3p",
+      "language": "s3p",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/double_option_line.s2p",
+      "language": "s2p",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/embedingNetwork.s2p",
+      "language": "s2p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s10p",
+      "language": "s10p",
+      "sizeLines": 200,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s11p",
+      "language": "s11p",
+      "sizeLines": 216,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s12p",
+      "language": "s12p",
+      "sizeLines": 232,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s13p",
+      "language": "s13p",
+      "sizeLines": 323,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s14p",
+      "language": "s14p",
+      "sizeLines": 344,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s15p",
+      "language": "s15p",
+      "sizeLines": 365,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s16p",
+      "language": "s16p",
+      "sizeLines": 386,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s17p",
+      "language": "s17p",
+      "sizeLines": 502,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s18p",
+      "language": "s18p",
+      "sizeLines": 528,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s19p",
+      "language": "s19p",
+      "sizeLines": 554,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s1p",
+      "language": "s1p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s20p",
+      "language": "s20p",
+      "sizeLines": 580,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s21p",
+      "language": "s21p",
+      "sizeLines": 721,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s22p",
+      "language": "s22p",
+      "sizeLines": 752,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s2p",
+      "language": "s2p",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s3p",
+      "language": "s3p",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s4p",
+      "language": "s4p",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s5p",
+      "language": "s5p",
+      "sizeLines": 85,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s6p",
+      "language": "s6p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s7p",
+      "language": "s7p",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s8p",
+      "language": "s8p",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2019R2/test_multiport.s9p",
+      "language": "s9p",
+      "sizeLines": 184,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s10p",
+      "language": "s10p",
+      "sizeLines": 180,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s11p",
+      "language": "s11p",
+      "sizeLines": 196,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s12p",
+      "language": "s12p",
+      "sizeLines": 212,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s13p",
+      "language": "s13p",
+      "sizeLines": 293,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s14p",
+      "language": "s14p",
+      "sizeLines": 314,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s15p",
+      "language": "s15p",
+      "sizeLines": 335,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s16p",
+      "language": "s16p",
+      "sizeLines": 356,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s17p",
+      "language": "s17p",
+      "sizeLines": 462,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s18p",
+      "language": "s18p",
+      "sizeLines": 488,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s19p",
+      "language": "s19p",
+      "sizeLines": 514,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s1p",
+      "language": "s1p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s20p",
+      "language": "s20p",
+      "sizeLines": 540,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s21p",
+      "language": "s21p",
+      "sizeLines": 159,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s22p",
+      "language": "s22p",
+      "sizeLines": 702,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s2p",
+      "language": "s2p",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s3p",
+      "language": "s3p",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s4p",
+      "language": "s4p",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s5p",
+      "language": "s5p",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s6p",
+      "language": "s6p",
+      "sizeLines": 86,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s7p",
+      "language": "s7p",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s8p",
+      "language": "s8p",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/HFSS_2020R2/test_multiport.s9p",
+      "language": "s9p",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/hfss_oneport.s1p",
+      "language": "s1p",
+      "sizeLines": 1610,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/hfss_twoport.s2p",
+      "language": "s2p",
+      "sizeLines": 426,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/match.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_1p_citi_2_ri.cti",
+      "language": "cti",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_1p_citi.cti",
+      "language": "cti",
+      "sizeLines": 179,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_1p_gmdif_2.mdf",
+      "language": "mdf",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_1p_gmdif.mdf",
+      "language": "mdf",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_2.cti",
+      "language": "cti",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_2params_db.cti",
+      "language": "cti",
+      "sizeLines": 3098,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_2params.cti",
+      "language": "cti",
+      "sizeLines": 3098,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_3_ri.cti",
+      "language": "cti",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi.cti",
+      "language": "cti",
+      "sizeLines": 569,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_2.mdf",
+      "language": "mdf",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_3.mdf",
+      "language": "mdf",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_yz.mdf",
+      "language": "mdf",
+      "sizeLines": 196,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_z.mdf",
+      "language": "mdf",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif.mdf",
+      "language": "mdf",
+      "sizeLines": 173,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_2p_only_freq_VAR.cti",
+      "language": "cti",
+      "sizeLines": 1780,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_4p_citi.cti",
+      "language": "cti",
+      "sizeLines": 8176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_4p_gmdif.mdf",
+      "language": "mdf",
+      "sizeLines": 1882,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/MDIF_CITI_MDL/test_comment_after_BEGIN.mdf",
+      "language": "mdf",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ntwk2.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ntwk3.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/open.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/pna_csv_reim.csv",
+      "language": "csv",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/io/tests/short.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/simple_touchstone.s2p",
+      "language": "s2p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_citi.py",
+      "language": "python",
+      "sizeLines": 152,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_csv.py",
+      "language": "python",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_encoding_ISO-8859-1.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_encoding_unknown.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_encoding_UTF-8-SIG.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_io.py",
+      "language": "python",
+      "sizeLines": 201,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_mdif.py",
+      "language": "python",
+      "sizeLines": 117,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_touchstone.py",
+      "language": "python",
+      "sizeLines": 242,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/test_ts_spec.py",
+      "language": "python",
+      "sizeLines": 239,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ansys.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_1.ts",
+      "language": "typescript",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_10.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_11.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_12_g.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_12.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_13.s2p",
+      "language": "s2p",
+      "sizeLines": 5,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_14.s4p",
+      "language": "s4p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_16.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_17.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_18.s2p",
+      "language": "s2p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_2.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_3.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_4.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_5.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_6.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_7.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_8.s1p",
+      "language": "s1p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/tests/ts/ex_9.s1p",
+      "language": "s1p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/io/touchstone.py",
+      "language": "python",
+      "sizeLines": 958,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/mathFunctions.py",
+      "language": "python",
+      "sizeLines": 1415,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/__init__.py",
+      "language": "python",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/circularWaveguide.py",
+      "language": "python",
+      "sizeLines": 427,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/coaxial.py",
+      "language": "python",
+      "sizeLines": 354,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/cpw.py",
+      "language": "python",
+      "sizeLines": 550,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/definedAEpTandZ0.py",
+      "language": "python",
+      "sizeLines": 292,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/device.py",
+      "language": "python",
+      "sizeLines": 234,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/distributedCircuit.py",
+      "language": "python",
+      "sizeLines": 295,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/freespace.py",
+      "language": "python",
+      "sizeLines": 334,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/media.py",
+      "language": "python",
+      "sizeLines": 2081,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/mline.py",
+      "language": "python",
+      "sizeLines": 731,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/rectangularWaveguide.py",
+      "language": "python",
+      "sizeLines": 484,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/capacitor_q.s2p",
+      "language": "s2p",
+      "sizeLines": 7006,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/cpw,t=0um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/cpw,t=35um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/cpwg,t=0um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/cpwg,t=35um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/inductor_q.s2p",
+      "language": "s2p",
+      "sizeLines": 7006,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/mlin,djordjevicsvensson,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/mlin,djordjevicsvensson,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/mlin,djordjevicsvensson,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/mlin,freqencyinvariant,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/mlin,freqencyinvariant,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/ads/mlin,freqencyinvariant,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/awr/tlinp.s2p",
+      "language": "s2p",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/capacitor,p01pF.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/capacitor.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/capacitor.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/capacitor.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/coaxial.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/coaxial.dpl",
+      "language": "dpl",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/coaxial.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/coaxial.sch",
+      "language": "sch",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw_qucs_ep_r9dot5.csv",
+      "language": "csv",
+      "sizeLines": 50,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw,t=0,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw,t=0,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw.dat",
+      "language": "dat",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw.s2p",
+      "language": "s2p",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw.sch",
+      "language": "sch",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw2.dat",
+      "language": "dat",
+      "sizeLines": 919,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw2.dpl",
+      "language": "dpl",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/cpw2.sch",
+      "language": "sch",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/distributedCircuit,line.dat",
+      "language": "dat",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/distributedCircuit,line.dpl",
+      "language": "dpl",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/distributedCircuit,line1mm.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/distributedCircuit.sch",
+      "language": "sch",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/impedanceMismatch,50to25.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/impedanceMismatch.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/impedanceMismatch.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/impedanceMismatch.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/inductor,p1nH.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/inductor.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/inductor.dpl",
+      "language": "dpl",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/inductor.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mediaTestCase",
+      "language": "unknown",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline,hammerstad,hammerstad.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline,hammerstad,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline,hammerstad,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline,hammerstad,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline,schneider,schneider.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline,wheeler,schneider.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline.dat",
+      "language": "dat",
+      "sizeLines": 919,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline.dpl",
+      "language": "dpl",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/mline.sch",
+      "language": "sch",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/rectangularWaveguideWR10,200mil.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/resistor,1ohm.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/resistor.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/resistor.dpl",
+      "language": "dpl",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/resistor.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/waveguideThru.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/waveguideThru.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/qucs_prj/waveguideThru.sch",
+      "language": "sch",
+      "sizeLines": 33,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/README.rst",
+      "language": "markdown",
+      "sizeLines": 32,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/media/tests/test_all_construction.py",
+      "language": "python",
+      "sizeLines": 184,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_coaxial.py",
+      "language": "python",
+      "sizeLines": 135,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_cpw.py",
+      "language": "python",
+      "sizeLines": 302,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_definedaeptandz0.py",
+      "language": "python",
+      "sizeLines": 177,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_distributedCircuit.py",
+      "language": "python",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_media.py",
+      "language": "python",
+      "sizeLines": 947,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_mline.py",
+      "language": "python",
+      "sizeLines": 283,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/test_rectangularWaveguide.py",
+      "language": "python",
+      "sizeLines": 73,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/wr1p5_1in_swg_Al_0rough.s2p",
+      "language": "s2p",
+      "sizeLines": 1611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/media/tests/wr1p5_1in_swg_Al_100nm_rough.s2p",
+      "language": "s2p",
+      "sizeLines": 1611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/network.py",
+      "language": "python",
+      "sizeLines": 8795,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/networkSet.py",
+      "language": "python",
+      "sizeLines": 1587,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/notebook/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/notebook/bokeh_.py",
+      "language": "python",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/notebook/matplotlib_.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/notebook/utils.py",
+      "language": "python",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/plotting.py",
+      "language": "python",
+      "sizeLines": 2004,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/programs/plot_touchstone.py",
+      "language": "python",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/programs/readme.txt",
+      "language": "txt",
+      "sizeLines": 26,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/qfactor.py",
+      "language": "python",
+      "sizeLines": 1286,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/taper.py",
+      "language": "python",
+      "sizeLines": 360,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/Agilent_E5071B.s4p",
+      "language": "s4p",
+      "sizeLines": 828,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/Clarity_example.S2P",
+      "language": "s2p",
+      "sizeLines": 52,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/conftest.py",
+      "language": "python",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/cst_example_4ports.s4p",
+      "language": "s4p",
+      "sizeLines": 2416,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/cst_example_6ports_V2.s6p",
+      "language": "s6p",
+      "sizeLines": 6027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/cst_example_6ports_V2.ts",
+      "language": "typescript",
+      "sizeLines": 6027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/cst_example_6ports.s6p",
+      "language": "s6p",
+      "sizeLines": 12026,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/designer_variable_coupler_ideal_20deg.s4p",
+      "language": "s4p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/designer_variable_coupler_ideal_75deg.s4p",
+      "language": "s4p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/designer_wilkinson_splitter.s3p",
+      "language": "s3p",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/fet.s2p",
+      "language": "s2p",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/helic_example_6ports_V2.sp",
+      "language": "sp",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/helic_example_6ports_V2.ts",
+      "language": "typescript",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_18.2.s3p",
+      "language": "s3p",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_19.2.s10p",
+      "language": "s10p",
+      "sizeLines": 428,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_19.2.s8p",
+      "language": "s8p",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_oneport_powerwave.s1p",
+      "language": "s1p",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_oneport.s1p",
+      "language": "s1p",
+      "sizeLines": 1610,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_threeport_DB_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 2713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_threeport_DB.s3p",
+      "language": "s3p",
+      "sizeLines": 2714,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_threeport_MA_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 2713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_threeport_MA_without_gamma_z0_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 1811,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_threeport_MA.s3p",
+      "language": "s3p",
+      "sizeLines": 2714,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/hfss_twoport.s2p",
+      "language": "s2p",
+      "sizeLines": 426,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/LFCN-2352+_Plus125degC.s2p",
+      "language": "s2p",
+      "sizeLines": 2014,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/LFCN-2352+_Plus25degC.s2p",
+      "language": "s2p",
+      "sizeLines": 2014,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/load_gain_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/load_stability_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/maxgain_ads.csv",
+      "language": "csv",
+      "sizeLines": 101,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_10g_40g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_10g_40g.s1p",
+      "language": "s1p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_10g_50g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_10g_50g.s1p",
+      "language": "s1p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_40g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_40g_low_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_40g_low_pass_step.csv",
+      "language": "csv",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_40g.s1p",
+      "language": "s1p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_50g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_50g_low_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 11,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_50g_low_pass_step.csv",
+      "language": "csv",
+      "sizeLines": 11,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/metas_tdr/short_10ps_dc_50g.s1p",
+      "language": "s1p",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/nf_circle_mwo.csv",
+      "language": "csv",
+      "sizeLines": 14,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/ntwk_arbitrary_frequency.s2p",
+      "language": "s2p",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk_noise_interp.s2p",
+      "language": "s2p",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk_noise.s2p",
+      "language": "s2p",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk.s32p",
+      "language": "s32p",
+      "sizeLines": 807,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk1.ntwk",
+      "language": "ntwk",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk2.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk3.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk4_n.s2p",
+      "language": "s2p",
+      "sizeLines": 316,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwk4.s2p",
+      "language": "s2p",
+      "sizeLines": 309,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwks/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwks/ntwk2.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/ntwks/ntwk3.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/PowerSI_example.S8P",
+      "language": "s8p",
+      "sizeLines": 4826,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/qfactor_data/Figure23.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/tests/qfactor_data/Figure27.txt",
+      "language": "txt",
+      "sizeLines": 239,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/tests/qfactor_data/Figure6b.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/tests/qfactor_data/Notes_and_Licence.txt",
+      "language": "txt",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/tests/qfactor_data/Table6c27.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/tests/RS_ZNB8.s4p",
+      "language": "s4p",
+      "sizeLines": 5013,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/RS_ZVR_1.20_beta_f.s2p",
+      "language": "s2p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/smodel export from mwo.txt",
+      "language": "txt",
+      "sizeLines": 2007,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "skrf/tests/source_gain_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/source_stability_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "skrf/tests/test_circuit.py",
+      "language": "python",
+      "sizeLines": 1442,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_convenience.py",
+      "language": "python",
+      "sizeLines": 194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_frequency.py",
+      "language": "python",
+      "sizeLines": 120,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_init.py",
+      "language": "python",
+      "sizeLines": 84,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_mathFunctions.py",
+      "language": "python",
+      "sizeLines": 235,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_network.py",
+      "language": "python",
+      "sizeLines": 2457,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_networkSet.py",
+      "language": "python",
+      "sizeLines": 452,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_plotting.py",
+      "language": "python",
+      "sizeLines": 125,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_qfactor.py",
+      "language": "python",
+      "sizeLines": 327,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_static_data.py",
+      "language": "python",
+      "sizeLines": 127,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_taper.py",
+      "language": "python",
+      "sizeLines": 190,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_tlineFunctions.py",
+      "language": "python",
+      "sizeLines": 180,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_util.py",
+      "language": "python",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/test_vectorfitting.py",
+      "language": "python",
+      "sizeLines": 148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tests/tmp_skrf_oneport_powerwave.s1p",
+      "language": "s1p",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/time.py",
+      "language": "python",
+      "sizeLines": 467,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/tlineFunctions.py",
+      "language": "python",
+      "sizeLines": 751,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/util.py",
+      "language": "python",
+      "sizeLines": 857,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vectorFitting.py",
+      "language": "python",
+      "sizeLines": 2665,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/__init__.py",
+      "language": "python",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/scpi_errors.py",
+      "language": "python",
+      "sizeLines": 142,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/tests/test_validators.py",
+      "language": "python",
+      "sizeLines": 150,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/tests/test_vna.py",
+      "language": "python",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/validators.py",
+      "language": "python",
+      "sizeLines": 236,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/__init__.py",
+      "language": "python",
+      "sizeLines": 183,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/hp/__init__.py",
+      "language": "python",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/hp/hp8510c_sweep_plan.py",
+      "language": "python",
+      "sizeLines": 251,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/hp/hp8510c.py",
+      "language": "python",
+      "sizeLines": 473,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/hp/hp8720b.py",
+      "language": "python",
+      "sizeLines": 375,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/hp/tests/test_8510c_sweep_plan.py",
+      "language": "python",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/hp/tests/test_8510c.py",
+      "language": "python",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/keysight/__init__.py",
+      "language": "python",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/keysight/fieldfox.py",
+      "language": "python",
+      "sizeLines": 359,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/keysight/pna.py",
+      "language": "python",
+      "sizeLines": 554,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/keysight/tests/test_fieldfox.py",
+      "language": "python",
+      "sizeLines": 163,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/keysight/tests/test_pna.py",
+      "language": "python",
+      "sizeLines": 232,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/nanovna/__init__.py",
+      "language": "python",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/nanovna/nanovna.py",
+      "language": "python",
+      "sizeLines": 320,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/rohde_schwarz/__init__.py",
+      "language": "python",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/rohde_schwarz/rs_vna.py",
+      "language": "python",
+      "sizeLines": 381,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/rohde_schwarz/tests/test_zna.py",
+      "language": "python",
+      "sizeLines": 229,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/rohde_schwarz/tests/test_zva.py",
+      "language": "python",
+      "sizeLines": 229,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/rohde_schwarz/zna.py",
+      "language": "python",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/rohde_schwarz/zva.py",
+      "language": "python",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "skrf/vi/vna/vna.py",
+      "language": "python",
+      "sizeLines": 320,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 647,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "very-large",
+  "importMap": {
+    ".github/dependabot.yml": [],
+    ".github/FUNDING.yml": [],
+    ".github/ISSUE_TEMPLATE/bug_report.md": [],
+    ".github/ISSUE_TEMPLATE/feature_request.md": [],
+    ".github/ISSUE_TEMPLATE/general-issue-.md": [],
+    ".github/labeler.yml": [],
+    ".github/workflows/codeql.yml": [],
+    ".github/workflows/linting.yml": [],
+    ".github/workflows/PR_labeler.yml": [],
+    ".github/workflows/publish.yml": [],
+    ".github/workflows/testing_notebooks.yml": [],
+    ".github/workflows/testing.yml": [],
+    ".github/workflows/urlchecker.yml": [],
+    ".pre-commit-config.yaml": [],
+    ".readthedocs.yml": [],
+    ".understand-anything/.understandignore": [],
+    ".understand-anything/config.json": [],
+    "apps/__init__.py": [],
+    "CITATION.cff": [],
+    "conda.recipe/meta.yaml": [],
+    "doc/gh-pages.py": [],
+    "doc/make.bat": [],
+    "doc/Makefile": [],
+    "doc/README.txt": [],
+    "doc/source/_static/scipy.css": [],
+    "doc/source/_templates/autosummary/class.rst": [],
+    "doc/source/_templates/indexsidebar.html": [],
+    "doc/source/_templates/layout.html": [],
+    "doc/source/api/calibration/deembedding.rst": [],
+    "doc/source/api/calibration/index.rst": [],
+    "doc/source/api/circuit.rst": [],
+    "doc/source/api/constants.rst": [],
+    "doc/source/api/data/index.rst": [],
+    "doc/source/api/frequency.rst": [],
+    "doc/source/api/index.rst": [],
+    "doc/source/api/instances.rst": [],
+    "doc/source/api/io/index.rst": [],
+    "doc/source/api/mathFunctions.rst": [],
+    "doc/source/api/media/device.rst": [],
+    "doc/source/api/media/index.rst": [],
+    "doc/source/api/network.rst": [],
+    "doc/source/api/networkSet.rst": [],
+    "doc/source/api/plotting.rst": [],
+    "doc/source/api/qfactor.rst": [],
+    "doc/source/api/taper.rst": [],
+    "doc/source/api/time.rst": [],
+    "doc/source/api/tlineFunctions.rst": [],
+    "doc/source/api/util.rst": [],
+    "doc/source/api/vectorFitting.rst": [],
+    "doc/source/api/vi/index.rst": [],
+    "doc/source/api/vi/vna.rst": [],
+    "doc/source/citations_ack/acknowledging.rst": [],
+    "doc/source/citations_ack/citations.rst": [],
+    "doc/source/citations_ack/index.rst": [],
+    "doc/source/conf.py": [
+      "skrf/__init__.py"
+    ],
+    "doc/source/contributing/index.rst": [],
+    "doc/source/examples/circuit/circuit_vi_Coaxial_T.s3p": [],
+    "doc/source/examples/circuit/circuit_vi_Designer_Currents.csv": [],
+    "doc/source/examples/circuit/circuit_vi_Designer_Voltages.csv": [],
+    "doc/source/examples/circuit/circuit_vi_HFSS_Currents.csv": [],
+    "doc/source/examples/circuit/circuit_vi_HFSS_Voltages.csv": [],
+    "doc/source/examples/circuit/designer_bandpass_filter_450_550MHz.s2p": [],
+    "doc/source/examples/circuit/designer_capacitor_30_80MHz_adv.s2p": [],
+    "doc/source/examples/circuit/designer_capacitor_30_80MHz_simple.s2p": [],
+    "doc/source/examples/circuit/Lumped Element Circuits.ipynb": [],
+    "doc/source/examples/circuit/Voltages and Currents in Circuits.ipynb": [],
+    "doc/source/examples/circuit/Wilkinson Power Splitter.ipynb": [],
+    "doc/source/examples/index.rst": [],
+    "doc/source/examples/instrumentcontrol/VNA Control.ipynb": [],
+    "doc/source/examples/interactive/Interact Transmission Lines.ipynb": [],
+    "doc/source/examples/interactive/Interactive Coaxial Properties.ipynb": [],
+    "doc/source/examples/interactive/Interactive Mismatched Line.ipynb": [],
+    "doc/source/examples/LICENSE.txt": [],
+    "doc/source/examples/matching/Impedance Matching.ipynb": [],
+    "doc/source/examples/metrology/Calibration With Three Receivers.ipynb": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_match_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_open_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_short_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_thru_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_12.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_13.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_14.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_21.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_23.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_24.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_31.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_32.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_34.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_41.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_42.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_43.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/MiniCircuits_ZX10Q-2-19-S+___Plus25degC.s4p": [],
+    "doc/source/examples/metrology/LRRM.ipynb": [],
+    "doc/source/examples/metrology/Measuring a Mutiport Device with a 2-Port Network Analyzer.ipynb": [],
+    "doc/source/examples/metrology/Multi-port Calibration.ipynb": [],
+    "doc/source/examples/metrology/Multiline TRL.ipynb": [],
+    "doc/source/examples/metrology/multiline_trl_data/DUT.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/gamma_f.s1p": [],
+    "doc/source/examples/metrology/multiline_trl_data/gamma_r.s1p": [],
+    "doc/source/examples/metrology/multiline_trl_data/line2p3mm.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/linep3mm.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/reflect.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/res_50ohm.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/thru.s2p": [],
+    "doc/source/examples/metrology/NanoVNA_V2_4port-splitter.ipynb": [],
+    "doc/source/examples/metrology/One Port Tiered Calibration.ipynb": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/probe.s2p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ds.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/load.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ro.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/short.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ds.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/load.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ro.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/short.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds1.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds2.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds3.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds4.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds5.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds1,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds2,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds3,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds4,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds5,0.s1p": [],
+    "doc/source/examples/metrology/probe.s2p": [],
+    "doc/source/examples/metrology/SOLT Calibration Standards Creation.ipynb": [],
+    "doc/source/examples/metrology/SOLT.ipynb": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/attenuator (forward).s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/attenuator (reverse).s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/load.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/quarter wave delay short.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/short.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/simulation.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/thru.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (forward).s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (reverse).s2p": [],
+    "doc/source/examples/metrology/trl_data/.s2p": [],
+    "doc/source/examples/metrology/trl_data/A.s2p": [],
+    "doc/source/examples/metrology/trl_data/B.s2p": [],
+    "doc/source/examples/metrology/trl_data/forward switch term.s1p": [],
+    "doc/source/examples/metrology/trl_data/line.s2p": [],
+    "doc/source/examples/metrology/trl_data/mismatched line.s2p": [],
+    "doc/source/examples/metrology/trl_data/reflect.s2p": [],
+    "doc/source/examples/metrology/trl_data/reverse switch term.s1p": [],
+    "doc/source/examples/metrology/trl_data/thru.s2p": [],
+    "doc/source/examples/metrology/TRL.ipynb": [],
+    "doc/source/examples/metrology/TwoPortOnePath, EnhancedResponse, and FakeFlip.ipynb": [],
+    "doc/source/examples/mixedmodeanalysis/Mixed Mode Basics.ipynb": [],
+    "doc/source/examples/mixedmodeanalysis/Mixed Mode S and Impedance Transformation.ipynb": [],
+    "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_se.s4p": [],
+    "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_truemode_balbal.s4p": [],
+    "doc/source/examples/mixedmodeanalysis/mixedmodeSandZtransform_files/EP2C+_Plus25DegC_Unit1.S3P": [],
+    "doc/source/examples/networks/Compute Error Between S Parameter Matrices.ipynb": [],
+    "doc/source/examples/networks/Export Network as Touchstone File.ipynb": [],
+    "doc/source/examples/networksets/Export Network Set as MDIF File.ipynb": [],
+    "doc/source/examples/networksets/Interpolating Network Sets.ipynb": [],
+    "doc/source/examples/networksets/Sorting Network Sets.ipynb": [],
+    "doc/source/examples/networktheory/Balanced Network De-embedding.ipynb": [],
+    "doc/source/examples/networktheory/Balun_Transformer_Designs.ipynb": [],
+    "doc/source/examples/networktheory/Balun_Transformer_Designs/Ideal_4port_xformer_hi_res.s4p": [],
+    "doc/source/examples/networktheory/BFU520_05V0_010mA_NF_SP.s2p": [],
+    "doc/source/examples/networktheory/Correlating microstripline model to measurement.ipynb": [],
+    "doc/source/examples/networktheory/CPW media example.ipynb": [],
+    "doc/source/examples/networktheory/CPWG100.s2p": [],
+    "doc/source/examples/networktheory/CPWG200.s2p": [],
+    "doc/source/examples/networktheory/DC Extrapolation for Time Domain .ipynb": [],
+    "doc/source/examples/networktheory/DefinedAEpTandZ0 media example.ipynb": [],
+    "doc/source/examples/networktheory/IEEEP370 Deembedding.ipynb": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_NZC_diff_fdf_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_ZC_diff_fdf_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_NZC_se_fdf.s2p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_ZC_se_fdf.s2p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dat": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dpl": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.sch": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dat": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dpl": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.sch": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dat": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dpl": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.sch": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/se_2xthru.s2p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/se_fdf.s2p": [],
+    "doc/source/examples/networktheory/LNA Example.ipynb": [],
+    "doc/source/examples/networktheory/MSL100.s2p": [],
+    "doc/source/examples/networktheory/MSL200.s2p": [],
+    "doc/source/examples/networktheory/Properties of Rectangular Waveguides.ipynb": [],
+    "doc/source/examples/networktheory/Renormalizing S-parameters.ipynb": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Load_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Open_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Short_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Stepped_140-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_100-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_200-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Load_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Open_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Short_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/readme.txt": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/SetupFile#2.chx": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Stepped_140-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Thru_100-P2.s2p": [],
+    "doc/source/examples/networktheory/Time domain reflectometry, measurement vs simulation.ipynb": [],
+    "doc/source/examples/networktheory/Time Domain.ipynb": [],
+    "doc/source/examples/networktheory/Transmission Line Losses.ipynb": [],
+    "doc/source/examples/networktheory/Transmission Line Properties and Manipulations.ipynb": [],
+    "doc/source/examples/networktheory/Transmission Lines and SWR.ipynb": [],
+    "doc/source/examples/networktheory/Working with Complex Characteristic Impedances.ipynb": [],
+    "doc/source/examples/plotting/Modeling RG-58.ipynb": [],
+    "doc/source/examples/plotting/XKCD styling.ipynb": [],
+    "doc/source/examples/qfactor/data/resonator_144mm.s2p": [],
+    "doc/source/examples/qfactor/data/resonator_36mm.s2p": [],
+    "doc/source/examples/qfactor/data/resonator_72mm.s2p": [],
+    "doc/source/examples/qfactor/Finding_Dk_Df_from_resonance_fitting.ipynb": [],
+    "doc/source/examples/README.md": [],
+    "doc/source/examples/taper/ANSYS_Circuit_taper_exponential_s_mag.csv": [],
+    "doc/source/examples/taper/ANSYS_Circuit_taper_linear_s_mag.csv": [],
+    "doc/source/examples/taper/tapered_transmission_lines.ipynb": [],
+    "doc/source/examples/vectorfitting/190ghz_tx_measured.S2P": [],
+    "doc/source/examples/vectorfitting/Agilent_E5071B.s4p": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex1_ringslot.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex2_190ghz_active.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex3_Agilent_E5071B.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex4_passivity.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_problems.ipynb": [],
+    "doc/source/glossary.rst": [],
+    "doc/source/index.rst": [],
+    "doc/source/license.rst": [],
+    "doc/source/Makefile": [],
+    "doc/source/tutorials/BFU520_05V0_010mA_NF_SP.s2p": [],
+    "doc/source/tutorials/Calibration.ipynb": [],
+    "doc/source/tutorials/Circuit.ipynb": [],
+    "doc/source/tutorials/Connecting_Networks.ipynb": [],
+    "doc/source/tutorials/data/ring slot.s2p": [],
+    "doc/source/tutorials/data/ro,1.s1p": [],
+    "doc/source/tutorials/data/ro,2.s1p": [],
+    "doc/source/tutorials/data/ro,3.s1p": [],
+    "doc/source/tutorials/Deembedding.ipynb": [],
+    "doc/source/tutorials/index.rst": [],
+    "doc/source/tutorials/Installation.ipynb": [],
+    "doc/source/tutorials/Introduction.ipynb": [],
+    "doc/source/tutorials/Media.ipynb": [],
+    "doc/source/tutorials/Networks.ipynb": [],
+    "doc/source/tutorials/NetworkSet.ipynb": [],
+    "doc/source/tutorials/Plotting.ipynb": [],
+    "doc/source/tutorials/Q-Factor.ipynb": [],
+    "doc/source/tutorials/VectorFitting.ipynb": [],
+    "doc/source/tutorials/VirtualInstruments.ipynb": [],
+    "doc/sphinxext/LICENSE.txt": [],
+    "doc/sphinxext/MANIFEST.in": [],
+    "doc/sphinxext/README.txt": [],
+    "doc/sphinxext/tests/test_docscrape.py": [],
+    "INSTALL.txt": [],
+    "LICENSE.txt": [],
+    "pyproject.toml": [],
+    "README.md": [],
+    "skrf/__init__.py": [
+      "skrf/calibration/__init__.py",
+      "skrf/calibration/calibrationSet.py",
+      "skrf/calibration/deembedding.py",
+      "skrf/circuit.py",
+      "skrf/constants.py",
+      "skrf/data/__init__.py",
+      "skrf/frequency.py",
+      "skrf/instances.py",
+      "skrf/io/__init__.py",
+      "skrf/mathFunctions.py",
+      "skrf/media/__init__.py",
+      "skrf/network.py",
+      "skrf/networkSet.py",
+      "skrf/plotting.py",
+      "skrf/qfactor.py",
+      "skrf/taper.py",
+      "skrf/tlineFunctions.py",
+      "skrf/util.py",
+      "skrf/vectorFitting.py",
+      "skrf/vi/__init__.py"
+    ],
+    "skrf/calibration/__init__.py": [
+      "skrf/calibration/calibration.py",
+      "skrf/calibration/calibrationSet.py",
+      "skrf/calibration/deembedding.py"
+    ],
+    "skrf/calibration/calibration.py": [
+      "skrf/io/touchstone.py",
+      "skrf/mathFunctions.py",
+      "skrf/network.py",
+      "skrf/networkSet.py",
+      "skrf/plotting.py",
+      "skrf/util.py"
+    ],
+    "skrf/calibration/calibrationSet.py": [
+      "skrf/calibration/calibration.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/calibration/deembedding.py": [
+      "skrf/frequency.py",
+      "skrf/network.py",
+      "skrf/plotting.py"
+    ],
+    "skrf/calibration/tests/deembed/deemb_ind.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind2.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind3.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind4.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind5.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind6.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind7.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_ind8.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_open.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_open2.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_open7.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_short.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_short2.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_short8.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_thru3.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_thru4.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_thru5.s2p": [],
+    "skrf/calibration/tests/deembed/deemb_thru6.s2p": [],
+    "skrf/calibration/tests/deembed/fdf.s2p": [],
+    "skrf/calibration/tests/deembed/s2xthru.s2p": [],
+    "skrf/calibration/tests/delay short.s1p": [],
+    "skrf/calibration/tests/embedingNetwork.s2p": [],
+    "skrf/calibration/tests/match.s1p": [],
+    "skrf/calibration/tests/open.s1p": [],
+    "skrf/calibration/tests/short.s1p": [],
+    "skrf/calibration/tests/test_calibration.py": [
+      "skrf/__init__.py",
+      "skrf/calibration/__init__.py",
+      "skrf/constants.py",
+      "skrf/media/__init__.py",
+      "skrf/network.py",
+      "skrf/networkSet.py",
+      "skrf/util.py"
+    ],
+    "skrf/calibration/tests/test_calibrationSet.py": [
+      "skrf/__init__.py",
+      "skrf/calibration/__init__.py",
+      "skrf/calibration/calibrationSet.py",
+      "skrf/networkSet.py",
+      "skrf/util.py"
+    ],
+    "skrf/calibration/tests/test_deembedding.py": [
+      "skrf/__init__.py",
+      "skrf/calibration/deembedding.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/circuit.py": [
+      "skrf/constants.py",
+      "skrf/media/__init__.py",
+      "skrf/media/media.py",
+      "skrf/network.py",
+      "skrf/plotting.py"
+    ],
+    "skrf/constants.py": [],
+    "skrf/data/__init__.py": [
+      "skrf/io/general.py",
+      "skrf/network.py"
+    ],
+    "skrf/data/delay_short.s1p": [],
+    "skrf/data/ieeetrans.mplstyle": [],
+    "skrf/data/ind.s2p": [],
+    "skrf/data/line.s2p": [],
+    "skrf/data/ntwk1.s2p": [],
+    "skrf/data/one_port.cal": [],
+    "skrf/data/open.s2p": [],
+    "skrf/data/ring slot measured.s1p": [],
+    "skrf/data/ring slot.s2p": [],
+    "skrf/data/ro,1.s1p": [],
+    "skrf/data/ro,2.s1p": [],
+    "skrf/data/ro,3.s1p": [],
+    "skrf/data/short.s1p": [],
+    "skrf/data/short.s2p": [],
+    "skrf/data/skrf_wide.mplstyle": [],
+    "skrf/data/skrf.mplstyle": [],
+    "skrf/data/skrf2_wide.mplstyle": [],
+    "skrf/data/skrf2.mplstyle": [],
+    "skrf/data/skrfSesh.p": [],
+    "skrf/data/tee.s3p": [],
+    "skrf/data/wr1p5,line.s2p": [],
+    "skrf/data/wr1p5,short.s1p": [],
+    "skrf/data/wr2p2,delayshort.s1p": [],
+    "skrf/data/wr2p2,line.s2p": [],
+    "skrf/data/wr2p2,line1.s2p": [],
+    "skrf/data/wr2p2,short.s1p": [],
+    "skrf/frequency.py": [
+      "skrf/constants.py",
+      "skrf/plotting.py",
+      "skrf/util.py"
+    ],
+    "skrf/instances.py": [
+      "skrf/frequency.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/io/__init__.py": [
+      "skrf/io/citi.py",
+      "skrf/io/csv.py",
+      "skrf/io/general.py",
+      "skrf/io/mdif.py",
+      "skrf/io/metas.py",
+      "skrf/io/touchstone.py"
+    ],
+    "skrf/io/citi.py": [
+      "skrf/frequency.py",
+      "skrf/mathFunctions.py",
+      "skrf/network.py",
+      "skrf/networkSet.py",
+      "skrf/util.py"
+    ],
+    "skrf/io/csv.py": [
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/network.py",
+      "skrf/util.py"
+    ],
+    "skrf/io/general.py": [
+      "skrf/frequency.py",
+      "skrf/io/__init__.py",
+      "skrf/network.py",
+      "skrf/networkSet.py",
+      "skrf/util.py"
+    ],
+    "skrf/io/mdif.py": [
+      "skrf/frequency.py",
+      "skrf/mathFunctions.py",
+      "skrf/network.py",
+      "skrf/networkSet.py",
+      "skrf/util.py"
+    ],
+    "skrf/io/metas.py": [
+      "skrf/mathFunctions.py",
+      "skrf/network.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/io/tests/ansys_modal_data.s2p": [],
+    "skrf/io/tests/ansys_terminal_data.s4p": [],
+    "skrf/io/tests/comments.s3p": [],
+    "skrf/io/tests/double_option_line.s2p": [],
+    "skrf/io/tests/embedingNetwork.s2p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s10p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s11p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s12p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s13p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s14p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s15p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s16p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s17p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s18p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s19p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s1p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s20p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s21p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s22p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s2p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s3p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s4p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s5p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s6p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s7p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s8p": [],
+    "skrf/io/tests/HFSS_2019R2/test_multiport.s9p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s10p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s11p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s12p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s13p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s14p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s15p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s16p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s17p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s18p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s19p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s1p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s20p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s21p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s22p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s2p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s3p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s4p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s5p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s6p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s7p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s8p": [],
+    "skrf/io/tests/HFSS_2020R2/test_multiport.s9p": [],
+    "skrf/io/tests/hfss_oneport.s1p": [],
+    "skrf/io/tests/hfss_twoport.s2p": [],
+    "skrf/io/tests/match.s1p": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_1p_citi_2_ri.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_1p_citi.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_1p_gmdif_2.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_1p_gmdif.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_2.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_2params_db.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_2params.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi_3_ri.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_citi.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_2.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_3.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_yz.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif_z.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_gmdif.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_2p_only_freq_VAR.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_4p_citi.cti": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_4p_gmdif.mdf": [],
+    "skrf/io/tests/MDIF_CITI_MDL/test_comment_after_BEGIN.mdf": [],
+    "skrf/io/tests/ntwk1.s2p": [],
+    "skrf/io/tests/ntwk2.s2p": [],
+    "skrf/io/tests/ntwk3.s2p": [],
+    "skrf/io/tests/open.s1p": [],
+    "skrf/io/tests/pna_csv_reim.csv": [],
+    "skrf/io/tests/short.s1p": [],
+    "skrf/io/tests/simple_touchstone.s2p": [],
+    "skrf/io/tests/test_citi.py": [
+      "skrf/__init__.py",
+      "skrf/io/citi.py",
+      "skrf/mathFunctions.py"
+    ],
+    "skrf/io/tests/test_csv.py": [
+      "skrf/__init__.py",
+      "skrf/util.py"
+    ],
+    "skrf/io/tests/test_encoding_ISO-8859-1.s2p": [],
+    "skrf/io/tests/test_encoding_unknown.s2p": [],
+    "skrf/io/tests/test_encoding_UTF-8-SIG.s2p": [],
+    "skrf/io/tests/test_io.py": [
+      "skrf/__init__.py",
+      "skrf/io/__init__.py",
+      "skrf/io/general.py"
+    ],
+    "skrf/io/tests/test_mdif.py": [
+      "skrf/__init__.py",
+      "skrf/io/mdif.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/io/tests/test_touchstone.py": [
+      "skrf/__init__.py",
+      "skrf/io/touchstone.py"
+    ],
+    "skrf/io/tests/test_ts_spec.py": [
+      "skrf/__init__.py",
+      "skrf/io/__init__.py"
+    ],
+    "skrf/io/tests/ts/ansys.ts": [],
+    "skrf/io/tests/ts/ex_1.ts": [],
+    "skrf/io/tests/ts/ex_10.ts": [],
+    "skrf/io/tests/ts/ex_11.s2p": [],
+    "skrf/io/tests/ts/ex_12_g.ts": [],
+    "skrf/io/tests/ts/ex_12.ts": [],
+    "skrf/io/tests/ts/ex_13.s2p": [],
+    "skrf/io/tests/ts/ex_14.s4p": [],
+    "skrf/io/tests/ts/ex_16.ts": [],
+    "skrf/io/tests/ts/ex_17.ts": [],
+    "skrf/io/tests/ts/ex_18.s2p": [],
+    "skrf/io/tests/ts/ex_2.ts": [],
+    "skrf/io/tests/ts/ex_3.ts": [],
+    "skrf/io/tests/ts/ex_4.ts": [],
+    "skrf/io/tests/ts/ex_5.ts": [],
+    "skrf/io/tests/ts/ex_6.ts": [],
+    "skrf/io/tests/ts/ex_7.ts": [],
+    "skrf/io/tests/ts/ex_8.s1p": [],
+    "skrf/io/tests/ts/ex_9.s1p": [],
+    "skrf/io/touchstone.py": [
+      "skrf/constants.py",
+      "skrf/network.py",
+      "skrf/util.py"
+    ],
+    "skrf/mathFunctions.py": [
+      "skrf/constants.py"
+    ],
+    "skrf/media/__init__.py": [
+      "skrf/media/circularWaveguide.py",
+      "skrf/media/coaxial.py",
+      "skrf/media/cpw.py",
+      "skrf/media/definedAEpTandZ0.py",
+      "skrf/media/device.py",
+      "skrf/media/distributedCircuit.py",
+      "skrf/media/freespace.py",
+      "skrf/media/media.py",
+      "skrf/media/mline.py",
+      "skrf/media/rectangularWaveguide.py"
+    ],
+    "skrf/media/circularWaveguide.py": [
+      "skrf/data/__init__.py",
+      "skrf/media/freespace.py",
+      "skrf/media/media.py"
+    ],
+    "skrf/media/coaxial.py": [
+      "skrf/constants.py",
+      "skrf/mathFunctions.py",
+      "skrf/media/distributedCircuit.py",
+      "skrf/media/media.py",
+      "skrf/tlineFunctions.py"
+    ],
+    "skrf/media/cpw.py": [
+      "skrf/constants.py",
+      "skrf/media/media.py",
+      "skrf/tlineFunctions.py"
+    ],
+    "skrf/media/definedAEpTandZ0.py": [
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/media/media.py"
+    ],
+    "skrf/media/device.py": [
+      "skrf/network.py"
+    ],
+    "skrf/media/distributedCircuit.py": [
+      "skrf/constants.py",
+      "skrf/media/media.py"
+    ],
+    "skrf/media/freespace.py": [
+      "skrf/constants.py",
+      "skrf/data/__init__.py",
+      "skrf/media/media.py"
+    ],
+    "skrf/media/media.py": [
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/network.py"
+    ],
+    "skrf/media/mline.py": [
+      "skrf/media/media.py",
+      "skrf/tlineFunctions.py"
+    ],
+    "skrf/media/rectangularWaveguide.py": [
+      "skrf/data/__init__.py",
+      "skrf/media/freespace.py",
+      "skrf/media/media.py",
+      "skrf/tlineFunctions.py"
+    ],
+    "skrf/media/tests/ads/capacitor_q.s2p": [],
+    "skrf/media/tests/ads/cpw,t=0um.s2p": [],
+    "skrf/media/tests/ads/cpw,t=35um.s2p": [],
+    "skrf/media/tests/ads/cpwg,t=0um.s2p": [],
+    "skrf/media/tests/ads/cpwg,t=35um.s2p": [],
+    "skrf/media/tests/ads/inductor_q.s2p": [],
+    "skrf/media/tests/ads/mlin,djordjevicsvensson,kirschning.s2p": [],
+    "skrf/media/tests/ads/mlin,djordjevicsvensson,kobayashi.s2p": [],
+    "skrf/media/tests/ads/mlin,djordjevicsvensson,yamashita.s2p": [],
+    "skrf/media/tests/ads/mlin,freqencyinvariant,kirschning.s2p": [],
+    "skrf/media/tests/ads/mlin,freqencyinvariant,kobayashi.s2p": [],
+    "skrf/media/tests/ads/mlin,freqencyinvariant,yamashita.s2p": [],
+    "skrf/media/tests/awr/tlinp.s2p": [],
+    "skrf/media/tests/qucs_prj/capacitor,p01pF.s2p": [],
+    "skrf/media/tests/qucs_prj/capacitor.dat": [],
+    "skrf/media/tests/qucs_prj/capacitor.dpl": [],
+    "skrf/media/tests/qucs_prj/capacitor.sch": [],
+    "skrf/media/tests/qucs_prj/coaxial.dat": [],
+    "skrf/media/tests/qucs_prj/coaxial.dpl": [],
+    "skrf/media/tests/qucs_prj/coaxial.s2p": [],
+    "skrf/media/tests/qucs_prj/coaxial.sch": [],
+    "skrf/media/tests/qucs_prj/cpw_qucs_ep_r9dot5.csv": [],
+    "skrf/media/tests/qucs_prj/cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "skrf/media/tests/qucs_prj/cpw,t=0,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p": [],
+    "skrf/media/tests/qucs_prj/cpw,t=0,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "skrf/media/tests/qucs_prj/cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p": [],
+    "skrf/media/tests/qucs_prj/cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "skrf/media/tests/qucs_prj/cpw.dat": [],
+    "skrf/media/tests/qucs_prj/cpw.dpl": [],
+    "skrf/media/tests/qucs_prj/cpw.s2p": [],
+    "skrf/media/tests/qucs_prj/cpw.sch": [],
+    "skrf/media/tests/qucs_prj/cpw2.dat": [],
+    "skrf/media/tests/qucs_prj/cpw2.dpl": [],
+    "skrf/media/tests/qucs_prj/cpw2.sch": [],
+    "skrf/media/tests/qucs_prj/distributedCircuit,line.dat": [],
+    "skrf/media/tests/qucs_prj/distributedCircuit,line.dpl": [],
+    "skrf/media/tests/qucs_prj/distributedCircuit,line1mm.s2p": [],
+    "skrf/media/tests/qucs_prj/distributedCircuit.sch": [],
+    "skrf/media/tests/qucs_prj/impedanceMismatch,50to25.s2p": [],
+    "skrf/media/tests/qucs_prj/impedanceMismatch.dat": [],
+    "skrf/media/tests/qucs_prj/impedanceMismatch.dpl": [],
+    "skrf/media/tests/qucs_prj/impedanceMismatch.sch": [],
+    "skrf/media/tests/qucs_prj/inductor,p1nH.s2p": [],
+    "skrf/media/tests/qucs_prj/inductor.dat": [],
+    "skrf/media/tests/qucs_prj/inductor.dpl": [],
+    "skrf/media/tests/qucs_prj/inductor.sch": [],
+    "skrf/media/tests/qucs_prj/mediaTestCase": [],
+    "skrf/media/tests/qucs_prj/mline,hammerstad,hammerstad.s2p": [],
+    "skrf/media/tests/qucs_prj/mline,hammerstad,kirschning.s2p": [],
+    "skrf/media/tests/qucs_prj/mline,hammerstad,kobayashi.s2p": [],
+    "skrf/media/tests/qucs_prj/mline,hammerstad,yamashita.s2p": [],
+    "skrf/media/tests/qucs_prj/mline,schneider,schneider.s2p": [],
+    "skrf/media/tests/qucs_prj/mline,wheeler,schneider.s2p": [],
+    "skrf/media/tests/qucs_prj/mline.dat": [],
+    "skrf/media/tests/qucs_prj/mline.dpl": [],
+    "skrf/media/tests/qucs_prj/mline.sch": [],
+    "skrf/media/tests/qucs_prj/rectangularWaveguideWR10,200mil.s2p": [],
+    "skrf/media/tests/qucs_prj/resistor,1ohm.s2p": [],
+    "skrf/media/tests/qucs_prj/resistor.dat": [],
+    "skrf/media/tests/qucs_prj/resistor.dpl": [],
+    "skrf/media/tests/qucs_prj/resistor.sch": [],
+    "skrf/media/tests/qucs_prj/waveguideThru.dat": [],
+    "skrf/media/tests/qucs_prj/waveguideThru.dpl": [],
+    "skrf/media/tests/qucs_prj/waveguideThru.sch": [],
+    "skrf/media/tests/README.rst": [],
+    "skrf/media/tests/test_all_construction.py": [
+      "skrf/__init__.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/media/tests/test_coaxial.py": [
+      "skrf/__init__.py",
+      "skrf/mathFunctions.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/media/tests/test_cpw.py": [
+      "skrf/__init__.py",
+      "skrf/frequency.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/media/tests/test_definedaeptandz0.py": [
+      "skrf/__init__.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/media/tests/test_distributedCircuit.py": [
+      "skrf/media/__init__.py",
+      "skrf/network.py"
+    ],
+    "skrf/media/tests/test_media.py": [
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/media/__init__.py",
+      "skrf/network.py"
+    ],
+    "skrf/media/tests/test_mline.py": [
+      "skrf/__init__.py",
+      "skrf/frequency.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/media/tests/test_rectangularWaveguide.py": [
+      "skrf/constants.py",
+      "skrf/media/rectangularWaveguide.py",
+      "skrf/network.py"
+    ],
+    "skrf/media/tests/wr1p5_1in_swg_Al_0rough.s2p": [],
+    "skrf/media/tests/wr1p5_1in_swg_Al_100nm_rough.s2p": [],
+    "skrf/network.py": [
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/io/__init__.py",
+      "skrf/plotting.py",
+      "skrf/time.py",
+      "skrf/util.py"
+    ],
+    "skrf/networkSet.py": [
+      "skrf/io/__init__.py",
+      "skrf/network.py",
+      "skrf/util.py"
+    ],
+    "skrf/notebook/__init__.py": [],
+    "skrf/notebook/bokeh_.py": [
+      "skrf/network.py",
+      "skrf/notebook/utils.py"
+    ],
+    "skrf/notebook/matplotlib_.py": [],
+    "skrf/notebook/utils.py": [],
+    "skrf/plotting.py": [
+      "skrf/util.py"
+    ],
+    "skrf/programs/plot_touchstone.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/programs/readme.txt": [],
+    "skrf/qfactor.py": [
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/network.py"
+    ],
+    "skrf/taper.py": [
+      "skrf/network.py"
+    ],
+    "skrf/tests/Agilent_E5071B.s4p": [],
+    "skrf/tests/Clarity_example.S2P": [],
+    "skrf/tests/conftest.py": [
+      "skrf/__init__.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/tests/cst_example_4ports.s4p": [],
+    "skrf/tests/cst_example_6ports_V2.s6p": [],
+    "skrf/tests/cst_example_6ports_V2.ts": [],
+    "skrf/tests/cst_example_6ports.s6p": [],
+    "skrf/tests/designer_variable_coupler_ideal_20deg.s4p": [],
+    "skrf/tests/designer_variable_coupler_ideal_75deg.s4p": [],
+    "skrf/tests/designer_wilkinson_splitter.s3p": [],
+    "skrf/tests/fet.s2p": [],
+    "skrf/tests/helic_example_6ports_V2.sp": [],
+    "skrf/tests/helic_example_6ports_V2.ts": [],
+    "skrf/tests/hfss_18.2.s3p": [],
+    "skrf/tests/hfss_19.2.s10p": [],
+    "skrf/tests/hfss_19.2.s8p": [],
+    "skrf/tests/hfss_oneport_powerwave.s1p": [],
+    "skrf/tests/hfss_oneport.s1p": [],
+    "skrf/tests/hfss_threeport_DB_50Ohm.s3p": [],
+    "skrf/tests/hfss_threeport_DB.s3p": [],
+    "skrf/tests/hfss_threeport_MA_50Ohm.s3p": [],
+    "skrf/tests/hfss_threeport_MA_without_gamma_z0_50Ohm.s3p": [],
+    "skrf/tests/hfss_threeport_MA.s3p": [],
+    "skrf/tests/hfss_twoport.s2p": [],
+    "skrf/tests/LFCN-2352+_Plus125degC.s2p": [],
+    "skrf/tests/LFCN-2352+_Plus25degC.s2p": [],
+    "skrf/tests/load_gain_circle_ads.csv": [],
+    "skrf/tests/load_stability_circle_ads.csv": [],
+    "skrf/tests/maxgain_ads.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_10g_40g_band_pass_impulse.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_10g_40g.s1p": [],
+    "skrf/tests/metas_tdr/short_10ps_10g_50g_band_pass_impulse.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_10g_50g.s1p": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_40g_band_pass_impulse.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_40g_low_pass_impulse.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_40g_low_pass_step.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_40g.s1p": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_50g_band_pass_impulse.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_50g_low_pass_impulse.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_50g_low_pass_step.csv": [],
+    "skrf/tests/metas_tdr/short_10ps_dc_50g.s1p": [],
+    "skrf/tests/nf_circle_mwo.csv": [],
+    "skrf/tests/ntwk_arbitrary_frequency.s2p": [],
+    "skrf/tests/ntwk_noise_interp.s2p": [],
+    "skrf/tests/ntwk_noise.s2p": [],
+    "skrf/tests/ntwk.s32p": [],
+    "skrf/tests/ntwk1.ntwk": [],
+    "skrf/tests/ntwk1.s2p": [],
+    "skrf/tests/ntwk2.s2p": [],
+    "skrf/tests/ntwk3.s2p": [],
+    "skrf/tests/ntwk4_n.s2p": [],
+    "skrf/tests/ntwk4.s2p": [],
+    "skrf/tests/ntwks/ntwk1.s2p": [],
+    "skrf/tests/ntwks/ntwk2.s2p": [],
+    "skrf/tests/ntwks/ntwk3.s2p": [],
+    "skrf/tests/PowerSI_example.S8P": [],
+    "skrf/tests/qfactor_data/Figure23.txt": [],
+    "skrf/tests/qfactor_data/Figure27.txt": [],
+    "skrf/tests/qfactor_data/Figure6b.txt": [],
+    "skrf/tests/qfactor_data/Notes_and_Licence.txt": [],
+    "skrf/tests/qfactor_data/Table6c27.txt": [],
+    "skrf/tests/RS_ZNB8.s4p": [],
+    "skrf/tests/RS_ZVR_1.20_beta_f.s2p": [],
+    "skrf/tests/smodel export from mwo.txt": [],
+    "skrf/tests/source_gain_circle_ads.csv": [],
+    "skrf/tests/source_stability_circle_ads.csv": [],
+    "skrf/tests/test_circuit.py": [
+      "skrf/__init__.py",
+      "skrf/circuit.py",
+      "skrf/constants.py",
+      "skrf/network.py"
+    ],
+    "skrf/tests/test_convenience.py": [
+      "skrf/__init__.py",
+      "skrf/io/__init__.py"
+    ],
+    "skrf/tests/test_frequency.py": [
+      "skrf/__init__.py",
+      "skrf/frequency.py"
+    ],
+    "skrf/tests/test_init.py": [],
+    "skrf/tests/test_mathFunctions.py": [
+      "skrf/constants.py",
+      "skrf/mathFunctions.py"
+    ],
+    "skrf/tests/test_network.py": [
+      "skrf/__init__.py",
+      "skrf/circuit.py",
+      "skrf/constants.py",
+      "skrf/frequency.py",
+      "skrf/io/__init__.py",
+      "skrf/mathFunctions.py",
+      "skrf/media/__init__.py",
+      "skrf/network.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/tests/test_networkSet.py": [
+      "skrf/__init__.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/tests/test_plotting.py": [
+      "skrf/__init__.py",
+      "skrf/networkSet.py"
+    ],
+    "skrf/tests/test_qfactor.py": [
+      "skrf/__init__.py",
+      "skrf/qfactor.py"
+    ],
+    "skrf/tests/test_static_data.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/tests/test_taper.py": [
+      "skrf/__init__.py",
+      "skrf/media/__init__.py"
+    ],
+    "skrf/tests/test_tlineFunctions.py": [
+      "skrf/tlineFunctions.py"
+    ],
+    "skrf/tests/test_util.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/tests/test_vectorfitting.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/tests/thru.s2p": [],
+    "skrf/tests/tmp_skrf_oneport_powerwave.s1p": [],
+    "skrf/time.py": [
+      "skrf/util.py"
+    ],
+    "skrf/tlineFunctions.py": [
+      "skrf/constants.py"
+    ],
+    "skrf/util.py": [],
+    "skrf/vectorFitting.py": [
+      "skrf/plotting.py"
+    ],
+    "skrf/vi/__init__.py": [
+      "skrf/vi/validators.py"
+    ],
+    "skrf/vi/scpi_errors.py": [],
+    "skrf/vi/tests/test_validators.py": [
+      "skrf/vi/__init__.py",
+      "skrf/vi/validators.py"
+    ],
+    "skrf/vi/tests/test_vna.py": [],
+    "skrf/vi/validators.py": [],
+    "skrf/vi/vna/__init__.py": [
+      "skrf/vi/vna/hp/__init__.py",
+      "skrf/vi/vna/keysight/__init__.py",
+      "skrf/vi/vna/nanovna/__init__.py",
+      "skrf/vi/vna/rohde_schwarz/__init__.py",
+      "skrf/vi/vna/vna.py"
+    ],
+    "skrf/vi/vna/hp/__init__.py": [
+      "skrf/vi/vna/hp/hp8510c.py",
+      "skrf/vi/vna/hp/hp8720b.py"
+    ],
+    "skrf/vi/vna/hp/hp8510c_sweep_plan.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/vi/vna/hp/hp8510c.py": [
+      "skrf/__init__.py",
+      "skrf/network.py",
+      "skrf/time.py",
+      "skrf/vi/vna/__init__.py",
+      "skrf/vi/vna/hp/hp8510c_sweep_plan.py"
+    ],
+    "skrf/vi/vna/hp/hp8720b.py": [
+      "skrf/__init__.py",
+      "skrf/vi/vna/__init__.py"
+    ],
+    "skrf/vi/vna/hp/tests/test_8510c_sweep_plan.py": [],
+    "skrf/vi/vna/hp/tests/test_8510c.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/vi/vna/keysight/__init__.py": [
+      "skrf/vi/vna/keysight/fieldfox.py",
+      "skrf/vi/vna/keysight/pna.py"
+    ],
+    "skrf/vi/vna/keysight/fieldfox.py": [
+      "skrf/__init__.py",
+      "skrf/vi/__init__.py",
+      "skrf/vi/validators.py",
+      "skrf/vi/vna/__init__.py"
+    ],
+    "skrf/vi/vna/keysight/pna.py": [
+      "skrf/__init__.py",
+      "skrf/vi/__init__.py",
+      "skrf/vi/validators.py",
+      "skrf/vi/vna/__init__.py"
+    ],
+    "skrf/vi/vna/keysight/tests/test_fieldfox.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/vi/vna/keysight/tests/test_pna.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/vi/vna/nanovna/__init__.py": [
+      "skrf/vi/vna/nanovna/nanovna.py"
+    ],
+    "skrf/vi/vna/nanovna/nanovna.py": [
+      "skrf/__init__.py",
+      "skrf/vi/__init__.py",
+      "skrf/vi/vna/__init__.py"
+    ],
+    "skrf/vi/vna/rohde_schwarz/__init__.py": [
+      "skrf/vi/vna/rohde_schwarz/rs_vna.py",
+      "skrf/vi/vna/rohde_schwarz/zna.py",
+      "skrf/vi/vna/rohde_schwarz/zva.py"
+    ],
+    "skrf/vi/vna/rohde_schwarz/rs_vna.py": [
+      "skrf/__init__.py",
+      "skrf/vi/__init__.py",
+      "skrf/vi/validators.py",
+      "skrf/vi/vna/__init__.py"
+    ],
+    "skrf/vi/vna/rohde_schwarz/tests/test_zna.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/vi/vna/rohde_schwarz/tests/test_zva.py": [
+      "skrf/__init__.py"
+    ],
+    "skrf/vi/vna/rohde_schwarz/zna.py": [
+      "skrf/vi/vna/rohde_schwarz/rs_vna.py"
+    ],
+    "skrf/vi/vna/rohde_schwarz/zva.py": [
+      "skrf/vi/vna/rohde_schwarz/rs_vna.py"
+    ],
+    "skrf/vi/vna/vna.py": [
+      "skrf/vi/scpi_errors.py",
+      "skrf/vi/validators.py"
+    ]
+  }
+}

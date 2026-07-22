@@ -1,0 +1,16 @@
+{
+  "fixedSectionOk": true,
+  "nodesRecovered": 0,
+  "edgesRestored": 0,
+  "crossBatchEdgesAdded": 28,
+  "typesRemapped": 0,
+  "complexityRemapped": 0,
+  "notes": [
+    "The migration-scale ID rewrite affected 720 of 1,301 nodes (55.3%); this is expected for the intentional Python-to-Rust path migration, not an upstream analyzer anomaly.",
+    "No missing or duplicate node IDs, unknown node types, unknown complexity values, duplicate edges, dangling edges, dangling layer references, or dangling tour references were found before review fixes.",
+    "All graph and source-map path fields are portable: no absolute paths were found, and src/skrf paths consistently use ./src/ or ./skrf/ prefixes.",
+    "28 import edges backed by the Rust scan import map were added between existing migrated file nodes.",
+    "4 Rust scan import relationships were not added because at least one endpoint has no node in the intentionally migrated upstream graph.",
+    "The source map records one intentionally unresolved Python source file, ./skrf/tests/conftest.py; it remains relative and was not speculatively remapped."
+  ]
+}

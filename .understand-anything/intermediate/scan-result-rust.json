@@ -1,0 +1,5450 @@
+{
+  "name": "rust-rf",
+  "description": "A Rust port of scikit-rf for RF and microwave engineering. Note: this project has over 100 source files; consider scoping analysis to a subdirectory for faster results.",
+  "languages": [
+    "batch",
+    "cal",
+    "chx",
+    "css",
+    "csv",
+    "cti",
+    "dat",
+    "dpl",
+    "html",
+    "in",
+    "ipynb",
+    "json",
+    "jsonl",
+    "makefile",
+    "markdown",
+    "mdf",
+    "mplstyle",
+    "ntwk",
+    "p",
+    "python",
+    "rust",
+    "s10p",
+    "s11p",
+    "s12p",
+    "s13p",
+    "s14p",
+    "s15p",
+    "s16p",
+    "s17p",
+    "s18p",
+    "s19p",
+    "s1p",
+    "s20p",
+    "s21p",
+    "s22p",
+    "s2p",
+    "s32p",
+    "s3p",
+    "s4p",
+    "s5p",
+    "s6p",
+    "s7p",
+    "s8p",
+    "s9p",
+    "sch",
+    "sp",
+    "toml",
+    "txt",
+    "typescript",
+    "unknown",
+    "yaml"
+  ],
+  "frameworks": [
+    "GitHub Actions",
+    "Serde"
+  ],
+  "files": [
+    {
+      "path": ".beads/config.yaml",
+      "language": "yaml",
+      "sizeLines": 68,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".beads/interactions.jsonl",
+      "language": "jsonl",
+      "sizeLines": 270,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".beads/metadata.json",
+      "language": "json",
+      "sizeLines": 6,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".beads/README.md",
+      "language": "markdown",
+      "sizeLines": 81,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "language": "markdown",
+      "sizeLines": 32,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "language": "markdown",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".github/workflows/build.yml",
+      "language": "yaml",
+      "sizeLines": 74,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".github/workflows/test.yml",
+      "language": "yaml",
+      "sizeLines": 67,
+      "fileCategory": "infra"
+    },
+    {
+      "path": ".understand-anything/.understandignore",
+      "language": "unknown",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".understand-anything/config.json",
+      "language": "json",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".understand-anything/fingerprints.json",
+      "language": "json",
+      "sizeLines": 19625,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".understand-anything/intermediate/scan-result.json",
+      "language": "json",
+      "sizeLines": 4959,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".understand-anything/knowledge-graph.json",
+      "language": "json",
+      "sizeLines": 33118,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".understand-anything/meta.json",
+      "language": "json",
+      "sizeLines": 6,
+      "fileCategory": "config"
+    },
+    {
+      "path": "build.rs",
+      "language": "rust",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "Cargo.toml",
+      "language": "toml",
+      "sizeLines": 224,
+      "fileCategory": "config"
+    },
+    {
+      "path": "clippy.toml",
+      "language": "toml",
+      "sizeLines": 8,
+      "fileCategory": "config"
+    },
+    {
+      "path": "data/ind.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/line.s2p",
+      "language": "s2p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/open.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/ring slot measured.s1p",
+      "language": "s1p",
+      "sizeLines": 205,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/ring slot.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/ro,1.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/ro,2.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/ro,3.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/short.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/skrf.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/tee.s3p",
+      "language": "s3p",
+      "sizeLines": 609,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/wr1p5,line.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/wr1p5,short.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/wr2p2,delayshort.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/wr2p2,line.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/wr2p2,line1.s2p",
+      "language": "s2p",
+      "sizeLines": 104,
+      "fileCategory": "code"
+    },
+    {
+      "path": "data/wr2p2,short.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "DEPENDENCIES.md",
+      "language": "markdown",
+      "sizeLines": 35,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/gh-pages.py",
+      "language": "python",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/make.bat",
+      "language": "batch",
+      "sizeLines": 11,
+      "fileCategory": "script"
+    },
+    {
+      "path": "doc/Makefile",
+      "language": "makefile",
+      "sizeLines": 14,
+      "fileCategory": "infra"
+    },
+    {
+      "path": "doc/README.md",
+      "language": "markdown",
+      "sizeLines": 24,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/README.txt",
+      "language": "txt",
+      "sizeLines": 1,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/requirements.txt",
+      "language": "txt",
+      "sizeLines": 3,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/_static/scipy.css",
+      "language": "css",
+      "sizeLines": 197,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "doc/source/_templates/autosummary/class.rst",
+      "language": "markdown",
+      "sizeLines": 7,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/_templates/indexsidebar.html",
+      "language": "html",
+      "sizeLines": 5,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "doc/source/_templates/layout.html",
+      "language": "html",
+      "sizeLines": 1,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "doc/source/api/calibration/deembedding.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/calibration/index.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/circuit.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/constants.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/data/index.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/frequency.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/index.rst",
+      "language": "markdown",
+      "sizeLines": 35,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/instances.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/io/index.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/mathFunctions.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/media/device.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/media/index.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/network.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/networkSet.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/plotting.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/qfactor.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/taper.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/time.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/tlineFunctions.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/util.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/vectorFitting.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/vi/index.rst",
+      "language": "markdown",
+      "sizeLines": 12,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/api/vi/vna.rst",
+      "language": "markdown",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/citations_ack/acknowledging.rst",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/citations_ack/citations.rst",
+      "language": "markdown",
+      "sizeLines": 159,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/citations_ack/index.rst",
+      "language": "markdown",
+      "sizeLines": 11,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/conf.py",
+      "language": "python",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/contributing/index.rst",
+      "language": "markdown",
+      "sizeLines": 26,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_Coaxial_T.s3p",
+      "language": "s3p",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_Designer_Currents.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_Designer_Voltages.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_HFSS_Currents.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/circuit_vi_HFSS_Voltages.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/circuit/designer_bandpass_filter_450_550MHz.s2p",
+      "language": "s2p",
+      "sizeLines": 3021,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/designer_capacitor_30_80MHz_adv.s2p",
+      "language": "s2p",
+      "sizeLines": 1520,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/designer_capacitor_30_80MHz_simple.s2p",
+      "language": "s2p",
+      "sizeLines": 1519,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/Lumped Element Circuits.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/Voltages and Currents in Circuits.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/circuit/Wilkinson Power Splitter.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/index.rst",
+      "language": "markdown",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/instrumentcontrol/VNA Control.ipynb",
+      "language": "ipynb",
+      "sizeLines": 110,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/interactive/Interact Transmission Lines.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/interactive/Interactive Coaxial Properties.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/interactive/Interactive Mismatched Line.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/LICENSE.txt",
+      "language": "txt",
+      "sizeLines": 28,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/matching/Impedance Matching.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Calibration With Three Receivers.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_match_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_open_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_short_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_thru_raw.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_12.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_13.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_14.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_21.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_23.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_24.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_31.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_32.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_34.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_41.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_42.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_43.s2p",
+      "language": "s2p",
+      "sizeLines": 4403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/data_MiniCircuits_splitter/MiniCircuits_ZX10Q-2-19-S+___Plus25degC.s4p",
+      "language": "s4p",
+      "sizeLines": 6377,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/LRRM.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Measuring a Mutiport Device with a 2-Port Network Analyzer.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Multi-port Calibration.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/Multiline TRL.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/DUT.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/gamma_f.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/gamma_r.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/line2p3mm.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/linep3mm.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/reflect.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/res_50ohm.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/multiline_trl_data/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/NanoVNA_V2_4port-splitter.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/One Port Tiered Calibration.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/probe.s2p",
+      "language": "s2p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ds.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/load.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ro.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/short.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ds.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/load.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ro.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/short.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds1.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds2.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds3.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds4.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds5.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds1,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds2,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds3,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds4,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds5,0.s1p",
+      "language": "s1p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/probe.s2p",
+      "language": "s2p",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/SOLT Calibration Standards Creation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/SOLT.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/attenuator (forward).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/attenuator (reverse).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/load.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/quarter wave delay short.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/short.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/simulation.s2p",
+      "language": "s2p",
+      "sizeLines": 1618,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (forward).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (reverse).s2p",
+      "language": "s2p",
+      "sizeLines": 724,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/.s2p",
+      "language": "unknown",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/A.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/B.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/forward switch term.s1p",
+      "language": "s1p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/line.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/mismatched line.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/reflect.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/reverse switch term.s1p",
+      "language": "s1p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/trl_data/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 650,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/TRL.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/metrology/TwoPortOnePath, EnhancedResponse, and FakeFlip.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/Mixed Mode Basics.ipynb",
+      "language": "ipynb",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/Mixed Mode S and Impedance Transformation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_se.s4p",
+      "language": "s4p",
+      "sizeLines": 8013,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_truemode_balbal.s4p",
+      "language": "s4p",
+      "sizeLines": 8029,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/mixedmodeanalysis/mixedmodeSandZtransform_files/EP2C+_Plus25DegC_Unit1.S3P",
+      "language": "s3p",
+      "sizeLines": 525,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networks/Compute Error Between S Parameter Matrices.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networks/Export Network as Touchstone File.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networksets/Export Network Set as MDIF File.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networksets/Interpolating Network Sets.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networksets/Sorting Network Sets.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Balanced Network De-embedding.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Balun_Transformer_Designs.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Balun_Transformer_Designs/Ideal_4port_xformer_hi_res.s4p",
+      "language": "s4p",
+      "sizeLines": 40153,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/BFU520_05V0_010mA_NF_SP.s2p",
+      "language": "s2p",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Correlating microstripline model to measurement.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/CPW media example.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/CPWG100.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/CPWG200.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/DC Extrapolation for Time Domain .ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/DefinedAEpTandZ0 media example.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/IEEEP370 Deembedding.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_NZC_diff_fdf_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_ZC_diff_fdf_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_NZC_se_fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 1002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_ZC_se_fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 1002,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4011,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dat",
+      "language": "dat",
+      "sizeLines": 19039,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dpl",
+      "language": "dpl",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.s4p",
+      "language": "s4p",
+      "sizeLines": 4001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.sch",
+      "language": "sch",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dat",
+      "language": "dat",
+      "sizeLines": 19039,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.s4p",
+      "language": "s4p",
+      "sizeLines": 4001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.sch",
+      "language": "sch",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf_with_connectors.s4p",
+      "language": "s4p",
+      "sizeLines": 4011,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dat",
+      "language": "dat",
+      "sizeLines": 17035,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.s4p",
+      "language": "s4p",
+      "sizeLines": 4001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.sch",
+      "language": "sch",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/se_2xthru.s2p",
+      "language": "s2p",
+      "sizeLines": 1003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/ieeep370deembedding/se_fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 1003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/LNA Example.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/MSL100.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/MSL200.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Properties of Rectangular Waveguides.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Renormalizing S-parameters.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Load_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Open_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Short_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Stepped_140-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_100-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_200-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Load_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Open_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Short_50.s1p",
+      "language": "s1p",
+      "sizeLines": 10008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/readme.txt",
+      "language": "txt",
+      "sizeLines": 3,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/SetupFile#2.chx",
+      "language": "chx",
+      "sizeLines": 15946,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Stepped_140-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Thru_100-P2.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Time domain reflectometry, measurement vs simulation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Time Domain.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Transmission Line Losses.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Transmission Line Properties and Manipulations.ipynb",
+      "language": "ipynb",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Transmission Lines and SWR.ipynb",
+      "language": "ipynb",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/networktheory/Working with Complex Characteristic Impedances.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/plotting/Modeling RG-58.ipynb",
+      "language": "ipynb",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/plotting/XKCD styling.ipynb",
+      "language": "ipynb",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/data/resonator_144mm.s2p",
+      "language": "s2p",
+      "sizeLines": 4012,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/data/resonator_36mm.s2p",
+      "language": "s2p",
+      "sizeLines": 412,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/data/resonator_72mm.s2p",
+      "language": "s2p",
+      "sizeLines": 4012,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/qfactor/Finding_Dk_Df_from_resonance_fitting.ipynb",
+      "language": "ipynb",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/README.md",
+      "language": "markdown",
+      "sizeLines": 5,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/examples/taper/ANSYS_Circuit_taper_exponential_s_mag.csv",
+      "language": "csv",
+      "sizeLines": 192,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/taper/ANSYS_Circuit_taper_linear_s_mag.csv",
+      "language": "csv",
+      "sizeLines": 192,
+      "fileCategory": "data"
+    },
+    {
+      "path": "doc/source/examples/taper/tapered_transmission_lines.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/190ghz_tx_measured.S2P",
+      "language": "s2p",
+      "sizeLines": 810,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/Agilent_E5071B.s4p",
+      "language": "s4p",
+      "sizeLines": 828,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex1_ringslot.ipynb",
+      "language": "ipynb",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex2_190ghz_active.ipynb",
+      "language": "ipynb",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex3_Agilent_E5071B.ipynb",
+      "language": "ipynb",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_ex4_passivity.ipynb",
+      "language": "ipynb",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/examples/vectorfitting/vectorfitting_problems.ipynb",
+      "language": "ipynb",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/glossary.rst",
+      "language": "markdown",
+      "sizeLines": 35,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/index.rst",
+      "language": "markdown",
+      "sizeLines": 32,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/license.rst",
+      "language": "markdown",
+      "sizeLines": 36,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/Makefile",
+      "language": "makefile",
+      "sizeLines": 7,
+      "fileCategory": "infra"
+    },
+    {
+      "path": "doc/source/notebook-porting.rst",
+      "language": "markdown",
+      "sizeLines": 146,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/tutorials/BFU520_05V0_010mA_NF_SP.s2p",
+      "language": "s2p",
+      "sizeLines": 95,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Calibration.ipynb",
+      "language": "ipynb",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Circuit.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Connecting_Networks.ipynb",
+      "language": "ipynb",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ring slot.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ro,1.s1p",
+      "language": "s1p",
+      "sizeLines": 206,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ro,2.s1p",
+      "language": "s1p",
+      "sizeLines": 206,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/data/ro,3.s1p",
+      "language": "s1p",
+      "sizeLines": 206,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Deembedding.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/index.rst",
+      "language": "markdown",
+      "sizeLines": 13,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/source/tutorials/Installation.ipynb",
+      "language": "ipynb",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Introduction.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Media.ipynb",
+      "language": "ipynb",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Networks.ipynb",
+      "language": "ipynb",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/NetworkSet.ipynb",
+      "language": "ipynb",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Plotting.ipynb",
+      "language": "ipynb",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/Q-Factor.ipynb",
+      "language": "ipynb",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/VectorFitting.ipynb",
+      "language": "ipynb",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/source/tutorials/VirtualInstruments.ipynb",
+      "language": "ipynb",
+      "sizeLines": 110,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/sphinxext/LICENSE.txt",
+      "language": "txt",
+      "sizeLines": 96,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/sphinxext/MANIFEST.in",
+      "language": "in",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "doc/sphinxext/README.txt",
+      "language": "txt",
+      "sizeLines": 45,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "doc/sphinxext/tests/test_docscrape.py",
+      "language": "python",
+      "sizeLines": 615,
+      "fileCategory": "code"
+    },
+    {
+      "path": "PORTING_AUDIT.md",
+      "language": "markdown",
+      "sizeLines": 149,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "PORTING_MAP.md",
+      "language": "markdown",
+      "sizeLines": 138,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 20,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/bin/publish_docs.rs",
+      "language": "rust",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/calibration_set.rs",
+      "language": "rust",
+      "sizeLines": 171,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/calibration.rs",
+      "language": "rust",
+      "sizeLines": 5110,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/deembedding.rs",
+      "language": "rust",
+      "sizeLines": 2412,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/mod.rs",
+      "language": "rust",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind2.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind3.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind4.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind5.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind6.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind7.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_ind8.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_open.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_open2.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_open7.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_short.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_short2.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_short8.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_thru3.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_thru4.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_thru5.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/deemb_thru6.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/fdf.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/deembed/s2xthru.s2p",
+      "language": "s2p",
+      "sizeLines": 10003,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/delay short.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/embedingNetwork.s2p",
+      "language": "s2p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/match.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/open.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/short.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/test_calibration_set.rs",
+      "language": "rust",
+      "sizeLines": 145,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/test_calibration.rs",
+      "language": "rust",
+      "sizeLines": 1475,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/calibration/tests/test_deembedding.rs",
+      "language": "rust",
+      "sizeLines": 545,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/circuit.rs",
+      "language": "rust",
+      "sizeLines": 706,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/constants.rs",
+      "language": "rust",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data.rs",
+      "language": "rust",
+      "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/delay_short.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ieeetrans.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ind.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/line.s2p",
+      "language": "s2p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/one_port.cal",
+      "language": "cal",
+      "sizeLines": 241,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/open.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ring slot measured.s1p",
+      "language": "s1p",
+      "sizeLines": 205,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ring slot.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ro,1.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ro,2.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/ro,3.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/short.s1p",
+      "language": "s1p",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/short.s2p",
+      "language": "s2p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/skrf_wide.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/skrf.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/skrf2_wide.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/skrf2.mplstyle",
+      "language": "mplstyle",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/skrfSesh.p",
+      "language": "p",
+      "sizeLines": 346,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/tee.s3p",
+      "language": "s3p",
+      "sizeLines": 609,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/wr1p5,line.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/wr1p5,short.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/wr2p2,delayshort.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/wr2p2,line.s2p",
+      "language": "s2p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/wr2p2,line1.s2p",
+      "language": "s2p",
+      "sizeLines": 104,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/data/wr2p2,short.s1p",
+      "language": "s1p",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/docs.rs",
+      "language": "rust",
+      "sizeLines": 287,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/error.rs",
+      "language": "rust",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/frequency.rs",
+      "language": "rust",
+      "sizeLines": 610,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/instances.rs",
+      "language": "rust",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/citi.rs",
+      "language": "rust",
+      "sizeLines": 445,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/csv.rs",
+      "language": "rust",
+      "sizeLines": 499,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/general.rs",
+      "language": "rust",
+      "sizeLines": 443,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/mdif.rs",
+      "language": "rust",
+      "sizeLines": 677,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/metas.rs",
+      "language": "rust",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/mod.rs",
+      "language": "rust",
+      "sizeLines": 33,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ansys_modal_data.s2p",
+      "language": "s2p",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ansys_terminal_data.s4p",
+      "language": "s4p",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/comments.s3p",
+      "language": "s3p",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/double_option_line.s2p",
+      "language": "s2p",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/embedingNetwork.s2p",
+      "language": "s2p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s10p",
+      "language": "s10p",
+      "sizeLines": 200,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s11p",
+      "language": "s11p",
+      "sizeLines": 216,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s12p",
+      "language": "s12p",
+      "sizeLines": 232,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s13p",
+      "language": "s13p",
+      "sizeLines": 323,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s14p",
+      "language": "s14p",
+      "sizeLines": 344,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s15p",
+      "language": "s15p",
+      "sizeLines": 365,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s16p",
+      "language": "s16p",
+      "sizeLines": 386,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s17p",
+      "language": "s17p",
+      "sizeLines": 502,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s18p",
+      "language": "s18p",
+      "sizeLines": 528,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s19p",
+      "language": "s19p",
+      "sizeLines": 554,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s1p",
+      "language": "s1p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s20p",
+      "language": "s20p",
+      "sizeLines": 580,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s21p",
+      "language": "s21p",
+      "sizeLines": 721,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s22p",
+      "language": "s22p",
+      "sizeLines": 752,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s2p",
+      "language": "s2p",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s3p",
+      "language": "s3p",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s4p",
+      "language": "s4p",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s5p",
+      "language": "s5p",
+      "sizeLines": 85,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s6p",
+      "language": "s6p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s7p",
+      "language": "s7p",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s8p",
+      "language": "s8p",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2019R2/test_multiport.s9p",
+      "language": "s9p",
+      "sizeLines": 184,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s10p",
+      "language": "s10p",
+      "sizeLines": 180,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s11p",
+      "language": "s11p",
+      "sizeLines": 196,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s12p",
+      "language": "s12p",
+      "sizeLines": 212,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s13p",
+      "language": "s13p",
+      "sizeLines": 293,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s14p",
+      "language": "s14p",
+      "sizeLines": 314,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s15p",
+      "language": "s15p",
+      "sizeLines": 335,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s16p",
+      "language": "s16p",
+      "sizeLines": 356,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s17p",
+      "language": "s17p",
+      "sizeLines": 462,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s18p",
+      "language": "s18p",
+      "sizeLines": 488,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s19p",
+      "language": "s19p",
+      "sizeLines": 514,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s1p",
+      "language": "s1p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s20p",
+      "language": "s20p",
+      "sizeLines": 540,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s21p",
+      "language": "s21p",
+      "sizeLines": 159,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s22p",
+      "language": "s22p",
+      "sizeLines": 702,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s2p",
+      "language": "s2p",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s3p",
+      "language": "s3p",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s4p",
+      "language": "s4p",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s5p",
+      "language": "s5p",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s6p",
+      "language": "s6p",
+      "sizeLines": 86,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s7p",
+      "language": "s7p",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s8p",
+      "language": "s8p",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/HFSS_2020R2/test_multiport.s9p",
+      "language": "s9p",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/hfss_oneport.s1p",
+      "language": "s1p",
+      "sizeLines": 1610,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/hfss_twoport.s2p",
+      "language": "s2p",
+      "sizeLines": 426,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/match.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_1p_citi_2_ri.cti",
+      "language": "cti",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_1p_citi.cti",
+      "language": "cti",
+      "sizeLines": 179,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_1p_gmdif_2.mdf",
+      "language": "mdf",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_1p_gmdif.mdf",
+      "language": "mdf",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_citi_2.cti",
+      "language": "cti",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_citi_2params_db.cti",
+      "language": "cti",
+      "sizeLines": 3098,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_citi_2params.cti",
+      "language": "cti",
+      "sizeLines": 3098,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_citi_3_ri.cti",
+      "language": "cti",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_citi.cti",
+      "language": "cti",
+      "sizeLines": 569,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_2.mdf",
+      "language": "mdf",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_3.mdf",
+      "language": "mdf",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_yz.mdf",
+      "language": "mdf",
+      "sizeLines": 196,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_z.mdf",
+      "language": "mdf",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif.mdf",
+      "language": "mdf",
+      "sizeLines": 173,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_2p_only_freq_VAR.cti",
+      "language": "cti",
+      "sizeLines": 1780,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_4p_citi.cti",
+      "language": "cti",
+      "sizeLines": 8176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_4p_gmdif.mdf",
+      "language": "mdf",
+      "sizeLines": 1882,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/MDIF_CITI_MDL/test_comment_after_BEGIN.mdf",
+      "language": "mdf",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ntwk2.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ntwk3.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/open.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/pna_csv_reim.csv",
+      "language": "csv",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/io/tests/short.s1p",
+      "language": "s1p",
+      "sizeLines": 403,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/simple_touchstone.s2p",
+      "language": "s2p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_citi.rs",
+      "language": "rust",
+      "sizeLines": 84,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_csv.rs",
+      "language": "rust",
+      "sizeLines": 125,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_encoding_ISO-8859-1.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_encoding_unknown.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_encoding_UTF-8-SIG.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_io.rs",
+      "language": "rust",
+      "sizeLines": 168,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_mdif.rs",
+      "language": "rust",
+      "sizeLines": 165,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_touchstone.rs",
+      "language": "rust",
+      "sizeLines": 316,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/test_ts_spec.rs",
+      "language": "rust",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ansys.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_1.ts",
+      "language": "typescript",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_10.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_11.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_12_g.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_12.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_13.s2p",
+      "language": "s2p",
+      "sizeLines": 5,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_14.s4p",
+      "language": "s4p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_16.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_17.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_18.s2p",
+      "language": "s2p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_2.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_3.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_4.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_5.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_6.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_7.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_8.s1p",
+      "language": "s1p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/tests/ts/ex_9.s1p",
+      "language": "s1p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/io/touchstone.rs",
+      "language": "rust",
+      "sizeLines": 1121,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/lib.rs",
+      "language": "rust",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/math.rs",
+      "language": "rust",
+      "sizeLines": 1194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/circular_waveguide.rs",
+      "language": "rust",
+      "sizeLines": 375,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/coaxial.rs",
+      "language": "rust",
+      "sizeLines": 364,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/cpw.rs",
+      "language": "rust",
+      "sizeLines": 451,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/defined_a_ep_tand_z0.rs",
+      "language": "rust",
+      "sizeLines": 343,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/device.rs",
+      "language": "rust",
+      "sizeLines": 279,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/distributed_circuit.rs",
+      "language": "rust",
+      "sizeLines": 224,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/freespace.rs",
+      "language": "rust",
+      "sizeLines": 336,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/media.rs",
+      "language": "rust",
+      "sizeLines": 1140,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/mline.rs",
+      "language": "rust",
+      "sizeLines": 680,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/mod.rs",
+      "language": "rust",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/rectangular_waveguide.rs",
+      "language": "rust",
+      "sizeLines": 424,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/capacitor_q.s2p",
+      "language": "s2p",
+      "sizeLines": 7006,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/cpw,t=0um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/cpw,t=35um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/cpwg,t=0um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/cpwg,t=35um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/inductor_q.s2p",
+      "language": "s2p",
+      "sizeLines": 7006,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/mlin,djordjevicsvensson,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/mlin,djordjevicsvensson,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/mlin,djordjevicsvensson,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/mlin,freqencyinvariant,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/mlin,freqencyinvariant,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/ads/mlin,freqencyinvariant,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/awr/tlinp.s2p",
+      "language": "s2p",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/capacitor,p01pF.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/capacitor.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/capacitor.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/capacitor.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/coaxial.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/coaxial.dpl",
+      "language": "dpl",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/coaxial.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/coaxial.sch",
+      "language": "sch",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw_qucs_ep_r9dot5.csv",
+      "language": "csv",
+      "sizeLines": 50,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw,t=0,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw,t=0,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw.dat",
+      "language": "dat",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw.s2p",
+      "language": "s2p",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw.sch",
+      "language": "sch",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw2.dat",
+      "language": "dat",
+      "sizeLines": 919,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw2.dpl",
+      "language": "dpl",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/cpw2.sch",
+      "language": "sch",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/distributedCircuit,line.dat",
+      "language": "dat",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/distributedCircuit,line.dpl",
+      "language": "dpl",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/distributedCircuit,line1mm.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/distributedCircuit.sch",
+      "language": "sch",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/impedanceMismatch,50to25.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/impedanceMismatch.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/impedanceMismatch.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/impedanceMismatch.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/inductor,p1nH.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/inductor.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/inductor.dpl",
+      "language": "dpl",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/inductor.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mediaTestCase",
+      "language": "unknown",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline,hammerstad,hammerstad.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline,hammerstad,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline,hammerstad,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline,hammerstad,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline,schneider,schneider.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline,wheeler,schneider.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline.dat",
+      "language": "dat",
+      "sizeLines": 919,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline.dpl",
+      "language": "dpl",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/mline.sch",
+      "language": "sch",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/rectangularWaveguideWR10,200mil.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/resistor,1ohm.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/resistor.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/resistor.dpl",
+      "language": "dpl",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/resistor.sch",
+      "language": "sch",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/waveguideThru.dat",
+      "language": "dat",
+      "sizeLines": 516,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/waveguideThru.dpl",
+      "language": "dpl",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/qucs_prj/waveguideThru.sch",
+      "language": "sch",
+      "sizeLines": 33,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/README.rst",
+      "language": "markdown",
+      "sizeLines": 32,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/media/tests/test_all_construction.rs",
+      "language": "rust",
+      "sizeLines": 147,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_coaxial.rs",
+      "language": "rust",
+      "sizeLines": 100,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_cpw.rs",
+      "language": "rust",
+      "sizeLines": 244,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_definedaeptandz0.rs",
+      "language": "rust",
+      "sizeLines": 151,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_distributed_circuit.rs",
+      "language": "rust",
+      "sizeLines": 148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_media.rs",
+      "language": "rust",
+      "sizeLines": 621,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_mline.rs",
+      "language": "rust",
+      "sizeLines": 375,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/test_rectangular_waveguide.rs",
+      "language": "rust",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/wr1p5_1in_swg_Al_0rough.s2p",
+      "language": "s2p",
+      "sizeLines": 1611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/media/tests/wr1p5_1in_swg_Al_100nm_rough.s2p",
+      "language": "s2p",
+      "sizeLines": 1611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/network_set.rs",
+      "language": "rust",
+      "sizeLines": 1281,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/network.rs",
+      "language": "rust",
+      "sizeLines": 2621,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/notebook.rs",
+      "language": "rust",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/notebook/bokeh_.rs",
+      "language": "rust",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/notebook/matplotlib_.rs",
+      "language": "rust",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/notebook/utils.rs",
+      "language": "rust",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/plotting.rs",
+      "language": "rust",
+      "sizeLines": 730,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/programs/plot_touchstone.rs",
+      "language": "rust",
+      "sizeLines": 217,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/programs/readme.txt",
+      "language": "txt",
+      "sizeLines": 26,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/qfactor.rs",
+      "language": "rust",
+      "sizeLines": 884,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/taper.rs",
+      "language": "rust",
+      "sizeLines": 296,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/Agilent_E5071B.s4p",
+      "language": "s4p",
+      "sizeLines": 828,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/Clarity_example.S2P",
+      "language": "s2p",
+      "sizeLines": 52,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/cst_example_4ports.s4p",
+      "language": "s4p",
+      "sizeLines": 2416,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/cst_example_6ports_V2.s6p",
+      "language": "s6p",
+      "sizeLines": 6027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/cst_example_6ports_V2.ts",
+      "language": "typescript",
+      "sizeLines": 6027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/cst_example_6ports.s6p",
+      "language": "s6p",
+      "sizeLines": 12026,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/designer_variable_coupler_ideal_20deg.s4p",
+      "language": "s4p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/designer_variable_coupler_ideal_75deg.s4p",
+      "language": "s4p",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/designer_wilkinson_splitter.s3p",
+      "language": "s3p",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/fet.s2p",
+      "language": "s2p",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/helic_example_6ports_V2.sp",
+      "language": "sp",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/helic_example_6ports_V2.ts",
+      "language": "typescript",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_18.2.s3p",
+      "language": "s3p",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_19.2.s10p",
+      "language": "s10p",
+      "sizeLines": 428,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_19.2.s8p",
+      "language": "s8p",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_oneport_powerwave.s1p",
+      "language": "s1p",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_oneport.s1p",
+      "language": "s1p",
+      "sizeLines": 1610,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_threeport_DB_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 2713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_threeport_DB.s3p",
+      "language": "s3p",
+      "sizeLines": 2714,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_threeport_MA_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 2713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_threeport_MA_without_gamma_z0_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 1811,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_threeport_MA.s3p",
+      "language": "s3p",
+      "sizeLines": 2714,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/hfss_twoport.s2p",
+      "language": "s2p",
+      "sizeLines": 426,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/LFCN-2352+_Plus125degC.s2p",
+      "language": "s2p",
+      "sizeLines": 2014,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/LFCN-2352+_Plus25degC.s2p",
+      "language": "s2p",
+      "sizeLines": 2014,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/load_gain_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/load_stability_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/maxgain_ads.csv",
+      "language": "csv",
+      "sizeLines": 101,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_10g_40g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_10g_40g.s1p",
+      "language": "s1p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_10g_50g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_10g_50g.s1p",
+      "language": "s1p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_40g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_40g_low_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_40g_low_pass_step.csv",
+      "language": "csv",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_40g.s1p",
+      "language": "s1p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_50g_band_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_50g_low_pass_impulse.csv",
+      "language": "csv",
+      "sizeLines": 11,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_50g_low_pass_step.csv",
+      "language": "csv",
+      "sizeLines": 11,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/metas_tdr/short_10ps_dc_50g.s1p",
+      "language": "s1p",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/nf_circle_mwo.csv",
+      "language": "csv",
+      "sizeLines": 14,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/ntwk_arbitrary_frequency.s2p",
+      "language": "s2p",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk_noise_interp.s2p",
+      "language": "s2p",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk_noise.s2p",
+      "language": "s2p",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk.s32p",
+      "language": "s32p",
+      "sizeLines": 807,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk1.ntwk",
+      "language": "ntwk",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk2.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk3.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk4_n.s2p",
+      "language": "s2p",
+      "sizeLines": 316,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwk4.s2p",
+      "language": "s2p",
+      "sizeLines": 309,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwks/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwks/ntwk2.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/ntwks/ntwk3.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/PowerSI_example.S8P",
+      "language": "s8p",
+      "sizeLines": 4826,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/qfactor_data/Figure23.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/tests/qfactor_data/Figure27.txt",
+      "language": "txt",
+      "sizeLines": 239,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/tests/qfactor_data/Figure6b.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/tests/qfactor_data/Notes_and_Licence.txt",
+      "language": "txt",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/tests/qfactor_data/Table6c27.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/tests/RS_ZNB8.s4p",
+      "language": "s4p",
+      "sizeLines": 5013,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/RS_ZVR_1.20_beta_f.s2p",
+      "language": "s2p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/smodel export from mwo.txt",
+      "language": "txt",
+      "sizeLines": 2007,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/tests/source_gain_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/source_stability_circle_ads.csv",
+      "language": "csv",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/tests/test_circuit.rs",
+      "language": "rust",
+      "sizeLines": 282,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_convenience.rs",
+      "language": "rust",
+      "sizeLines": 162,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_frequency.rs",
+      "language": "rust",
+      "sizeLines": 191,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_init.rs",
+      "language": "rust",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_math_functions.rs",
+      "language": "rust",
+      "sizeLines": 465,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_network_set.rs",
+      "language": "rust",
+      "sizeLines": 526,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_network.rs",
+      "language": "rust",
+      "sizeLines": 788,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_plotting.rs",
+      "language": "rust",
+      "sizeLines": 279,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_qfactor.rs",
+      "language": "rust",
+      "sizeLines": 393,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_static_data.rs",
+      "language": "rust",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_taper.rs",
+      "language": "rust",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_tline_functions.rs",
+      "language": "rust",
+      "sizeLines": 208,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_util.rs",
+      "language": "rust",
+      "sizeLines": 188,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/test_vector_fitting.rs",
+      "language": "rust",
+      "sizeLines": 428,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/thru.s2p",
+      "language": "s2p",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/tests/tmp_skrf_oneport_powerwave.s1p",
+      "language": "s1p",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/time.rs",
+      "language": "rust",
+      "sizeLines": 570,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/transmission_line.rs",
+      "language": "rust",
+      "sizeLines": 278,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/util.rs",
+      "language": "rust",
+      "sizeLines": 482,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vector_fitting.rs",
+      "language": "rust",
+      "sizeLines": 1296,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/mod.rs",
+      "language": "rust",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/scpi_errors.rs",
+      "language": "rust",
+      "sizeLines": 500,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/tests/test_validators.rs",
+      "language": "rust",
+      "sizeLines": 134,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/tests/test_vna.rs",
+      "language": "rust",
+      "sizeLines": 132,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/validators.rs",
+      "language": "rust",
+      "sizeLines": 410,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/visa.rs",
+      "language": "rust",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/hp8510c_sweep_plan.rs",
+      "language": "rust",
+      "sizeLines": 344,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/hp8510c.rs",
+      "language": "rust",
+      "sizeLines": 507,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/hp8720b.rs",
+      "language": "rust",
+      "sizeLines": 334,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/mod.rs",
+      "language": "rust",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/tests/test_8510c_sweep_plan.rs",
+      "language": "rust",
+      "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/tests/test_8510c.rs",
+      "language": "rust",
+      "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/hp/tests/test_hp8720b.rs",
+      "language": "rust",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/keysight/fieldfox.rs",
+      "language": "rust",
+      "sizeLines": 413,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/keysight/mod.rs",
+      "language": "rust",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/keysight/pna.rs",
+      "language": "rust",
+      "sizeLines": 798,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/keysight/tests/test_fieldfox.rs",
+      "language": "rust",
+      "sizeLines": 152,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/keysight/tests/test_pna.rs",
+      "language": "rust",
+      "sizeLines": 166,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/mod.rs",
+      "language": "rust",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/nanovna/mod.rs",
+      "language": "rust",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/nanovna/nanovna.rs",
+      "language": "rust",
+      "sizeLines": 320,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/rohde_schwarz/mod.rs",
+      "language": "rust",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/rohde_schwarz/rs_vna.rs",
+      "language": "rust",
+      "sizeLines": 617,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/rohde_schwarz/tests/test_zna.rs",
+      "language": "rust",
+      "sizeLines": 120,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/rohde_schwarz/tests/test_zva.rs",
+      "language": "rust",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/rohde_schwarz/zna.rs",
+      "language": "rust",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/rohde_schwarz/zva.rs",
+      "language": "rust",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/vi/vna/vna.rs",
+      "language": "rust",
+      "sizeLines": 344,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/constants.rs",
+      "language": "rust",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/docs.rs",
+      "language": "rust",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ansys_modal_data.s2p",
+      "language": "s2p",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ansys.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/Agilent_E5071B.s4p",
+      "language": "s4p",
+      "sizeLines": 828,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/cst_example_4ports.s4p",
+      "language": "s4p",
+      "sizeLines": 2416,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/cst_example_6ports_V2.s6p",
+      "language": "s6p",
+      "sizeLines": 6027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/cst_example_6ports_V2.ts",
+      "language": "typescript",
+      "sizeLines": 6027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/cst_example_6ports.s6p",
+      "language": "s6p",
+      "sizeLines": 12026,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/helic_example_6ports_V2.sp",
+      "language": "sp",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/helic_example_6ports_V2.ts",
+      "language": "typescript",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_18.2.s3p",
+      "language": "s3p",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_19.2.s10p",
+      "language": "s10p",
+      "sizeLines": 428,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_19.2.s8p",
+      "language": "s8p",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_oneport.s1p",
+      "language": "s1p",
+      "sizeLines": 1610,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_threeport_DB_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 2713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_threeport_DB.s3p",
+      "language": "s3p",
+      "sizeLines": 2714,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_threeport_MA_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 2713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_threeport_MA_without_gamma_z0_50Ohm.s3p",
+      "language": "s3p",
+      "sizeLines": 1811,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_threeport_MA.s3p",
+      "language": "s3p",
+      "sizeLines": 2714,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/hfss_twoport.s2p",
+      "language": "s2p",
+      "sizeLines": 426,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/ntwk1.s2p",
+      "language": "s2p",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/RS_ZNB8.s4p",
+      "language": "s4p",
+      "sizeLines": 5013,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/convenience/RS_ZVR_1.20_beta_f.s2p",
+      "language": "s2p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/designer_wilkinson_splitter.s3p",
+      "language": "s3p",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/double_option_line.s2p",
+      "language": "s2p",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/awr/tlinp.s2p",
+      "language": "s2p",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/cpw/ads/cpw,t=0um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/cpw/ads/cpwg,t=0um.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/cpw/qucs/cpw_qucs_ep_r9dot5.csv",
+      "language": "csv",
+      "sizeLines": 50,
+      "fileCategory": "data"
+    },
+    {
+      "path": "tests/fixtures/media/cpw/qucs/cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/cpw/qucs/cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/cpw/qucs/cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/ads/mlin,djordjevicsvensson,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/ads/mlin,djordjevicsvensson,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/ads/mlin,djordjevicsvensson,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/ads/mlin,freqencyinvariant,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/ads/mlin,freqencyinvariant,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/ads/mlin,freqencyinvariant,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/qucs/mline,hammerstad,hammerstad.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/qucs/mline,hammerstad,kirschning.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/qucs/mline,hammerstad,kobayashi.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/qucs/mline,hammerstad,yamashita.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/qucs/mline,schneider,schneider.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/mline/qucs/mline,wheeler,schneider.s2p",
+      "language": "s2p",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/qucs/distributedCircuit,line1mm.s2p",
+      "language": "s2p",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/rectangular_waveguide/wr1p5_1in_swg_Al_0rough.s2p",
+      "language": "s2p",
+      "sizeLines": 1611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/media/rectangular_waveguide/wr1p5_1in_swg_Al_100nm_rough.s2p",
+      "language": "s2p",
+      "sizeLines": 1611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/noise.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/qfactor/Figure23.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tests/fixtures/qfactor/Figure27.txt",
+      "language": "txt",
+      "sizeLines": 239,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tests/fixtures/qfactor/Figure6b.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tests/fixtures/qfactor/Notes_and_Licence.txt",
+      "language": "txt",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tests/fixtures/qfactor/Table6c27.txt",
+      "language": "txt",
+      "sizeLines": 217,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tests/fixtures/simple_touchstone.s2p",
+      "language": "s2p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ansys.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_1.ts",
+      "language": "typescript",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_10.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_11.s2p",
+      "language": "s2p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_12_g.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_12.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_13.s2p",
+      "language": "s2p",
+      "sizeLines": 5,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_14.s4p",
+      "language": "s4p",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_16.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_17.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_18.s2p",
+      "language": "s2p",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_2.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_3.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_4.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_5.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_6.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_7.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_8.s1p",
+      "language": "s1p",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/ts-spec/ex_9.s1p",
+      "language": "s1p",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fixtures/vector_fitting/190ghz_tx_measured.s2p",
+      "language": "s2p",
+      "sizeLines": 810,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/media_device.rs",
+      "language": "rust",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/metas.rs",
+      "language": "rust",
+      "sizeLines": 57,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/nanovna.rs",
+      "language": "rust",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/scpi_errors.rs",
+      "language": "rust",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/time.rs",
+      "language": "rust",
+      "sizeLines": 162,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 749,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "very-large",
+  "importMap": {
+    ".beads/config.yaml": [],
+    ".beads/interactions.jsonl": [],
+    ".beads/metadata.json": [],
+    ".beads/README.md": [],
+    ".github/ISSUE_TEMPLATE/bug_report.md": [],
+    ".github/ISSUE_TEMPLATE/feature_request.md": [],
+    ".github/workflows/build.yml": [],
+    ".github/workflows/test.yml": [],
+    ".understand-anything/.understandignore": [],
+    ".understand-anything/config.json": [],
+    ".understand-anything/fingerprints.json": [],
+    ".understand-anything/intermediate/scan-result.json": [],
+    ".understand-anything/knowledge-graph.json": [],
+    ".understand-anything/meta.json": [],
+    "build.rs": [],
+    "Cargo.toml": [],
+    "clippy.toml": [],
+    "data/ind.s2p": [],
+    "data/line.s2p": [],
+    "data/ntwk1.s2p": [],
+    "data/open.s2p": [],
+    "data/ring slot measured.s1p": [],
+    "data/ring slot.s2p": [],
+    "data/ro,1.s1p": [],
+    "data/ro,2.s1p": [],
+    "data/ro,3.s1p": [],
+    "data/short.s2p": [],
+    "data/skrf.mplstyle": [],
+    "data/tee.s3p": [],
+    "data/wr1p5,line.s2p": [],
+    "data/wr1p5,short.s1p": [],
+    "data/wr2p2,delayshort.s1p": [],
+    "data/wr2p2,line.s2p": [],
+    "data/wr2p2,line1.s2p": [],
+    "data/wr2p2,short.s1p": [],
+    "DEPENDENCIES.md": [],
+    "doc/gh-pages.py": [],
+    "doc/make.bat": [],
+    "doc/Makefile": [],
+    "doc/README.md": [],
+    "doc/README.txt": [],
+    "doc/requirements.txt": [],
+    "doc/source/_static/scipy.css": [],
+    "doc/source/_templates/autosummary/class.rst": [],
+    "doc/source/_templates/indexsidebar.html": [],
+    "doc/source/_templates/layout.html": [],
+    "doc/source/api/calibration/deembedding.rst": [],
+    "doc/source/api/calibration/index.rst": [],
+    "doc/source/api/circuit.rst": [],
+    "doc/source/api/constants.rst": [],
+    "doc/source/api/data/index.rst": [],
+    "doc/source/api/frequency.rst": [],
+    "doc/source/api/index.rst": [],
+    "doc/source/api/instances.rst": [],
+    "doc/source/api/io/index.rst": [],
+    "doc/source/api/mathFunctions.rst": [],
+    "doc/source/api/media/device.rst": [],
+    "doc/source/api/media/index.rst": [],
+    "doc/source/api/network.rst": [],
+    "doc/source/api/networkSet.rst": [],
+    "doc/source/api/plotting.rst": [],
+    "doc/source/api/qfactor.rst": [],
+    "doc/source/api/taper.rst": [],
+    "doc/source/api/time.rst": [],
+    "doc/source/api/tlineFunctions.rst": [],
+    "doc/source/api/util.rst": [],
+    "doc/source/api/vectorFitting.rst": [],
+    "doc/source/api/vi/index.rst": [],
+    "doc/source/api/vi/vna.rst": [],
+    "doc/source/citations_ack/acknowledging.rst": [],
+    "doc/source/citations_ack/citations.rst": [],
+    "doc/source/citations_ack/index.rst": [],
+    "doc/source/conf.py": [],
+    "doc/source/contributing/index.rst": [],
+    "doc/source/examples/circuit/circuit_vi_Coaxial_T.s3p": [],
+    "doc/source/examples/circuit/circuit_vi_Designer_Currents.csv": [],
+    "doc/source/examples/circuit/circuit_vi_Designer_Voltages.csv": [],
+    "doc/source/examples/circuit/circuit_vi_HFSS_Currents.csv": [],
+    "doc/source/examples/circuit/circuit_vi_HFSS_Voltages.csv": [],
+    "doc/source/examples/circuit/designer_bandpass_filter_450_550MHz.s2p": [],
+    "doc/source/examples/circuit/designer_capacitor_30_80MHz_adv.s2p": [],
+    "doc/source/examples/circuit/designer_capacitor_30_80MHz_simple.s2p": [],
+    "doc/source/examples/circuit/Lumped Element Circuits.ipynb": [],
+    "doc/source/examples/circuit/Voltages and Currents in Circuits.ipynb": [],
+    "doc/source/examples/circuit/Wilkinson Power Splitter.ipynb": [],
+    "doc/source/examples/index.rst": [],
+    "doc/source/examples/instrumentcontrol/VNA Control.ipynb": [],
+    "doc/source/examples/interactive/Interact Transmission Lines.ipynb": [],
+    "doc/source/examples/interactive/Interactive Coaxial Properties.ipynb": [],
+    "doc/source/examples/interactive/Interactive Mismatched Line.ipynb": [],
+    "doc/source/examples/LICENSE.txt": [],
+    "doc/source/examples/matching/Impedance Matching.ipynb": [],
+    "doc/source/examples/metrology/Calibration With Three Receivers.ipynb": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_match_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_open_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_short_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/cal_thru_raw.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_12.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_13.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_14.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_21.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_23.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_24.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_31.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_32.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_34.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_41.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_42.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/dut_raw_43.s2p": [],
+    "doc/source/examples/metrology/data_MiniCircuits_splitter/MiniCircuits_ZX10Q-2-19-S+___Plus25degC.s4p": [],
+    "doc/source/examples/metrology/LRRM.ipynb": [],
+    "doc/source/examples/metrology/Measuring a Mutiport Device with a 2-Port Network Analyzer.ipynb": [],
+    "doc/source/examples/metrology/Multi-port Calibration.ipynb": [],
+    "doc/source/examples/metrology/Multiline TRL.ipynb": [],
+    "doc/source/examples/metrology/multiline_trl_data/DUT.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/gamma_f.s1p": [],
+    "doc/source/examples/metrology/multiline_trl_data/gamma_r.s1p": [],
+    "doc/source/examples/metrology/multiline_trl_data/line2p3mm.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/linep3mm.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/reflect.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/res_50ohm.s2p": [],
+    "doc/source/examples/metrology/multiline_trl_data/thru.s2p": [],
+    "doc/source/examples/metrology/NanoVNA_V2_4port-splitter.ipynb": [],
+    "doc/source/examples/metrology/One Port Tiered Calibration.ipynb": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/probe.s2p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ds.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/load.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/ro.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/ideals/short.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ds.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/load.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/ro.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier1/measured/short.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds1.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds2.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds3.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds4.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/ideals/ds5.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds1,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds2,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds3,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds4,0.s1p": [],
+    "doc/source/examples/metrology/oneport_tiered_calibration/tier2/measured/ds5,0.s1p": [],
+    "doc/source/examples/metrology/probe.s2p": [],
+    "doc/source/examples/metrology/SOLT Calibration Standards Creation.ipynb": [],
+    "doc/source/examples/metrology/SOLT.ipynb": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/attenuator (forward).s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/attenuator (reverse).s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/load.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/quarter wave delay short.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/short.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/simulation.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/thru.s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (forward).s2p": [],
+    "doc/source/examples/metrology/three_receiver_cal/data/wr15 shim and swg (reverse).s2p": [],
+    "doc/source/examples/metrology/trl_data/.s2p": [],
+    "doc/source/examples/metrology/trl_data/A.s2p": [],
+    "doc/source/examples/metrology/trl_data/B.s2p": [],
+    "doc/source/examples/metrology/trl_data/forward switch term.s1p": [],
+    "doc/source/examples/metrology/trl_data/line.s2p": [],
+    "doc/source/examples/metrology/trl_data/mismatched line.s2p": [],
+    "doc/source/examples/metrology/trl_data/reflect.s2p": [],
+    "doc/source/examples/metrology/trl_data/reverse switch term.s1p": [],
+    "doc/source/examples/metrology/trl_data/thru.s2p": [],
+    "doc/source/examples/metrology/TRL.ipynb": [],
+    "doc/source/examples/metrology/TwoPortOnePath, EnhancedResponse, and FakeFlip.ipynb": [],
+    "doc/source/examples/mixedmodeanalysis/Mixed Mode Basics.ipynb": [],
+    "doc/source/examples/mixedmodeanalysis/Mixed Mode S and Impedance Transformation.ipynb": [],
+    "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_se.s4p": [],
+    "doc/source/examples/mixedmodeanalysis/mixedmodebasics_files/load_truemode_balbal.s4p": [],
+    "doc/source/examples/mixedmodeanalysis/mixedmodeSandZtransform_files/EP2C+_Plus25DegC_Unit1.S3P": [],
+    "doc/source/examples/networks/Compute Error Between S Parameter Matrices.ipynb": [],
+    "doc/source/examples/networks/Export Network as Touchstone File.ipynb": [],
+    "doc/source/examples/networksets/Export Network Set as MDIF File.ipynb": [],
+    "doc/source/examples/networksets/Interpolating Network Sets.ipynb": [],
+    "doc/source/examples/networksets/Sorting Network Sets.ipynb": [],
+    "doc/source/examples/networktheory/Balanced Network De-embedding.ipynb": [],
+    "doc/source/examples/networktheory/Balun_Transformer_Designs.ipynb": [],
+    "doc/source/examples/networktheory/Balun_Transformer_Designs/Ideal_4port_xformer_hi_res.s4p": [],
+    "doc/source/examples/networktheory/BFU520_05V0_010mA_NF_SP.s2p": [],
+    "doc/source/examples/networktheory/Correlating microstripline model to measurement.ipynb": [],
+    "doc/source/examples/networktheory/CPW media example.ipynb": [],
+    "doc/source/examples/networktheory/CPWG100.s2p": [],
+    "doc/source/examples/networktheory/CPWG200.s2p": [],
+    "doc/source/examples/networktheory/DC Extrapolation for Time Domain .ipynb": [],
+    "doc/source/examples/networktheory/DefinedAEpTandZ0 media example.ipynb": [],
+    "doc/source/examples/networktheory/IEEEP370 Deembedding.ipynb": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_NZC_diff_fdf_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_MM_ZC_diff_fdf_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_NZC_se_fdf.s2p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/deembedded_SE_ZC_se_fdf.s2p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dat": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.dpl": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_2xthru.sch": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dat": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.dpl": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_dut.sch": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf_with_connectors.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dat": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.dpl": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.s4p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/diff_fdf.sch": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/se_2xthru.s2p": [],
+    "doc/source/examples/networktheory/ieeep370deembedding/se_fdf.s2p": [],
+    "doc/source/examples/networktheory/LNA Example.ipynb": [],
+    "doc/source/examples/networktheory/MSL100.s2p": [],
+    "doc/source/examples/networktheory/MSL200.s2p": [],
+    "doc/source/examples/networktheory/Properties of Rectangular Waveguides.ipynb": [],
+    "doc/source/examples/networktheory/Renormalizing S-parameters.ipynb": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Load_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Open_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Short_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Stepped_140-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_100-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P1-MSL_Thru_200-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Load_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Open_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/P2-MSL_Short_50.s1p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/readme.txt": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/measurement/SetupFile#2.chx": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Stepped_140-P2.s2p": [],
+    "doc/source/examples/networktheory/tdr_measurement_vs_simulation/simulation/P1-MSL_Thru_100-P2.s2p": [],
+    "doc/source/examples/networktheory/Time domain reflectometry, measurement vs simulation.ipynb": [],
+    "doc/source/examples/networktheory/Time Domain.ipynb": [],
+    "doc/source/examples/networktheory/Transmission Line Losses.ipynb": [],
+    "doc/source/examples/networktheory/Transmission Line Properties and Manipulations.ipynb": [],
+    "doc/source/examples/networktheory/Transmission Lines and SWR.ipynb": [],
+    "doc/source/examples/networktheory/Working with Complex Characteristic Impedances.ipynb": [],
+    "doc/source/examples/plotting/Modeling RG-58.ipynb": [],
+    "doc/source/examples/plotting/XKCD styling.ipynb": [],
+    "doc/source/examples/qfactor/data/resonator_144mm.s2p": [],
+    "doc/source/examples/qfactor/data/resonator_36mm.s2p": [],
+    "doc/source/examples/qfactor/data/resonator_72mm.s2p": [],
+    "doc/source/examples/qfactor/Finding_Dk_Df_from_resonance_fitting.ipynb": [],
+    "doc/source/examples/README.md": [],
+    "doc/source/examples/taper/ANSYS_Circuit_taper_exponential_s_mag.csv": [],
+    "doc/source/examples/taper/ANSYS_Circuit_taper_linear_s_mag.csv": [],
+    "doc/source/examples/taper/tapered_transmission_lines.ipynb": [],
+    "doc/source/examples/vectorfitting/190ghz_tx_measured.S2P": [],
+    "doc/source/examples/vectorfitting/Agilent_E5071B.s4p": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex1_ringslot.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex2_190ghz_active.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex3_Agilent_E5071B.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_ex4_passivity.ipynb": [],
+    "doc/source/examples/vectorfitting/vectorfitting_problems.ipynb": [],
+    "doc/source/glossary.rst": [],
+    "doc/source/index.rst": [],
+    "doc/source/license.rst": [],
+    "doc/source/Makefile": [],
+    "doc/source/notebook-porting.rst": [],
+    "doc/source/tutorials/BFU520_05V0_010mA_NF_SP.s2p": [],
+    "doc/source/tutorials/Calibration.ipynb": [],
+    "doc/source/tutorials/Circuit.ipynb": [],
+    "doc/source/tutorials/Connecting_Networks.ipynb": [],
+    "doc/source/tutorials/data/ring slot.s2p": [],
+    "doc/source/tutorials/data/ro,1.s1p": [],
+    "doc/source/tutorials/data/ro,2.s1p": [],
+    "doc/source/tutorials/data/ro,3.s1p": [],
+    "doc/source/tutorials/Deembedding.ipynb": [],
+    "doc/source/tutorials/index.rst": [],
+    "doc/source/tutorials/Installation.ipynb": [],
+    "doc/source/tutorials/Introduction.ipynb": [],
+    "doc/source/tutorials/Media.ipynb": [],
+    "doc/source/tutorials/Networks.ipynb": [],
+    "doc/source/tutorials/NetworkSet.ipynb": [],
+    "doc/source/tutorials/Plotting.ipynb": [],
+    "doc/source/tutorials/Q-Factor.ipynb": [],
+    "doc/source/tutorials/VectorFitting.ipynb": [],
+    "doc/source/tutorials/VirtualInstruments.ipynb": [],
+    "doc/sphinxext/LICENSE.txt": [],
+    "doc/sphinxext/MANIFEST.in": [],
+    "doc/sphinxext/README.txt": [],
+    "doc/sphinxext/tests/test_docscrape.py": [],
+    "PORTING_AUDIT.md": [],
+    "PORTING_MAP.md": [],
+    "README.md": [],
+    "src/bin/publish_docs.rs": [],
+    "src/calibration/calibration_set.rs": [
+      "src/calibration/mod.rs"
+    ],
+    "src/calibration/calibration.rs": [
+      "src/math.rs"
+    ],
+    "src/calibration/deembedding.rs": [
+      "src/network.rs"
+    ],
+    "src/calibration/mod.rs": [
+      "src/calibration/calibration_set.rs",
+      "src/calibration/calibration.rs",
+      "src/calibration/deembedding.rs"
+    ],
+    "src/calibration/tests/deembed/deemb_ind.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind2.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind3.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind4.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind5.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind6.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind7.s2p": [],
+    "src/calibration/tests/deembed/deemb_ind8.s2p": [],
+    "src/calibration/tests/deembed/deemb_open.s2p": [],
+    "src/calibration/tests/deembed/deemb_open2.s2p": [],
+    "src/calibration/tests/deembed/deemb_open7.s2p": [],
+    "src/calibration/tests/deembed/deemb_short.s2p": [],
+    "src/calibration/tests/deembed/deemb_short2.s2p": [],
+    "src/calibration/tests/deembed/deemb_short8.s2p": [],
+    "src/calibration/tests/deembed/deemb_thru3.s2p": [],
+    "src/calibration/tests/deembed/deemb_thru4.s2p": [],
+    "src/calibration/tests/deembed/deemb_thru5.s2p": [],
+    "src/calibration/tests/deembed/deemb_thru6.s2p": [],
+    "src/calibration/tests/deembed/fdf.s2p": [],
+    "src/calibration/tests/deembed/s2xthru.s2p": [],
+    "src/calibration/tests/delay short.s1p": [],
+    "src/calibration/tests/embedingNetwork.s2p": [],
+    "src/calibration/tests/match.s1p": [],
+    "src/calibration/tests/open.s1p": [],
+    "src/calibration/tests/short.s1p": [],
+    "src/calibration/tests/test_calibration_set.rs": [],
+    "src/calibration/tests/test_calibration.rs": [],
+    "src/calibration/tests/test_deembedding.rs": [],
+    "src/circuit.rs": [
+      "src/math.rs",
+      "src/network.rs"
+    ],
+    "src/constants.rs": [],
+    "src/data.rs": [
+      "src/calibration/mod.rs",
+      "src/io/mod.rs"
+    ],
+    "src/data/delay_short.s1p": [],
+    "src/data/ieeetrans.mplstyle": [],
+    "src/data/ind.s2p": [],
+    "src/data/line.s2p": [],
+    "src/data/ntwk1.s2p": [],
+    "src/data/one_port.cal": [],
+    "src/data/open.s2p": [],
+    "src/data/ring slot measured.s1p": [],
+    "src/data/ring slot.s2p": [],
+    "src/data/ro,1.s1p": [],
+    "src/data/ro,2.s1p": [],
+    "src/data/ro,3.s1p": [],
+    "src/data/short.s1p": [],
+    "src/data/short.s2p": [],
+    "src/data/skrf_wide.mplstyle": [],
+    "src/data/skrf.mplstyle": [],
+    "src/data/skrf2_wide.mplstyle": [],
+    "src/data/skrf2.mplstyle": [],
+    "src/data/skrfSesh.p": [],
+    "src/data/tee.s3p": [],
+    "src/data/wr1p5,line.s2p": [],
+    "src/data/wr1p5,short.s1p": [],
+    "src/data/wr2p2,delayshort.s1p": [],
+    "src/data/wr2p2,line.s2p": [],
+    "src/data/wr2p2,line1.s2p": [],
+    "src/data/wr2p2,short.s1p": [],
+    "src/docs.rs": [],
+    "src/error.rs": [],
+    "src/frequency.rs": [],
+    "src/instances.rs": [
+      "src/constants.rs",
+      "src/media/mod.rs"
+    ],
+    "src/io/citi.rs": [
+      "src/network.rs"
+    ],
+    "src/io/csv.rs": [],
+    "src/io/general.rs": [],
+    "src/io/mdif.rs": [
+      "src/network.rs"
+    ],
+    "src/io/metas.rs": [],
+    "src/io/mod.rs": [
+      "src/io/citi.rs",
+      "src/io/csv.rs",
+      "src/io/general.rs",
+      "src/io/mdif.rs",
+      "src/io/metas.rs",
+      "src/io/touchstone.rs"
+    ],
+    "src/io/tests/ansys_modal_data.s2p": [],
+    "src/io/tests/ansys_terminal_data.s4p": [],
+    "src/io/tests/comments.s3p": [],
+    "src/io/tests/double_option_line.s2p": [],
+    "src/io/tests/embedingNetwork.s2p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s10p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s11p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s12p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s13p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s14p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s15p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s16p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s17p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s18p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s19p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s1p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s20p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s21p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s22p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s2p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s3p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s4p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s5p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s6p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s7p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s8p": [],
+    "src/io/tests/HFSS_2019R2/test_multiport.s9p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s10p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s11p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s12p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s13p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s14p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s15p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s16p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s17p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s18p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s19p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s1p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s20p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s21p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s22p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s2p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s3p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s4p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s5p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s6p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s7p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s8p": [],
+    "src/io/tests/HFSS_2020R2/test_multiport.s9p": [],
+    "src/io/tests/hfss_oneport.s1p": [],
+    "src/io/tests/hfss_twoport.s2p": [],
+    "src/io/tests/match.s1p": [],
+    "src/io/tests/MDIF_CITI_MDL/test_1p_citi_2_ri.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_1p_citi.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_1p_gmdif_2.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_1p_gmdif.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_citi_2.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_citi_2params_db.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_citi_2params.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_citi_3_ri.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_citi.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_2.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_3.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_yz.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif_z.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_gmdif.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_2p_only_freq_VAR.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_4p_citi.cti": [],
+    "src/io/tests/MDIF_CITI_MDL/test_4p_gmdif.mdf": [],
+    "src/io/tests/MDIF_CITI_MDL/test_comment_after_BEGIN.mdf": [],
+    "src/io/tests/ntwk1.s2p": [],
+    "src/io/tests/ntwk2.s2p": [],
+    "src/io/tests/ntwk3.s2p": [],
+    "src/io/tests/open.s1p": [],
+    "src/io/tests/pna_csv_reim.csv": [],
+    "src/io/tests/short.s1p": [],
+    "src/io/tests/simple_touchstone.s2p": [],
+    "src/io/tests/test_citi.rs": [],
+    "src/io/tests/test_csv.rs": [],
+    "src/io/tests/test_encoding_ISO-8859-1.s2p": [],
+    "src/io/tests/test_encoding_unknown.s2p": [],
+    "src/io/tests/test_encoding_UTF-8-SIG.s2p": [],
+    "src/io/tests/test_io.rs": [],
+    "src/io/tests/test_mdif.rs": [],
+    "src/io/tests/test_touchstone.rs": [],
+    "src/io/tests/test_ts_spec.rs": [],
+    "src/io/tests/ts/ansys.ts": [],
+    "src/io/tests/ts/ex_1.ts": [],
+    "src/io/tests/ts/ex_10.ts": [],
+    "src/io/tests/ts/ex_11.s2p": [],
+    "src/io/tests/ts/ex_12_g.ts": [],
+    "src/io/tests/ts/ex_12.ts": [],
+    "src/io/tests/ts/ex_13.s2p": [],
+    "src/io/tests/ts/ex_14.s4p": [],
+    "src/io/tests/ts/ex_16.ts": [],
+    "src/io/tests/ts/ex_17.ts": [],
+    "src/io/tests/ts/ex_18.s2p": [],
+    "src/io/tests/ts/ex_2.ts": [],
+    "src/io/tests/ts/ex_3.ts": [],
+    "src/io/tests/ts/ex_4.ts": [],
+    "src/io/tests/ts/ex_5.ts": [],
+    "src/io/tests/ts/ex_6.ts": [],
+    "src/io/tests/ts/ex_7.ts": [],
+    "src/io/tests/ts/ex_8.s1p": [],
+    "src/io/tests/ts/ex_9.s1p": [],
+    "src/io/touchstone.rs": [
+      "src/media/mod.rs",
+      "src/network.rs"
+    ],
+    "src/lib.rs": [
+      "src/calibration/mod.rs",
+      "src/circuit.rs",
+      "src/constants.rs",
+      "src/data.rs",
+      "src/docs.rs",
+      "src/error.rs",
+      "src/frequency.rs",
+      "src/instances.rs",
+      "src/io/mod.rs",
+      "src/math.rs",
+      "src/media/mod.rs",
+      "src/network_set.rs",
+      "src/network.rs",
+      "src/notebook.rs",
+      "src/plotting.rs",
+      "src/qfactor.rs",
+      "src/taper.rs",
+      "src/time.rs",
+      "src/transmission_line.rs",
+      "src/util.rs",
+      "src/vector_fitting.rs",
+      "src/vi/mod.rs"
+    ],
+    "src/math.rs": [
+      "src/constants.rs"
+    ],
+    "src/media/circular_waveguide.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/coaxial.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/cpw.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/defined_a_ep_tand_z0.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/device.rs": [],
+    "src/media/distributed_circuit.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/freespace.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/media.rs": [],
+    "src/media/mline.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/mod.rs": [
+      "src/constants.rs",
+      "src/math.rs",
+      "src/media/circular_waveguide.rs",
+      "src/media/coaxial.rs",
+      "src/media/cpw.rs",
+      "src/media/defined_a_ep_tand_z0.rs",
+      "src/media/device.rs",
+      "src/media/distributed_circuit.rs",
+      "src/media/freespace.rs",
+      "src/media/media.rs",
+      "src/media/mline.rs",
+      "src/media/rectangular_waveguide.rs"
+    ],
+    "src/media/rectangular_waveguide.rs": [
+      "src/media/mod.rs"
+    ],
+    "src/media/tests/ads/capacitor_q.s2p": [],
+    "src/media/tests/ads/cpw,t=0um.s2p": [],
+    "src/media/tests/ads/cpw,t=35um.s2p": [],
+    "src/media/tests/ads/cpwg,t=0um.s2p": [],
+    "src/media/tests/ads/cpwg,t=35um.s2p": [],
+    "src/media/tests/ads/inductor_q.s2p": [],
+    "src/media/tests/ads/mlin,djordjevicsvensson,kirschning.s2p": [],
+    "src/media/tests/ads/mlin,djordjevicsvensson,kobayashi.s2p": [],
+    "src/media/tests/ads/mlin,djordjevicsvensson,yamashita.s2p": [],
+    "src/media/tests/ads/mlin,freqencyinvariant,kirschning.s2p": [],
+    "src/media/tests/ads/mlin,freqencyinvariant,kobayashi.s2p": [],
+    "src/media/tests/ads/mlin,freqencyinvariant,yamashita.s2p": [],
+    "src/media/tests/awr/tlinp.s2p": [],
+    "src/media/tests/qucs_prj/capacitor,p01pF.s2p": [],
+    "src/media/tests/qucs_prj/capacitor.dat": [],
+    "src/media/tests/qucs_prj/capacitor.dpl": [],
+    "src/media/tests/qucs_prj/capacitor.sch": [],
+    "src/media/tests/qucs_prj/coaxial.dat": [],
+    "src/media/tests/qucs_prj/coaxial.dpl": [],
+    "src/media/tests/qucs_prj/coaxial.s2p": [],
+    "src/media/tests/qucs_prj/coaxial.sch": [],
+    "src/media/tests/qucs_prj/cpw_qucs_ep_r9dot5.csv": [],
+    "src/media/tests/qucs_prj/cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "src/media/tests/qucs_prj/cpw,t=0,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p": [],
+    "src/media/tests/qucs_prj/cpw,t=0,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "src/media/tests/qucs_prj/cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p": [],
+    "src/media/tests/qucs_prj/cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "src/media/tests/qucs_prj/cpw.dat": [],
+    "src/media/tests/qucs_prj/cpw.dpl": [],
+    "src/media/tests/qucs_prj/cpw.s2p": [],
+    "src/media/tests/qucs_prj/cpw.sch": [],
+    "src/media/tests/qucs_prj/cpw2.dat": [],
+    "src/media/tests/qucs_prj/cpw2.dpl": [],
+    "src/media/tests/qucs_prj/cpw2.sch": [],
+    "src/media/tests/qucs_prj/distributedCircuit,line.dat": [],
+    "src/media/tests/qucs_prj/distributedCircuit,line.dpl": [],
+    "src/media/tests/qucs_prj/distributedCircuit,line1mm.s2p": [],
+    "src/media/tests/qucs_prj/distributedCircuit.sch": [],
+    "src/media/tests/qucs_prj/impedanceMismatch,50to25.s2p": [],
+    "src/media/tests/qucs_prj/impedanceMismatch.dat": [],
+    "src/media/tests/qucs_prj/impedanceMismatch.dpl": [],
+    "src/media/tests/qucs_prj/impedanceMismatch.sch": [],
+    "src/media/tests/qucs_prj/inductor,p1nH.s2p": [],
+    "src/media/tests/qucs_prj/inductor.dat": [],
+    "src/media/tests/qucs_prj/inductor.dpl": [],
+    "src/media/tests/qucs_prj/inductor.sch": [],
+    "src/media/tests/qucs_prj/mediaTestCase": [],
+    "src/media/tests/qucs_prj/mline,hammerstad,hammerstad.s2p": [],
+    "src/media/tests/qucs_prj/mline,hammerstad,kirschning.s2p": [],
+    "src/media/tests/qucs_prj/mline,hammerstad,kobayashi.s2p": [],
+    "src/media/tests/qucs_prj/mline,hammerstad,yamashita.s2p": [],
+    "src/media/tests/qucs_prj/mline,schneider,schneider.s2p": [],
+    "src/media/tests/qucs_prj/mline,wheeler,schneider.s2p": [],
+    "src/media/tests/qucs_prj/mline.dat": [],
+    "src/media/tests/qucs_prj/mline.dpl": [],
+    "src/media/tests/qucs_prj/mline.sch": [],
+    "src/media/tests/qucs_prj/rectangularWaveguideWR10,200mil.s2p": [],
+    "src/media/tests/qucs_prj/resistor,1ohm.s2p": [],
+    "src/media/tests/qucs_prj/resistor.dat": [],
+    "src/media/tests/qucs_prj/resistor.dpl": [],
+    "src/media/tests/qucs_prj/resistor.sch": [],
+    "src/media/tests/qucs_prj/waveguideThru.dat": [],
+    "src/media/tests/qucs_prj/waveguideThru.dpl": [],
+    "src/media/tests/qucs_prj/waveguideThru.sch": [],
+    "src/media/tests/README.rst": [],
+    "src/media/tests/test_all_construction.rs": [],
+    "src/media/tests/test_coaxial.rs": [],
+    "src/media/tests/test_cpw.rs": [],
+    "src/media/tests/test_definedaeptandz0.rs": [],
+    "src/media/tests/test_distributed_circuit.rs": [],
+    "src/media/tests/test_media.rs": [],
+    "src/media/tests/test_mline.rs": [],
+    "src/media/tests/test_rectangular_waveguide.rs": [],
+    "src/media/tests/wr1p5_1in_swg_Al_0rough.s2p": [],
+    "src/media/tests/wr1p5_1in_swg_Al_100nm_rough.s2p": [],
+    "src/network_set.rs": [
+      "src/io/mod.rs"
+    ],
+    "src/network.rs": [
+      "src/constants.rs",
+      "src/math.rs"
+    ],
+    "src/notebook.rs": [],
+    "src/notebook/bokeh_.rs": [
+      "src/plotting.rs"
+    ],
+    "src/notebook/matplotlib_.rs": [],
+    "src/notebook/utils.rs": [],
+    "src/plotting.rs": [
+      "src/math.rs",
+      "src/network.rs"
+    ],
+    "src/programs/plot_touchstone.rs": [],
+    "src/programs/readme.txt": [],
+    "src/qfactor.rs": [],
+    "src/taper.rs": [
+      "src/math.rs",
+      "src/media/mod.rs"
+    ],
+    "src/tests/Agilent_E5071B.s4p": [],
+    "src/tests/Clarity_example.S2P": [],
+    "src/tests/cst_example_4ports.s4p": [],
+    "src/tests/cst_example_6ports_V2.s6p": [],
+    "src/tests/cst_example_6ports_V2.ts": [],
+    "src/tests/cst_example_6ports.s6p": [],
+    "src/tests/designer_variable_coupler_ideal_20deg.s4p": [],
+    "src/tests/designer_variable_coupler_ideal_75deg.s4p": [],
+    "src/tests/designer_wilkinson_splitter.s3p": [],
+    "src/tests/fet.s2p": [],
+    "src/tests/helic_example_6ports_V2.sp": [],
+    "src/tests/helic_example_6ports_V2.ts": [],
+    "src/tests/hfss_18.2.s3p": [],
+    "src/tests/hfss_19.2.s10p": [],
+    "src/tests/hfss_19.2.s8p": [],
+    "src/tests/hfss_oneport_powerwave.s1p": [],
+    "src/tests/hfss_oneport.s1p": [],
+    "src/tests/hfss_threeport_DB_50Ohm.s3p": [],
+    "src/tests/hfss_threeport_DB.s3p": [],
+    "src/tests/hfss_threeport_MA_50Ohm.s3p": [],
+    "src/tests/hfss_threeport_MA_without_gamma_z0_50Ohm.s3p": [],
+    "src/tests/hfss_threeport_MA.s3p": [],
+    "src/tests/hfss_twoport.s2p": [],
+    "src/tests/LFCN-2352+_Plus125degC.s2p": [],
+    "src/tests/LFCN-2352+_Plus25degC.s2p": [],
+    "src/tests/load_gain_circle_ads.csv": [],
+    "src/tests/load_stability_circle_ads.csv": [],
+    "src/tests/maxgain_ads.csv": [],
+    "src/tests/metas_tdr/short_10ps_10g_40g_band_pass_impulse.csv": [],
+    "src/tests/metas_tdr/short_10ps_10g_40g.s1p": [],
+    "src/tests/metas_tdr/short_10ps_10g_50g_band_pass_impulse.csv": [],
+    "src/tests/metas_tdr/short_10ps_10g_50g.s1p": [],
+    "src/tests/metas_tdr/short_10ps_dc_40g_band_pass_impulse.csv": [],
+    "src/tests/metas_tdr/short_10ps_dc_40g_low_pass_impulse.csv": [],
+    "src/tests/metas_tdr/short_10ps_dc_40g_low_pass_step.csv": [],
+    "src/tests/metas_tdr/short_10ps_dc_40g.s1p": [],
+    "src/tests/metas_tdr/short_10ps_dc_50g_band_pass_impulse.csv": [],
+    "src/tests/metas_tdr/short_10ps_dc_50g_low_pass_impulse.csv": [],
+    "src/tests/metas_tdr/short_10ps_dc_50g_low_pass_step.csv": [],
+    "src/tests/metas_tdr/short_10ps_dc_50g.s1p": [],
+    "src/tests/nf_circle_mwo.csv": [],
+    "src/tests/ntwk_arbitrary_frequency.s2p": [],
+    "src/tests/ntwk_noise_interp.s2p": [],
+    "src/tests/ntwk_noise.s2p": [],
+    "src/tests/ntwk.s32p": [],
+    "src/tests/ntwk1.ntwk": [],
+    "src/tests/ntwk1.s2p": [],
+    "src/tests/ntwk2.s2p": [],
+    "src/tests/ntwk3.s2p": [],
+    "src/tests/ntwk4_n.s2p": [],
+    "src/tests/ntwk4.s2p": [],
+    "src/tests/ntwks/ntwk1.s2p": [],
+    "src/tests/ntwks/ntwk2.s2p": [],
+    "src/tests/ntwks/ntwk3.s2p": [],
+    "src/tests/PowerSI_example.S8P": [],
+    "src/tests/qfactor_data/Figure23.txt": [],
+    "src/tests/qfactor_data/Figure27.txt": [],
+    "src/tests/qfactor_data/Figure6b.txt": [],
+    "src/tests/qfactor_data/Notes_and_Licence.txt": [],
+    "src/tests/qfactor_data/Table6c27.txt": [],
+    "src/tests/RS_ZNB8.s4p": [],
+    "src/tests/RS_ZVR_1.20_beta_f.s2p": [],
+    "src/tests/smodel export from mwo.txt": [],
+    "src/tests/source_gain_circle_ads.csv": [],
+    "src/tests/source_stability_circle_ads.csv": [],
+    "src/tests/test_circuit.rs": [],
+    "src/tests/test_convenience.rs": [],
+    "src/tests/test_frequency.rs": [],
+    "src/tests/test_init.rs": [],
+    "src/tests/test_math_functions.rs": [],
+    "src/tests/test_network_set.rs": [],
+    "src/tests/test_network.rs": [],
+    "src/tests/test_plotting.rs": [],
+    "src/tests/test_qfactor.rs": [],
+    "src/tests/test_static_data.rs": [],
+    "src/tests/test_taper.rs": [],
+    "src/tests/test_tline_functions.rs": [],
+    "src/tests/test_util.rs": [],
+    "src/tests/test_vector_fitting.rs": [],
+    "src/tests/thru.s2p": [],
+    "src/tests/tmp_skrf_oneport_powerwave.s1p": [],
+    "src/time.rs": [],
+    "src/transmission_line.rs": [
+      "src/constants.rs"
+    ],
+    "src/util.rs": [],
+    "src/vector_fitting.rs": [
+      "src/math.rs",
+      "src/plotting.rs"
+    ],
+    "src/vi/mod.rs": [
+      "src/vi/scpi_errors.rs",
+      "src/vi/validators.rs",
+      "src/vi/visa.rs",
+      "src/vi/vna/mod.rs"
+    ],
+    "src/vi/scpi_errors.rs": [],
+    "src/vi/tests/test_validators.rs": [],
+    "src/vi/tests/test_vna.rs": [],
+    "src/vi/validators.rs": [],
+    "src/vi/visa.rs": [
+      "src/vi/vna/mod.rs"
+    ],
+    "src/vi/vna/hp/hp8510c_sweep_plan.rs": [],
+    "src/vi/vna/hp/hp8510c.rs": [],
+    "src/vi/vna/hp/hp8720b.rs": [],
+    "src/vi/vna/hp/mod.rs": [
+      "src/vi/vna/hp/hp8510c_sweep_plan.rs",
+      "src/vi/vna/hp/hp8510c.rs",
+      "src/vi/vna/hp/hp8720b.rs"
+    ],
+    "src/vi/vna/hp/tests/test_8510c_sweep_plan.rs": [],
+    "src/vi/vna/hp/tests/test_8510c.rs": [],
+    "src/vi/vna/hp/tests/test_hp8720b.rs": [],
+    "src/vi/vna/keysight/fieldfox.rs": [
+      "src/vi/validators.rs"
+    ],
+    "src/vi/vna/keysight/mod.rs": [
+      "src/vi/vna/keysight/fieldfox.rs",
+      "src/vi/vna/keysight/pna.rs"
+    ],
+    "src/vi/vna/keysight/pna.rs": [
+      "src/vi/validators.rs"
+    ],
+    "src/vi/vna/keysight/tests/test_fieldfox.rs": [],
+    "src/vi/vna/keysight/tests/test_pna.rs": [],
+    "src/vi/vna/mod.rs": [
+      "src/vi/vna/hp/mod.rs",
+      "src/vi/vna/keysight/mod.rs",
+      "src/vi/vna/nanovna/mod.rs",
+      "src/vi/vna/rohde_schwarz/mod.rs",
+      "src/vi/vna/vna.rs"
+    ],
+    "src/vi/vna/nanovna/mod.rs": [
+      "src/vi/vna/nanovna/nanovna.rs"
+    ],
+    "src/vi/vna/nanovna/nanovna.rs": [],
+    "src/vi/vna/rohde_schwarz/mod.rs": [
+      "src/vi/vna/rohde_schwarz/rs_vna.rs",
+      "src/vi/vna/rohde_schwarz/zna.rs",
+      "src/vi/vna/rohde_schwarz/zva.rs"
+    ],
+    "src/vi/vna/rohde_schwarz/rs_vna.rs": [
+      "src/vi/validators.rs"
+    ],
+    "src/vi/vna/rohde_schwarz/tests/test_zna.rs": [],
+    "src/vi/vna/rohde_schwarz/tests/test_zva.rs": [],
+    "src/vi/vna/rohde_schwarz/zna.rs": [],
+    "src/vi/vna/rohde_schwarz/zva.rs": [],
+    "src/vi/vna/vna.rs": [
+      "src/vi/scpi_errors.rs"
+    ],
+    "tests/constants.rs": [],
+    "tests/docs.rs": [],
+    "tests/fixtures/ansys_modal_data.s2p": [],
+    "tests/fixtures/ansys.ts": [],
+    "tests/fixtures/convenience/Agilent_E5071B.s4p": [],
+    "tests/fixtures/convenience/cst_example_4ports.s4p": [],
+    "tests/fixtures/convenience/cst_example_6ports_V2.s6p": [],
+    "tests/fixtures/convenience/cst_example_6ports_V2.ts": [],
+    "tests/fixtures/convenience/cst_example_6ports.s6p": [],
+    "tests/fixtures/convenience/helic_example_6ports_V2.sp": [],
+    "tests/fixtures/convenience/helic_example_6ports_V2.ts": [],
+    "tests/fixtures/convenience/hfss_18.2.s3p": [],
+    "tests/fixtures/convenience/hfss_19.2.s10p": [],
+    "tests/fixtures/convenience/hfss_19.2.s8p": [],
+    "tests/fixtures/convenience/hfss_oneport.s1p": [],
+    "tests/fixtures/convenience/hfss_threeport_DB_50Ohm.s3p": [],
+    "tests/fixtures/convenience/hfss_threeport_DB.s3p": [],
+    "tests/fixtures/convenience/hfss_threeport_MA_50Ohm.s3p": [],
+    "tests/fixtures/convenience/hfss_threeport_MA_without_gamma_z0_50Ohm.s3p": [],
+    "tests/fixtures/convenience/hfss_threeport_MA.s3p": [],
+    "tests/fixtures/convenience/hfss_twoport.s2p": [],
+    "tests/fixtures/convenience/ntwk1.s2p": [],
+    "tests/fixtures/convenience/RS_ZNB8.s4p": [],
+    "tests/fixtures/convenience/RS_ZVR_1.20_beta_f.s2p": [],
+    "tests/fixtures/designer_wilkinson_splitter.s3p": [],
+    "tests/fixtures/double_option_line.s2p": [],
+    "tests/fixtures/media/awr/tlinp.s2p": [],
+    "tests/fixtures/media/cpw/ads/cpw,t=0um.s2p": [],
+    "tests/fixtures/media/cpw/ads/cpwg,t=0um.s2p": [],
+    "tests/fixtures/media/cpw/qucs/cpw_qucs_ep_r9dot5.csv": [],
+    "tests/fixtures/media/cpw/qucs/cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "tests/fixtures/media/cpw/qucs/cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p": [],
+    "tests/fixtures/media/cpw/qucs/cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p": [],
+    "tests/fixtures/media/mline/ads/mlin,djordjevicsvensson,kirschning.s2p": [],
+    "tests/fixtures/media/mline/ads/mlin,djordjevicsvensson,kobayashi.s2p": [],
+    "tests/fixtures/media/mline/ads/mlin,djordjevicsvensson,yamashita.s2p": [],
+    "tests/fixtures/media/mline/ads/mlin,freqencyinvariant,kirschning.s2p": [],
+    "tests/fixtures/media/mline/ads/mlin,freqencyinvariant,kobayashi.s2p": [],
+    "tests/fixtures/media/mline/ads/mlin,freqencyinvariant,yamashita.s2p": [],
+    "tests/fixtures/media/mline/qucs/mline,hammerstad,hammerstad.s2p": [],
+    "tests/fixtures/media/mline/qucs/mline,hammerstad,kirschning.s2p": [],
+    "tests/fixtures/media/mline/qucs/mline,hammerstad,kobayashi.s2p": [],
+    "tests/fixtures/media/mline/qucs/mline,hammerstad,yamashita.s2p": [],
+    "tests/fixtures/media/mline/qucs/mline,schneider,schneider.s2p": [],
+    "tests/fixtures/media/mline/qucs/mline,wheeler,schneider.s2p": [],
+    "tests/fixtures/media/qucs/distributedCircuit,line1mm.s2p": [],
+    "tests/fixtures/media/rectangular_waveguide/wr1p5_1in_swg_Al_0rough.s2p": [],
+    "tests/fixtures/media/rectangular_waveguide/wr1p5_1in_swg_Al_100nm_rough.s2p": [],
+    "tests/fixtures/noise.ts": [],
+    "tests/fixtures/qfactor/Figure23.txt": [],
+    "tests/fixtures/qfactor/Figure27.txt": [],
+    "tests/fixtures/qfactor/Figure6b.txt": [],
+    "tests/fixtures/qfactor/Notes_and_Licence.txt": [],
+    "tests/fixtures/qfactor/Table6c27.txt": [],
+    "tests/fixtures/simple_touchstone.s2p": [],
+    "tests/fixtures/ts-spec/ansys.ts": [],
+    "tests/fixtures/ts-spec/ex_1.ts": [],
+    "tests/fixtures/ts-spec/ex_10.ts": [],
+    "tests/fixtures/ts-spec/ex_11.s2p": [],
+    "tests/fixtures/ts-spec/ex_12_g.ts": [],
+    "tests/fixtures/ts-spec/ex_12.ts": [],
+    "tests/fixtures/ts-spec/ex_13.s2p": [],
+    "tests/fixtures/ts-spec/ex_14.s4p": [],
+    "tests/fixtures/ts-spec/ex_16.ts": [],
+    "tests/fixtures/ts-spec/ex_17.ts": [],
+    "tests/fixtures/ts-spec/ex_18.s2p": [],
+    "tests/fixtures/ts-spec/ex_2.ts": [],
+    "tests/fixtures/ts-spec/ex_3.ts": [],
+    "tests/fixtures/ts-spec/ex_4.ts": [],
+    "tests/fixtures/ts-spec/ex_5.ts": [],
+    "tests/fixtures/ts-spec/ex_6.ts": [],
+    "tests/fixtures/ts-spec/ex_7.ts": [],
+    "tests/fixtures/ts-spec/ex_8.s1p": [],
+    "tests/fixtures/ts-spec/ex_9.s1p": [],
+    "tests/fixtures/vector_fitting/190ghz_tx_measured.s2p": [],
+    "tests/media_device.rs": [],
+    "tests/metas.rs": [],
+    "tests/nanovna.rs": [],
+    "tests/scpi_errors.rs": [],
+    "tests/time.rs": []
+  }
+}

@@ -1,0 +1,520 @@
+{
+  "version": "1.0.0",
+  "project": "rust-rf",
+  "upstreamProject": "scikit-rf",
+  "gitCommitHash": "d6e524b11ed91cd8842ab3cbaa24a1d10411a797",
+  "mappedFiles": 100,
+  "missingFiles": 1,
+  "mappedNodes": 720,
+  "upstreamNodes": 289,
+  "resolvedDefinitionLines": 138,
+  "mappings": [
+    {
+      "sourcePath": "./skrf/__init__.py",
+      "targetPath": "./src/lib.rs",
+      "strategy": "crate-root"
+    },
+    {
+      "sourcePath": "./skrf/calibration/__init__.py",
+      "targetPath": "./src/calibration/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/calibration/calibration.py",
+      "targetPath": "./src/calibration/calibration.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/calibration/calibrationSet.py",
+      "targetPath": "./src/calibration/calibration_set.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/calibration/deembedding.py",
+      "targetPath": "./src/calibration/deembedding.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/calibration/tests/test_calibration.py",
+      "targetPath": "./src/calibration/tests/test_calibration.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/calibration/tests/test_calibrationSet.py",
+      "targetPath": "./src/calibration/tests/test_calibration_set.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/calibration/tests/test_deembedding.py",
+      "targetPath": "./src/calibration/tests/test_deembedding.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/circuit.py",
+      "targetPath": "./src/circuit.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/constants.py",
+      "targetPath": "./src/constants.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/data/__init__.py",
+      "targetPath": "./src/data.rs",
+      "strategy": "module-file"
+    },
+    {
+      "sourcePath": "./skrf/frequency.py",
+      "targetPath": "./src/frequency.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/instances.py",
+      "targetPath": "./src/instances.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/__init__.py",
+      "targetPath": "./src/io/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/io/citi.py",
+      "targetPath": "./src/io/citi.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/csv.py",
+      "targetPath": "./src/io/csv.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/general.py",
+      "targetPath": "./src/io/general.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/mdif.py",
+      "targetPath": "./src/io/mdif.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/metas.py",
+      "targetPath": "./src/io/metas.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/tests/test_citi.py",
+      "targetPath": "./src/io/tests/test_citi.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/tests/test_csv.py",
+      "targetPath": "./src/io/tests/test_csv.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/tests/test_io.py",
+      "targetPath": "./src/io/tests/test_io.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/tests/test_mdif.py",
+      "targetPath": "./src/io/tests/test_mdif.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/tests/test_touchstone.py",
+      "targetPath": "./src/io/tests/test_touchstone.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/tests/test_ts_spec.py",
+      "targetPath": "./src/io/tests/test_ts_spec.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/io/touchstone.py",
+      "targetPath": "./src/io/touchstone.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/mathFunctions.py",
+      "targetPath": "./src/math.rs",
+      "strategy": "special-name"
+    },
+    {
+      "sourcePath": "./skrf/media/__init__.py",
+      "targetPath": "./src/media/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/media/circularWaveguide.py",
+      "targetPath": "./src/media/circular_waveguide.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/coaxial.py",
+      "targetPath": "./src/media/coaxial.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/cpw.py",
+      "targetPath": "./src/media/cpw.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/definedAEpTandZ0.py",
+      "targetPath": "./src/media/defined_a_ep_tand_z0.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/device.py",
+      "targetPath": "./src/media/device.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/distributedCircuit.py",
+      "targetPath": "./src/media/distributed_circuit.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/freespace.py",
+      "targetPath": "./src/media/freespace.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/media.py",
+      "targetPath": "./src/media/media.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/mline.py",
+      "targetPath": "./src/media/mline.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/rectangularWaveguide.py",
+      "targetPath": "./src/media/rectangular_waveguide.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_all_construction.py",
+      "targetPath": "./src/media/tests/test_all_construction.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_coaxial.py",
+      "targetPath": "./src/media/tests/test_coaxial.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_cpw.py",
+      "targetPath": "./src/media/tests/test_cpw.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_definedaeptandz0.py",
+      "targetPath": "./src/media/tests/test_definedaeptandz0.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_distributedCircuit.py",
+      "targetPath": "./src/media/tests/test_distributed_circuit.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_media.py",
+      "targetPath": "./src/media/tests/test_media.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_mline.py",
+      "targetPath": "./src/media/tests/test_mline.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/media/tests/test_rectangularWaveguide.py",
+      "targetPath": "./src/media/tests/test_rectangular_waveguide.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/network.py",
+      "targetPath": "./src/network.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/networkSet.py",
+      "targetPath": "./src/network_set.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/notebook/__init__.py",
+      "targetPath": "./src/notebook.rs",
+      "strategy": "module-file"
+    },
+    {
+      "sourcePath": "./skrf/notebook/bokeh_.py",
+      "targetPath": "./src/notebook/bokeh_.rs",
+      "strategy": "canonical-stem"
+    },
+    {
+      "sourcePath": "./skrf/notebook/matplotlib_.py",
+      "targetPath": "./src/notebook/matplotlib_.rs",
+      "strategy": "canonical-stem"
+    },
+    {
+      "sourcePath": "./skrf/notebook/utils.py",
+      "targetPath": "./src/notebook/utils.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/plotting.py",
+      "targetPath": "./src/plotting.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/programs/plot_touchstone.py",
+      "targetPath": "./src/programs/plot_touchstone.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/qfactor.py",
+      "targetPath": "./src/qfactor.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/taper.py",
+      "targetPath": "./src/taper.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_circuit.py",
+      "targetPath": "./src/tests/test_circuit.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_convenience.py",
+      "targetPath": "./src/tests/test_convenience.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_frequency.py",
+      "targetPath": "./src/tests/test_frequency.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_init.py",
+      "targetPath": "./src/tests/test_init.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_mathFunctions.py",
+      "targetPath": "./src/tests/test_math_functions.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_network.py",
+      "targetPath": "./src/tests/test_network.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_networkSet.py",
+      "targetPath": "./src/tests/test_network_set.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_plotting.py",
+      "targetPath": "./src/tests/test_plotting.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_qfactor.py",
+      "targetPath": "./src/tests/test_qfactor.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_static_data.py",
+      "targetPath": "./src/tests/test_static_data.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_taper.py",
+      "targetPath": "./src/tests/test_taper.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_tlineFunctions.py",
+      "targetPath": "./src/tests/test_tline_functions.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_util.py",
+      "targetPath": "./src/tests/test_util.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tests/test_vectorfitting.py",
+      "targetPath": "./src/tests/test_vector_fitting.rs",
+      "strategy": "canonical-stem"
+    },
+    {
+      "sourcePath": "./skrf/time.py",
+      "targetPath": "./src/time.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/tlineFunctions.py",
+      "targetPath": "./src/transmission_line.rs",
+      "strategy": "special-name"
+    },
+    {
+      "sourcePath": "./skrf/util.py",
+      "targetPath": "./src/util.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vectorFitting.py",
+      "targetPath": "./src/vector_fitting.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/__init__.py",
+      "targetPath": "./src/vi/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/vi/scpi_errors.py",
+      "targetPath": "./src/vi/scpi_errors.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/tests/test_validators.py",
+      "targetPath": "./src/vi/tests/test_validators.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/tests/test_vna.py",
+      "targetPath": "./src/vi/tests/test_vna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/validators.py",
+      "targetPath": "./src/vi/validators.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/__init__.py",
+      "targetPath": "./src/vi/vna/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/hp/__init__.py",
+      "targetPath": "./src/vi/vna/hp/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/hp/hp8510c.py",
+      "targetPath": "./src/vi/vna/hp/hp8510c.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/hp/hp8510c_sweep_plan.py",
+      "targetPath": "./src/vi/vna/hp/hp8510c_sweep_plan.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/hp/hp8720b.py",
+      "targetPath": "./src/vi/vna/hp/hp8720b.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/hp/tests/test_8510c.py",
+      "targetPath": "./src/vi/vna/hp/tests/test_8510c.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/hp/tests/test_8510c_sweep_plan.py",
+      "targetPath": "./src/vi/vna/hp/tests/test_8510c_sweep_plan.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/keysight/__init__.py",
+      "targetPath": "./src/vi/vna/keysight/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/keysight/fieldfox.py",
+      "targetPath": "./src/vi/vna/keysight/fieldfox.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/keysight/pna.py",
+      "targetPath": "./src/vi/vna/keysight/pna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/keysight/tests/test_fieldfox.py",
+      "targetPath": "./src/vi/vna/keysight/tests/test_fieldfox.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/keysight/tests/test_pna.py",
+      "targetPath": "./src/vi/vna/keysight/tests/test_pna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/nanovna/__init__.py",
+      "targetPath": "./src/vi/vna/nanovna/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/nanovna/nanovna.py",
+      "targetPath": "./src/vi/vna/nanovna/nanovna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/rohde_schwarz/__init__.py",
+      "targetPath": "./src/vi/vna/rohde_schwarz/mod.rs",
+      "strategy": "module-directory"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/rohde_schwarz/rs_vna.py",
+      "targetPath": "./src/vi/vna/rohde_schwarz/rs_vna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/rohde_schwarz/tests/test_zna.py",
+      "targetPath": "./src/vi/vna/rohde_schwarz/tests/test_zna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/rohde_schwarz/tests/test_zva.py",
+      "targetPath": "./src/vi/vna/rohde_schwarz/tests/test_zva.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/rohde_schwarz/zna.py",
+      "targetPath": "./src/vi/vna/rohde_schwarz/zna.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/rohde_schwarz/zva.py",
+      "targetPath": "./src/vi/vna/rohde_schwarz/zva.rs",
+      "strategy": "snake-case"
+    },
+    {
+      "sourcePath": "./skrf/vi/vna/vna.py",
+      "targetPath": "./src/vi/vna/vna.rs",
+      "strategy": "snake-case"
+    }
+  ],
+  "missing": [
+    {
+      "sourcePath": "./skrf/tests/conftest.py",
+      "reason": "No standalone Rust file exists; fixture responsibilities are embedded in ./src/tests/test_convenience.rs.",
+      "relatedTargetPath": "./src/tests/test_convenience.rs"
+    }
+  ]
+}
