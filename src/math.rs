@@ -1,7 +1,14 @@
+//! Common mathematical operations for RF calculations.
+//!
+//! The module covers complex-component conversion, logarithmic units, phase
+//! handling, matrix predicates and solves, random samples, interpolation,
+//! Fourier transforms, and special functions.
+
 use std::sync::{Mutex, OnceLock};
 
 use ndarray::{Array1, Array2, Array3, ArrayD, Axis, IxDyn};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 use rand_distr::{Distribution, Normal};
@@ -15,43 +22,58 @@ use crate::{Error, Result};
 
 static RANDOM_GENERATOR: OnceLock<Mutex<StdRng>> = OnceLock::new();
 
-/// Port of `skrf.mathFunctions.complex_2_magnitude`.
+/// Return the magnitude $|z|$ of a complex value.
+#[must_use]
 pub fn complex_magnitude(value: Complex64) -> f64 {
     value.norm()
 }
 
-/// Port of `skrf.mathFunctions.complex_2_db`.
+/// Return complex magnitude in decibels: $20\log_{10}|z|$.
+#[must_use]
 pub fn complex_to_db(value: Complex64) -> f64 {
     magnitude_to_db(value.norm(), true)
 }
 
-/// Port of `skrf.mathFunctions.complex_2_db10`.
+/// Return complex magnitude on a 10-log scale: $10\log_{10}|z|$.
+#[must_use]
 pub fn complex_to_db10(value: Complex64) -> f64 {
     magnitude_to_db10(value.norm(), true)
 }
 
-/// Port of `skrf.mathFunctions.complex_2_radian`.
+/// Return the counterclockwise phase of a complex value in radians.
+///
+/// The result lies in $(-\pi, \pi]$.
+#[must_use]
 pub fn complex_angle_radians(value: Complex64) -> f64 {
     value.arg()
 }
 
-/// Port of `skrf.mathFunctions.complex_2_degree`.
+/// Return the counterclockwise phase of a complex value in degrees.
+#[must_use]
 pub fn complex_angle_degrees(value: Complex64) -> f64 {
     radians_to_degrees(value.arg())
 }
 
-/// Port of `skrf.mathFunctions.complex_2_quadrature`.
+/// Return complex magnitude and quadrature arc length.
+///
+/// The arc length is $|z|\arg(z)$, where the argument is in radians.
+#[must_use]
 pub fn complex_quadrature(value: Complex64) -> (f64, f64) {
     let magnitude = value.norm();
     (magnitude, value.arg() * magnitude)
 }
 
-/// Port of `skrf.mathFunctions.complex_2_reim`.
-pub fn complex_real_imaginary(value: Complex64) -> (f64, f64) {
+/// Return the real and imaginary components of a complex value.
+#[must_use]
+pub const fn complex_real_imaginary(value: Complex64) -> (f64, f64) {
     (value.re, value.im)
 }
 
-/// Port of `skrf.mathFunctions.complex_components`.
+/// Return all scalar representations of a complex value.
+///
+/// The tuple contains real part, imaginary part, angle in degrees, magnitude,
+/// and quadrature arc length.
+#[must_use]
 pub fn complex_components(value: Complex64) -> (f64, f64, f64, f64, f64) {
     let (magnitude, arc_length) = complex_quadrature(value);
     (
@@ -63,77 +85,95 @@ pub fn complex_components(value: Complex64) -> (f64, f64, f64, f64, f64) {
     )
 }
 
-/// Port of `skrf.mathFunctions.magnitude_2_db`.
+/// Convert linear magnitude to decibels using $20\log_{10}(x)$.
+///
+/// If `replace_nan` is true, a NaN logarithm is replaced by the crate's
+/// finite sentinel for the logarithm of a negative value.
+#[must_use]
 pub fn magnitude_to_db(value: f64, replace_nan: bool) -> f64 {
     replace_logarithm_nan(20.0 * value.log10(), replace_nan)
 }
 
-/// Port of `skrf.mathFunctions.mag_2_db10`.
+/// Convert linear magnitude to a 10-log decibel value using $10\log_{10}(x)$.
+#[must_use]
 pub fn magnitude_to_db10(value: f64, replace_nan: bool) -> f64 {
     replace_logarithm_nan(10.0 * value.log10(), replace_nan)
 }
 
-/// Port of `skrf.mathFunctions.db_2_magnitude`.
+/// Convert a 20-log decibel value to linear magnitude: $10^{x/20}$.
+#[must_use]
 pub fn db_to_magnitude(value: f64) -> f64 {
     10.0_f64.powf(value / 20.0)
 }
 
-/// Port of `skrf.mathFunctions.db10_2_mag` for complex dB values.
+/// Convert a complex 10-log decibel value to linear magnitude: $10^{z/10}$.
+#[must_use]
 pub fn db10_to_complex_magnitude(value: Complex64) -> Complex64 {
     (value * (std::f64::consts::LN_10 / 10.0)).exp()
 }
 
-/// Port of `skrf.mathFunctions.db10_2_mag` for real dB values.
+/// Convert a real 10-log decibel value to linear magnitude: $10^{x/10}$.
+#[must_use]
 pub fn db10_to_magnitude(value: f64) -> f64 {
     10.0_f64.powf(value / 10.0)
 }
 
-/// Port of `skrf.mathFunctions.magdeg_2_reim`.
+/// Construct a complex value from linear magnitude and phase in degrees.
+#[must_use]
 pub fn magnitude_degrees_to_complex(magnitude: f64, degrees: f64) -> Complex64 {
     Complex64::from_polar(magnitude, degrees_to_radians(degrees))
 }
 
-/// Port of `skrf.mathFunctions.dbdeg_2_reim`.
+/// Construct a complex value from 20-log magnitude in dB and phase in degrees.
+#[must_use]
 pub fn db_degrees_to_complex(db: f64, degrees: f64) -> Complex64 {
     magnitude_degrees_to_complex(db_to_magnitude(db), degrees)
 }
 
-/// Port of `skrf.mathFunctions.db_2_np`.
+/// Convert decibels to nepers: $\mathrm{Np}=\ln(10)\,\mathrm{dB}/20$.
+#[must_use]
 pub fn db_to_nepers(db: f64) -> f64 {
     std::f64::consts::LN_10 / 20.0 * db
 }
 
-/// Port of `skrf.mathFunctions.np_2_db`.
+/// Convert nepers to decibels: $\mathrm{dB}=20\,\mathrm{Np}/\ln(10)$.
+#[must_use]
 pub fn nepers_to_db(nepers: f64) -> f64 {
     20.0 / std::f64::consts::LN_10 * nepers
 }
 
-/// Port of `skrf.mathFunctions.radian_2_degree`.
-pub fn radians_to_degrees(radians: f64) -> f64 {
-    radians * 180.0 / std::f64::consts::PI
+/// Convert an angle from radians to degrees.
+#[must_use]
+pub const fn radians_to_degrees(radians: f64) -> f64 {
+    radians.to_degrees()
 }
 
-/// Port of `skrf.mathFunctions.degree_2_radian`.
-pub fn degrees_to_radians(degrees: f64) -> f64 {
-    degrees * std::f64::consts::PI / 180.0
+/// Convert an angle from degrees to radians.
+#[must_use]
+pub const fn degrees_to_radians(degrees: f64) -> f64 {
+    degrees.to_radians()
 }
 
-/// Port of `skrf.mathFunctions.feet_2_meter`.
+/// Convert feet to meters using one foot = 0.3048 meters.
+#[must_use]
 pub fn feet_to_meters(feet: f64) -> f64 {
     0.3048 * feet
 }
 
-/// Port of `skrf.mathFunctions.meter_2_feet`.
+/// Convert meters to feet.
+#[must_use]
 pub fn meters_to_feet(meters: f64) -> f64 {
     3.28084 * meters
 }
 
-/// Port of `skrf.mathFunctions.db_per_100feet_2_db_per_100meter`.
+/// Convert attenuation from dB per 100 feet to dB per 100 meters.
+#[must_use]
 pub fn db_per_100_feet_to_db_per_100_meters(value: f64) -> f64 {
     value * 100.0 / feet_to_meters(100.0)
 }
 
-/// Port of `skrf.mathFunctions.inf_to_num`.
+/// Replace positive and negative infinity with finite numerical sentinels.
+#[must_use]
 pub fn infinity_to_number(value: f64) -> f64 {
     if value == f64::INFINITY {
         NUMERICAL_INFINITY
@@ -144,16 +184,25 @@ pub fn infinity_to_number(value: f64) -> f64 {
     }
 }
 
+/// Replace every positive or negative infinity in an array with finite sentinels.
 pub fn infinities_to_numbers(values: &Array1<f64>) -> Array1<f64> {
     values.mapv(infinity_to_number)
 }
 
-/// Port of `skrf.mathFunctions.cross_ratio`.
+/// Calculate the cross ratio of four distinct complex points.
+///
+/// $$r = \frac{(a-b)(c-d)}{(a-d)(c-b)}$$
+///
+/// See [Cross-ratio](https://en.wikipedia.org/wiki/Cross-ratio).
+#[must_use]
 pub fn cross_ratio(a: Complex64, b: Complex64, c: Complex64, d: Complex64) -> Complex64 {
     (a - b) * (c - d) / ((a - d) * (c - b))
 }
 
-/// Port of `skrf.mathFunctions.unwrap_rad` for a one-dimensional phase trace.
+/// Unwrap a one-dimensional phase trace in radians.
+///
+/// Jumps larger than $\pi$ are shifted by integer multiples of $2\pi$.
+#[must_use]
 pub fn unwrap_radians(phase: &Array1<f64>) -> Array1<f64> {
     if phase.is_empty() {
         return phase.clone();
@@ -163,16 +212,17 @@ pub fn unwrap_radians(phase: &Array1<f64>) -> Array1<f64> {
     for index in 1..phase.len() {
         let difference = phase[index] - phase[index - 1];
         if difference > std::f64::consts::PI {
-            offset -= 2.0 * std::f64::consts::PI;
+            offset = 2.0_f64.mul_add(-std::f64::consts::PI, offset);
         } else if difference < -std::f64::consts::PI {
-            offset += 2.0 * std::f64::consts::PI;
+            offset = 2.0_f64.mul_add(std::f64::consts::PI, offset);
         }
         result[index] += offset;
     }
     result
 }
 
-/// Port of `skrf.mathFunctions.sqrt_known_sign` for scalar complex values.
+/// Return a square root whose phase sign matches an approximate value.
+#[must_use]
 pub fn sqrt_known_sign(value_squared: Complex64, approximation: Complex64) -> Complex64 {
     let root = value_squared.sqrt();
     if root.arg().signum() == approximation.arg().signum() {
@@ -182,7 +232,10 @@ pub fn sqrt_known_sign(value_squared: Complex64, approximation: Complex64) -> Co
     }
 }
 
-/// Port of `skrf.mathFunctions.find_correct_sign` for scalar complex values.
+/// Select between two roots by matching the phase sign of an approximation.
+///
+/// This supports branch selection when `$z_1,z_2=\pm\sqrt{z^2}$`.
+#[must_use]
 pub fn find_correct_sign(
     first: Complex64,
     second: Complex64,
@@ -195,7 +248,8 @@ pub fn find_correct_sign(
     }
 }
 
-/// Port of `skrf.mathFunctions.find_closest` for scalar complex values.
+/// Return whichever of two complex values is closest to an approximation.
+#[must_use]
 pub fn find_closest(first: Complex64, second: Complex64, approximation: Complex64) -> Complex64 {
     if (first - approximation).norm() < (second - approximation).norm() {
         first
@@ -204,27 +258,41 @@ pub fn find_closest(first: Complex64, second: Complex64, approximation: Complex6
     }
 }
 
-/// Port of `skrf.mathFunctions.sqrt_phase_unwrap`.
+/// Take a continuous square root of a complex trace using unwrapped phase.
+///
+/// $$\sqrt{|z|}\exp\left(j\,\frac{\operatorname{unwrap}(\arg z)}{2}\right)$$
+#[must_use]
 pub fn sqrt_phase_unwrap(values: &Array1<Complex64>) -> Array1<Complex64> {
-    let phase = unwrap_radians(&values.mapv(|value| value.arg()));
+    let phase = unwrap_radians(&values.mapv(Complex64::arg));
     Array1::from_shape_fn(values.len(), |index| {
         Complex64::from_polar(values[index].norm().sqrt(), phase[index] / 2.0)
     })
 }
 
-/// Port of `skrf.mathFunctions.dirac_delta`.
+/// Evaluate the discrete Dirac indicator: $\delta(x)=1$ for $x=0$, else $0$.
+///
+/// See [Dirac delta function](https://en.wikipedia.org/wiki/Dirac_delta_function).
+#[must_use]
 pub fn dirac_delta(value: f64) -> f64 {
     if value == 0.0 { 1.0 } else { 0.0 }
 }
 
-/// Port of `skrf.mathFunctions.neuman`.
+/// Calculate the Neumann number $2-\delta(x)$.
+#[must_use]
 pub fn neumann_number(value: f64) -> f64 {
     2.0 - dirac_delta(value)
 }
 
-/// Null-space basis computed from the full singular-value decomposition.
+/// Calculate a matrix null-space basis by full singular-value decomposition.
 ///
-/// Origin: `skrf.mathFunctions.null`.
+/// Right-singular vectors whose singular values do not exceed `epsilon` form
+/// the returned basis columns.
+///
+/// See the [SciPy Cookbook discussion](https://scipy-cookbook.readthedocs.io/items/RankNullspace.html).
+///
+/// # Errors
+///
+/// Returns an error when `epsilon` is invalid or the singular-value decomposition fails.
 pub fn null_space(matrix: &Array2<Complex64>, epsilon: f64) -> Result<Array2<Complex64>> {
     if !epsilon.is_finite() || epsilon < 0.0 {
         return Err(Error::Unsupported(
@@ -249,19 +317,29 @@ pub fn null_space(matrix: &Array2<Complex64>, epsilon: f64) -> Result<Array2<Com
     ))
 }
 
-/// Applies a scalar real function independently to the real and imaginary parts.
+/// Apply a scalar real function independently to real and imaginary parts.
 ///
-/// Origin: `skrf.mathFunctions.complexify` for the common first-argument form.
+/// If the input is $z=x+jy$, the result is $f(x)+jf(y)$.
+#[must_use]
 pub fn complexify(value: Complex64, function: impl Fn(f64) -> f64) -> Complex64 {
     Complex64::new(function(value.re), function(value.im))
 }
 
-/// Port of `skrf.mathFunctions.complex2Scalar`.
+/// Serialize complex values as alternating real and imaginary scalars.
+///
+/// The output order is `z[0].re, z[0].im, z[1].re, z[1].im, ...`.
+#[must_use]
 pub fn complex_to_scalar(values: &[Complex64]) -> Array1<f64> {
     Array1::from_iter(values.iter().flat_map(|value| [value.re, value.im]))
 }
 
-/// Port of `skrf.mathFunctions.scalar2Complex`.
+/// Deserialize alternating real and imaginary scalars into complex values.
+///
+/// This is the inverse of [`complex_to_scalar`].
+///
+/// # Errors
+///
+/// Returns an error when `values` does not contain complete real/imaginary pairs.
 pub fn scalar_to_complex(values: &[f64]) -> Result<Array1<Complex64>> {
     if values.len() % 2 != 0 {
         return Err(Error::IncompatibleShape(
@@ -275,7 +353,11 @@ pub fn scalar_to_complex(values: &[f64]) -> Result<Array1<Complex64>> {
     ))
 }
 
-/// Port of `skrf.mathFunctions.flatten_c_mat` using NumPy's default Fortran order.
+/// Flatten a complex matrix in column-major order and split it into scalars.
+///
+/// The result is compatible with `NumPy`'s default Fortran-order MDIF/METAS
+/// serialization.
+#[must_use]
 pub fn flatten_complex_matrix(matrix: &Array2<Complex64>) -> Array1<f64> {
     complex_to_scalar(
         &(0..matrix.ncols())
@@ -284,18 +366,22 @@ pub fn flatten_complex_matrix(matrix: &Array2<Complex64>) -> Array1<f64> {
     )
 }
 
+/// Return whether a matrix has the same number of rows and columns.
+#[must_use]
 pub fn is_square(matrix: &Array2<Complex64>) -> bool {
     matrix.nrows() == matrix.ncols()
 }
 
-/// Port of `skrf.mathFunctions.get_Hermitian_transpose`.
+/// Return the conjugate transpose $A^H$ of a matrix.
+#[must_use]
 pub fn hermitian_transpose(matrix: &Array2<Complex64>) -> Array2<Complex64> {
     Array2::from_shape_fn((matrix.ncols(), matrix.nrows()), |(row, column)| {
         matrix[(column, row)].conj()
     })
 }
 
-/// Port of `skrf.mathFunctions.is_symmetric`.
+/// Test whether a square matrix equals its transpose within `tolerance`.
+#[must_use]
 pub fn is_symmetric(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
     is_square(matrix)
         && (0..matrix.nrows()).all(|row| {
@@ -304,7 +390,8 @@ pub fn is_symmetric(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
         })
 }
 
-/// Port of `skrf.mathFunctions.is_Hermitian`.
+/// Test whether a square matrix equals its conjugate transpose within `tolerance`.
+#[must_use]
 pub fn is_hermitian(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
     is_square(matrix)
         && (0..matrix.nrows()).all(|row| {
@@ -314,7 +401,8 @@ pub fn is_hermitian(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
         })
 }
 
-/// Port of `skrf.mathFunctions.is_unitary`.
+/// Test whether $A^H A=I$ within `tolerance`.
+#[must_use]
 pub fn is_unitary(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
     if !is_square(matrix) {
         return false;
@@ -333,7 +421,11 @@ pub fn is_unitary(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
     true
 }
 
-/// Port of `skrf.mathFunctions.is_positive_definite`.
+/// Test whether a matrix is Hermitian positive definite.
+///
+/// The test first checks Hermitian symmetry and then attempts a Cholesky
+/// factorization with diagonal entries greater than `tolerance`.
+#[must_use]
 pub fn is_positive_definite(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
     if !is_hermitian(matrix, tolerance) {
         return false;
@@ -359,8 +451,11 @@ pub fn is_positive_definite(matrix: &Array2<Complex64>, tolerance: f64) -> bool 
     true
 }
 
-/// Port of `skrf.mathFunctions.is_positive_semidefinite` using an LDL-H
-/// factorization, avoiding a dependency on a general eigensolver.
+/// Test whether a matrix is Hermitian positive semidefinite.
+///
+/// An $LDL^H$ factorization checks that every diagonal value is nonnegative
+/// within `tolerance`.
+#[must_use]
 pub fn is_positive_semidefinite(matrix: &Array2<Complex64>, tolerance: f64) -> bool {
     if !is_hermitian(matrix, tolerance) {
         return false;
@@ -401,7 +496,13 @@ pub fn is_positive_semidefinite(matrix: &Array2<Complex64>, tolerance: f64) -> b
     true
 }
 
-/// Port of `skrf.mathFunctions.rsolve` for batches of square matrices.
+/// Solve $X A=B$ for batches of square matrices.
+///
+/// This is numerically preferable to explicitly computing $B A^{-1}$.
+///
+/// # Errors
+///
+/// Returns an error for incompatible matrix shapes or a singular coefficient matrix.
 pub fn right_solve(
     coefficients: &Array3<Complex64>,
     right_hand_side: &Array3<Complex64>,
@@ -432,8 +533,13 @@ pub fn right_solve(
     Ok(result)
 }
 
-/// Solves `A @ X = B` for batches of square matrices. This is the direct
-/// counterpart to scikit-rf's NumPy `solve` calls used by parameter conversion.
+/// Solve $A X=B$ for batches of square matrices.
+///
+/// This is used by network-parameter conversions without forming an inverse.
+///
+/// # Errors
+///
+/// Returns an error for incompatible matrix shapes or a singular coefficient matrix.
 pub fn left_solve(
     coefficients: &Array3<Complex64>,
     right_hand_side: &Array3<Complex64>,
@@ -464,7 +570,7 @@ pub fn left_solve(
     Ok(result)
 }
 
-/// Rust-native equivalent of `set_rand_rng`, using a deterministic seed.
+/// Reset the module's shared random-number generator to a deterministic seed.
 pub fn set_random_seed(seed: u64) {
     let generator = RANDOM_GENERATOR.get_or_init(|| Mutex::new(StdRng::seed_from_u64(seed)));
     *generator
@@ -472,7 +578,10 @@ pub fn set_random_seed(seed: u64) {
         .unwrap_or_else(std::sync::PoisonError::into_inner) = StdRng::seed_from_u64(seed);
 }
 
-/// Port of `skrf.mathFunctions.rand_c` for a two-dimensional result.
+/// Create a complex random matrix with independent real and imaginary parts.
+///
+/// Each component is uniformly distributed in $(-1,1)$ and uses the shared
+/// generator configured by [`set_random_seed`].
 pub fn random_complex(rows: usize, columns: usize) -> Array2<Complex64> {
     let generator = RANDOM_GENERATOR.get_or_init(|| Mutex::new(StdRng::seed_from_u64(0)));
     let mut generator = generator
@@ -480,13 +589,19 @@ pub fn random_complex(rows: usize, columns: usize) -> Array2<Complex64> {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     Array2::from_shape_fn((rows, columns), |_| {
         Complex64::new(
-            1.0 - 2.0 * generator.random::<f64>(),
-            1.0 - 2.0 * generator.random::<f64>(),
+            2.0_f64.mul_add(-generator.random::<f64>(), 1.0),
+            2.0_f64.mul_add(-generator.random::<f64>(), 1.0),
         )
     })
 }
 
-/// Random polar samples used by `skrf.media.Media.white_gaussian_polar`.
+/// Draw complex polar samples with Gaussian magnitude and phase.
+///
+/// Both distributions have zero mean and the supplied standard deviations.
+///
+/// # Errors
+///
+/// Returns an error when either standard deviation is invalid.
 pub fn random_gaussian_polar(
     rows: usize,
     columns: usize,
@@ -526,10 +641,14 @@ pub fn random_gaussian_polar(
     }))
 }
 
-/// Draws independent zero-mean Gaussian values with per-element deviations.
+/// Draw independent zero-mean Gaussian values with per-element deviations.
 ///
 /// This supports `skrf.networkSet.NetworkSet.add_polar_noise` while sharing
 /// the deterministic generator configured through [`set_random_seed`].
+///
+/// # Errors
+///
+/// Returns an error when a standard deviation is invalid or the output shape cannot be built.
 pub fn random_normal_like(standard_deviations: &Array3<f64>) -> Result<Array3<f64>> {
     if standard_deviations
         .iter()
@@ -561,9 +680,18 @@ pub fn random_normal_like(standard_deviations: &Array3<f64>) -> Result<Array3<f6
         .map_err(|error| Error::IncompatibleShape(error.to_string()))
 }
 
-/// Converts a one-sided complex spectrum into a centered real time signal.
+/// Convert a one-sided complex spectrum into a centered real time signal.
 ///
-/// Origin: `skrf.mathFunctions.psd2TimeDomain`.
+/// The spectrum must be ordered by increasing frequency. A conjugate mirror is
+/// constructed after applying `window`; the returned time axis has reciprocal
+/// units to `frequency`.
+///
+/// If the spectrum is not baseband, the time signal remains modulated by its
+/// initial frequency.
+///
+/// # Errors
+///
+/// Returns an error for incompatible inputs, non-increasing frequencies, or an invalid window.
 pub fn psd_to_time_domain(
     frequency: &Array1<f64>,
     spectrum: &Array1<Complex64>,
@@ -590,7 +718,7 @@ pub fn psd_to_time_domain(
         .iter()
         .skip(1)
         .rev()
-        .map(|value| value.conj())
+        .map(Complex64::conj)
         .chain(windowed.iter().copied())
         .collect::<Vec<_>>();
     complete = ifft_shift_complex(&complete);
@@ -598,13 +726,17 @@ pub fn psd_to_time_domain(
     planner
         .plan_fft_inverse(complete.len())
         .process(&mut complete);
-    let scale = complete.len() as f64;
-    complete.iter_mut().for_each(|value| *value /= scale);
+    let scale = complete.len().to_f64().unwrap_or(f64::INFINITY);
+    for value in &mut complete {
+        *value /= scale;
+    }
     complete = ifft_shift_complex(&complete);
     let period = 1.0 / (frequency[1] - frequency[0]).abs();
     let count = complete.len();
     let time = Array1::from_shape_fn(count, |index| {
-        -period / 2.0 + period * index as f64 / (count - 1) as f64
+        -period / 2.0
+            + period * index.to_f64().unwrap_or(f64::INFINITY)
+                / (count - 1).to_f64().unwrap_or(f64::INFINITY)
     });
     Ok((
         time,
@@ -614,7 +746,13 @@ pub fn psd_to_time_domain(
 
 /// Floater-Hormann barycentric rational interpolator.
 ///
-/// Origin: `skrf.mathFunctions.rational_interp` for axis zero and complex values.
+/// The interpolant has degree `d`, no real-axis poles, and high approximation
+/// rates. Targets within `epsilon` of an input coordinate return the original
+/// value exactly.
+///
+/// See M. S. Floater and K. Hormann, *Barycentric rational interpolation with
+/// no poles and high rates of approximation*, Numerische Mathematik 107,
+/// 315-331 (2007).
 #[derive(Clone, Debug)]
 pub struct RationalInterpolator {
     x: Array1<f64>,
@@ -624,6 +762,14 @@ pub struct RationalInterpolator {
 }
 
 impl RationalInterpolator {
+    /// Construct a scalar complex rational interpolator.
+    ///
+    /// `degree` must be smaller than the number of points. Coordinates are
+    /// sorted unless `assume_sorted` is true and must be strictly increasing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible inputs, invalid coordinates, or an unsupported degree.
     pub fn new(
         x: &Array1<f64>,
         y: &Array1<Complex64>,
@@ -654,7 +800,10 @@ impl RationalInterpolator {
         let x = Array1::from_iter(pairs.iter().map(|pair| pair.0));
         let y = Array1::from_iter(pairs.iter().map(|pair| pair.1));
         let count = x.len();
-        let scale = (x[count / 2] - x[count / 2 - 1]).powi(degree as i32);
+        let exponent = i32::try_from(degree).map_err(|_| {
+            Error::Unsupported("rational interpolation degree is too large".to_owned())
+        })?;
+        let scale = (x[count / 2] - x[count / 2 - 1]).powi(exponent);
         let mut weights = Array1::zeros(count);
         for k in 0..count {
             for i in k.saturating_sub(degree)..(k + 1).min(count - degree) {
@@ -675,6 +824,8 @@ impl RationalInterpolator {
         })
     }
 
+    /// Evaluate the interpolant at each target coordinate.
+    #[must_use]
     pub fn evaluate(&self, targets: &Array1<f64>) -> Array1<Complex64> {
         Array1::from_shape_fn(targets.len(), |target_index| {
             let target = targets[target_index];
@@ -699,7 +850,8 @@ impl RationalInterpolator {
 
 /// Axis-zero Floater-Hormann interpolation for arbitrary trailing dimensions.
 ///
-/// This is the full array-shape counterpart of `skrf.mathFunctions.rational_interp`.
+/// The first dimension of the value array corresponds to the input
+/// coordinates; every trailing element is interpolated independently.
 #[derive(Clone, Debug)]
 pub struct RationalInterpolatorAxis0 {
     x: Array1<f64>,
@@ -709,6 +861,14 @@ pub struct RationalInterpolatorAxis0 {
 }
 
 impl RationalInterpolatorAxis0 {
+    /// Construct an axis-zero rational interpolator.
+    ///
+    /// `y.shape()[0]` must equal `x.len()`. Coordinates are sorted unless
+    /// `assume_sorted` is true.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible inputs, invalid coordinates, or an invalid tolerance.
     pub fn new(
         x: &Array1<f64>,
         y: &ArrayD<Complex64>,
@@ -754,6 +914,8 @@ impl RationalInterpolatorAxis0 {
         })
     }
 
+    /// Evaluate the interpolator while preserving all trailing dimensions.
+    #[must_use]
     pub fn evaluate(&self, targets: &Array1<f64>) -> ArrayD<Complex64> {
         let mut shape = self.y.shape().to_vec();
         shape[0] = targets.len();
@@ -784,7 +946,8 @@ impl RationalInterpolatorAxis0 {
 
 fn floater_hormann_weights(x: &Array1<f64>, degree: usize) -> Array1<f64> {
     let count = x.len();
-    let scale = (x[count / 2] - x[count / 2 - 1]).powi(degree as i32);
+    let exponent = i32::try_from(degree).unwrap_or(i32::MAX);
+    let scale = (x[count / 2] - x[count / 2 - 1]).powi(exponent);
     let mut weights = Array1::zeros(count);
     for k in 0..count {
         for i in k.saturating_sub(degree)..(k + 1).min(count - degree) {
@@ -800,9 +963,10 @@ fn floater_hormann_weights(x: &Array1<f64>, degree: usize) -> Array1<f64> {
     weights
 }
 
-/// Centered complex inverse FFT matching NumPy's shift convention.
+/// Transform a complex spectrum to a centered time-domain trace.
 ///
-/// Origin: `skrf.mathFunctions.ifft`.
+/// Input and output use NumPy-compatible `ifftshift`/`fftshift` ordering.
+#[must_use]
 pub fn inverse_fft_centered(values: &Array1<Complex64>) -> Array1<Complex64> {
     if values.is_empty() {
         return Array1::zeros(0);
@@ -812,14 +976,21 @@ pub fn inverse_fft_centered(values: &Array1<Complex64>) -> Array1<Complex64> {
     planner
         .plan_fft_inverse(shifted.len())
         .process(&mut shifted);
-    let scale = shifted.len() as f64;
-    shifted.iter_mut().for_each(|value| *value /= scale);
+    let scale = shifted.len().to_f64().unwrap_or(f64::INFINITY);
+    for value in &mut shifted {
+        *value /= scale;
+    }
     Array1::from(fft_shift_complex(&shifted))
 }
 
-/// Centered real inverse FFT matching NumPy's `irfft` normalization.
+/// Transform a one-sided spectrum to a centered real time-domain trace.
 ///
-/// Origin: `skrf.mathFunctions.irfft`.
+/// Negative-frequency values are supplied by complex conjugation. When
+/// `output_length` is omitted, the conventional even length is inferred.
+///
+/// # Errors
+///
+/// Returns an error when the inverse real FFT cannot be evaluated.
 pub fn inverse_real_fft_centered(
     values: &Array1<Complex64>,
     output_length: Option<usize>,
@@ -839,14 +1010,22 @@ pub fn inverse_real_fft_centered(
         .plan_fft_inverse(length)
         .process(&mut spectrum, &mut output)
         .map_err(|error| Error::Unsupported(format!("inverse real FFT failed: {error}")))?;
-    output.iter_mut().for_each(|value| *value /= length as f64);
+    for value in &mut output {
+        *value /= length.to_f64().unwrap_or(f64::INFINITY);
+    }
     let split = length.div_ceil(2);
     Ok(Array1::from_iter(
         output[split..].iter().chain(&output[..split]).copied(),
     ))
 }
 
-/// Centered inverse FFT along axis zero for arbitrary trailing dimensions.
+/// Apply a centered complex inverse FFT along axis zero.
+///
+/// Every trailing-dimensional lane is transformed independently.
+///
+/// # Errors
+///
+/// Returns an error when `values` has no dimensions.
 pub fn inverse_fft_centered_axis0(values: &ArrayD<Complex64>) -> Result<ArrayD<Complex64>> {
     if values.ndim() == 0 {
         return Err(Error::IncompatibleShape(
@@ -863,9 +1042,9 @@ pub fn inverse_fft_centered_axis0(values: &ArrayD<Complex64>) -> Result<ArrayD<C
     for mut lane in output.lanes_mut(Axis(0)) {
         let mut transformed = ifft_shift_complex(&lane.iter().copied().collect::<Vec<_>>());
         transform.process(&mut transformed);
-        transformed
-            .iter_mut()
-            .for_each(|value| *value /= length as f64);
+        for value in &mut transformed {
+            *value /= length.to_f64().unwrap_or(f64::INFINITY);
+        }
         let transformed = fft_shift_complex(&transformed);
         for (destination, source) in lane.iter_mut().zip(transformed) {
             *destination = source;
@@ -874,7 +1053,13 @@ pub fn inverse_fft_centered_axis0(values: &ArrayD<Complex64>) -> Result<ArrayD<C
     Ok(output)
 }
 
-/// Centered real inverse FFT along axis zero for arbitrary trailing dimensions.
+/// Apply a centered real inverse FFT along axis zero.
+///
+/// Every trailing-dimensional lane is transformed independently.
+///
+/// # Errors
+///
+/// Returns an error when `values` has no dimensions or the inverse real FFT fails.
 pub fn inverse_real_fft_centered_axis0(
     values: &ArrayD<Complex64>,
     output_length: Option<usize>,
@@ -907,9 +1092,9 @@ pub fn inverse_real_fft_centered_axis0(
         transform
             .process(&mut spectrum, &mut transformed)
             .map_err(|error| Error::Unsupported(format!("inverse real FFT failed: {error}")))?;
-        transformed
-            .iter_mut()
-            .for_each(|value| *value /= length as f64);
+        for value in &mut transformed {
+            *value /= length.to_f64().unwrap_or(f64::INFINITY);
+        }
         let split = length.div_ceil(2);
         for (target, source) in destination
             .iter_mut()
@@ -923,7 +1108,13 @@ pub fn inverse_real_fft_centered_axis0(
 
 /// Nudges small eigenvalues to avoid singular matrix equations.
 ///
-/// Origin: `skrf.mathFunctions.nudge_eig`.
+/// Eigenvalues whose magnitude is below
+/// `max(condition * max(|eigenvalue|), minimum)` are raised to that threshold.
+/// Default thresholds come from the crate numerical constants.
+///
+/// # Errors
+///
+/// Returns an error for non-square matrices, invalid thresholds, or a failed decomposition or solve.
 pub fn nudge_eigenvalues(
     matrices: &Array3<Complex64>,
     condition: Option<f64>,
@@ -998,7 +1189,7 @@ fn ifft_shift_complex(values: &[Complex64]) -> Vec<Complex64> {
         .collect()
 }
 
-fn replace_logarithm_nan(value: f64, replace_nan: bool) -> f64 {
+const fn replace_logarithm_nan(value: f64, replace_nan: bool) -> f64 {
     if replace_nan && value.is_nan() {
         LOG_OF_NEGATIVE
     } else {
@@ -1058,8 +1249,13 @@ fn solve_linear_system(
     Ok(Array1::from_shape_fn(size, |row| augmented[(row, size)]))
 }
 
-/// Numerical seam for the functions originating in `skrf/mathFunctions.py`.
+/// Pluggable interpolation seam used by RF algorithms.
 pub trait Interpolator {
+    /// Interpolate a real-valued trace at the target coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot interpolate the supplied inputs.
     fn interpolate_real(
         &self,
         x: &Array1<f64>,
@@ -1067,6 +1263,11 @@ pub trait Interpolator {
         target: &Array1<f64>,
     ) -> Result<Array1<f64>>;
 
+    /// Interpolate a complex-valued trace at the target coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot interpolate the supplied inputs.
     fn interpolate_complex(
         &self,
         x: &Array1<f64>,
@@ -1075,18 +1276,38 @@ pub trait Interpolator {
     ) -> Result<Array1<Complex64>>;
 }
 
+/// Pluggable special-function seam used by media models.
 pub trait SpecialFunctions {
+    /// Evaluate the modified Bessel function $I_\nu(x)$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot evaluate the supplied arguments.
     fn bessel_i(&self, order: f64, value: f64) -> Result<f64>;
 
+    /// Evaluate the complete elliptic integral $K(m)$ of the first kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot evaluate `parameter`.
     fn complete_elliptic_integral_first_kind(&self, parameter: f64) -> Result<f64>;
 
+    /// Return a one-based positive zero of `$J_n$` or its derivative.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot find the requested zero.
     fn bessel_j_zero(&self, order: usize, index: usize, derivative: bool) -> Result<f64>;
 }
 
-/// Return the one-based `index`th positive zero of integer-order `J_n` or its derivative.
+/// Return the one-based `index`th positive zero of integer-order `$J_n$` or its derivative.
 ///
-/// This is the Rust numerical replacement for SciPy's `jn_zeros` and `jnp_zeros`, used by
-/// `skrf/media/circularWaveguide.py`.
+/// The implementation brackets roots and refines them by bisection. It is used
+/// by circular-waveguide cutoff calculations.
+///
+/// # Errors
+///
+/// Returns an error for a zero index, an unsupported order, or a root that cannot be bracketed.
 pub fn bessel_j_zero(order: usize, index: usize, derivative: bool) -> Result<f64> {
     if index == 0 {
         return Err(Error::Unsupported(
@@ -1108,11 +1329,17 @@ pub fn bessel_j_zero(order: usize, index: usize, derivative: bool) -> Result<f64
     };
 
     let step = std::f64::consts::PI / 32.0;
-    let maximum = (index as f64 + f64::from(order) / 2.0 + 3.0) * std::f64::consts::PI;
+    let index_as_float = index.to_f64().ok_or_else(|| {
+        Error::Unsupported("Bessel zero index cannot be represented as f64".to_owned())
+    })?;
+    let maximum = (index_as_float + f64::from(order) / 2.0 + 3.0) * std::f64::consts::PI;
     let mut left = f64::EPSILON.sqrt();
     let mut left_value = evaluate(left);
     let mut roots_found = 0;
-    while left < maximum {
+    loop {
+        if left >= maximum {
+            break;
+        }
         let right = (left + step).min(maximum);
         let right_value = evaluate(right);
         if left_value.is_finite()
@@ -1123,7 +1350,7 @@ pub fn bessel_j_zero(order: usize, index: usize, derivative: bool) -> Result<f64
             let mut upper = right;
             let mut lower_value = left_value;
             for _ in 0..80 {
-                let middle = (lower + upper) / 2.0;
+                let middle = lower.midpoint(upper);
                 let middle_value = evaluate(middle);
                 if middle_value == 0.0 {
                     lower = middle;
@@ -1139,7 +1366,7 @@ pub fn bessel_j_zero(order: usize, index: usize, derivative: bool) -> Result<f64
             }
             roots_found += 1;
             if roots_found == index {
-                return Ok((lower + upper) / 2.0);
+                return Ok(lower.midpoint(upper));
             }
         }
         left = right;
@@ -1150,19 +1377,23 @@ pub fn bessel_j_zero(order: usize, index: usize, derivative: bool) -> Result<f64
     )))
 }
 
-/// Complete elliptic integral of the first kind `K(m)` for a real parameter.
+/// Evaluate the complete elliptic integral $K(m)$ of the first kind.
 ///
-/// Uses the arithmetic-geometric mean identity and replaces `scipy.special.ellipk`.
+/// The arithmetic-geometric mean identity is used for $0\le m<1$.
+///
+/// # Errors
+///
+/// Returns an error when `parameter` is not finite or lies outside $[0,1)$.
 pub fn complete_elliptic_integral_first_kind(parameter: f64) -> Result<f64> {
     if !parameter.is_finite() || !(0.0..1.0).contains(&parameter) {
         return Err(Error::Unsupported(
             "the elliptic-integral parameter must satisfy 0 <= m < 1".to_owned(),
         ));
     }
-    let mut arithmetic = 1.0;
+    let mut arithmetic = 1.0_f64;
     let mut geometric = (1.0 - parameter).sqrt();
     for _ in 0..64 {
-        let next_arithmetic = (arithmetic + geometric) / 2.0;
+        let next_arithmetic = arithmetic.midpoint(geometric);
         let next_geometric = (arithmetic * geometric).sqrt();
         if (next_arithmetic - next_geometric).abs() <= f64::EPSILON * next_arithmetic {
             return Ok(std::f64::consts::PI / (2.0 * next_arithmetic));
@@ -1173,7 +1404,11 @@ pub fn complete_elliptic_integral_first_kind(parameter: f64) -> Result<f64> {
     Ok(std::f64::consts::PI / (2.0 * arithmetic))
 }
 
-/// Modified Bessel function `I_1(x)` evaluated by its entire power series.
+/// Evaluate the modified Bessel function `$I_1(x)$` by its entire power series.
+///
+/// # Errors
+///
+/// Returns an error when `value` is not finite.
 pub fn modified_bessel_i1(value: f64) -> Result<f64> {
     if !value.is_finite() {
         return Err(Error::Unsupported(
@@ -1184,7 +1419,7 @@ pub fn modified_bessel_i1(value: f64) -> Result<f64> {
     let mut term = half;
     let mut sum = term;
     for index in 1..=256 {
-        term *= half * half / (index as f64 * (index + 1) as f64);
+        term *= half * half / (f64::from(index) * f64::from(index + 1));
         sum += term;
         if term.abs() <= f64::EPSILON * sum.abs().max(1.0) {
             return Ok(sum);

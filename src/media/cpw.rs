@@ -1,10 +1,20 @@
-use super::media::*;
-use super::*;
+//! Coplanar-waveguide media with dielectric dispersion and conductor loss.
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{
+    Array1, Complex64, DielectricDispersionModel, Error, FREE_SPACE_PERMEABILITY,
+    FREE_SPACE_PERMITTIVITY, Frequency, Network, Result, SPEED_OF_LIGHT,
+    complete_elliptic_integral_first_kind, fmt,
+};
+/// Compatibility adjustments for external CPW models.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum CpwCompatibilityMode {
+    /// Native rust-rf behavior.
     #[default]
     Native,
+    /// Match Qucs behavior, including real quasi-static impedance.
     Qucs,
+    /// Match Keysight ADS dispersion behavior where implemented.
     Ads,
 }
 
@@ -12,25 +22,53 @@ type CpwQuasiStatic = (Array1<Complex64>, Array1<Complex64>, f64, f64, f64);
 
 /// Coplanar waveguide with optional conductor backing and frequency dispersion.
 ///
-/// Origin: `skrf/media/cpw.py::CPW`.
+/// Geometry is defined by center-strip width, gap, substrate height, and
+/// optional conductor thickness. The implementation includes quasi-static
+/// Ghione/Naldi models, wideband Djordjevic-Svensson dielectric dispersion,
+/// Frankel/Gevorgian frequency dispersion, and Wheeler-rule losses.
+///
+/// Technical background is available in the [Qucs technical documentation](http://qucs.sourceforge.net/docs/technical.pdf).
 #[derive(Clone, Debug)]
 pub struct Cpw {
+    /// Frequency band.
     pub frequency: Frequency,
+    /// Center-conductor width in meters.
     pub width: f64,
+    /// Gap width in meters.
     pub gap: f64,
+    /// Substrate height in meters.
     pub substrate_height: f64,
+    /// Conductor thickness in meters; `None` disables thickness correction.
     pub thickness: Option<f64>,
+    /// Substrate relative permittivity at the model specification frequency.
     pub relative_permittivity: f64,
+    /// Dielectric loss tangent at the model specification frequency.
     pub loss_tangent: f64,
+    /// Conductor resistivity in ohm-meters.
     pub resistivity: Option<f64>,
+    /// Dielectric frequency-dispersion model.
     pub dispersion_model: DielectricDispersionModel,
+    /// Whether the substrate backside is metal rather than air.
     pub has_metal_backside: bool,
+    /// External-simulator compatibility behavior.
     pub compatibility_mode: CpwCompatibilityMode,
+    /// Optional port impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Optional override for characteristic impedance.
     pub characteristic_impedance_override: Option<Array1<Complex64>>,
 }
 
 impl Cpw {
+    /// Construct a coplanar-waveguide medium.
+    ///
+    /// Geometric and dielectric inputs must be finite and physically valid.
+    /// Conductor loss requires both nonzero thickness and resistivity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when geometry, dielectric, thickness, or resistivity
+    /// inputs are invalid, conductor loss lacks resistivity, or an impedance
+    /// array does not match the frequency axis.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
@@ -110,6 +148,11 @@ impl Cpw {
         })
     }
 
+    /// Construct an unbacked, lossless, frequency-invariant CPW.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the geometry or relative permittivity is invalid.
     pub fn lossless(
         frequency: Frequency,
         width: f64,
@@ -134,7 +177,11 @@ impl Cpw {
         )
     }
 
-    /// Resolves conductor resistivity through `skrf.data.materials`.
+    /// Set conductor resistivity from a named material or alias.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `material` is unknown or has no resistivity value.
     pub fn set_resistivity_material(&mut self, material: &str) -> Result<()> {
         let properties = crate::data::MATERIALS
             .get(material.to_ascii_lowercase().as_str())
@@ -152,7 +199,7 @@ impl Cpw {
             ));
         }
         if modulus < (0.5_f64).sqrt() {
-            let complementary = (1.0 - modulus.powi(2)).sqrt();
+            let complementary = modulus.mul_add(-modulus, 1.0).sqrt();
             Ok(std::f64::consts::PI
                 / (2.0 * (1.0 + complementary.sqrt()) / (1.0 - complementary.sqrt())).ln())
         } else {
@@ -160,6 +207,15 @@ impl Cpw {
         }
     }
 
+    /// Calculate frequency-dependent complex permittivity and loss tangent.
+    ///
+    /// The Djordjevic-Svensson option provides a causal wideband dielectric
+    /// response; the frequency-invariant option repeats the specified values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the Djordjevic-Svensson logarithmic slope is
+    /// singular for the configured frequency bounds.
     pub fn dielectric_properties(&self) -> Result<(Array1<Complex64>, Array1<f64>)> {
         match self.dispersion_model {
             DielectricDispersionModel::FrequencyInvariant => Ok((
@@ -207,11 +263,11 @@ impl Cpw {
     ) -> Result<CpwQuasiStatic> {
         let free_space_impedance = (FREE_SPACE_PERMEABILITY / FREE_SPACE_PERMITTIVITY).sqrt();
         let conductor_width = self.width;
-        let total_width = self.width + 2.0 * self.gap;
+        let total_width = 2.0f64.mul_add(self.gap, self.width);
         let modulus = conductor_width / total_width;
         let elliptic = complete_elliptic_integral_first_kind(modulus)?;
         let complementary_elliptic =
-            complete_elliptic_integral_first_kind((1.0 - modulus.powi(2)).sqrt())?;
+            complete_elliptic_integral_first_kind(modulus.mul_add(-modulus, 1.0).sqrt())?;
         let primary_ratio = Self::elliptic_ratio(modulus)?;
 
         let (mut impedance_factor, mut effective) = if self.has_metal_backside {
@@ -241,7 +297,7 @@ impl Cpw {
             let correction = 1.25 * thickness / std::f64::consts::PI
                 * (1.0 + (4.0 * std::f64::consts::PI * self.width / thickness).ln());
             let effective_modulus =
-                modulus + (1.0 - modulus.powi(2)) * correction / (2.0 * self.gap);
+                modulus + modulus.mul_add(-modulus, 1.0) * correction / (2.0 * self.gap);
             let effective_ratio = Self::elliptic_ratio(effective_modulus)?;
             if self.has_metal_backside {
                 let backside_modulus = (std::f64::consts::PI * conductor_width
@@ -271,6 +327,15 @@ impl Cpw {
         ))
     }
 
+    /// Calculate quasi-static impedance and effective permittivity.
+    ///
+    /// Air- and metal-backed models use the Ghione/Naldi filling factors; a
+    /// first-order Gupta thickness correction is applied when requested.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when dielectric dispersion is singular or a derived
+    /// elliptic modulus is outside its valid range.
     pub fn quasi_static_characteristics(&self) -> Result<(Array1<Complex64>, Array1<Complex64>)> {
         let (permittivity, _) = self.dielectric_properties()?;
         let input = if self.compatibility_mode == CpwCompatibilityMode::Qucs {
@@ -282,6 +347,15 @@ impl Cpw {
         Ok((impedance, effective))
     }
 
+    /// Calculate frequency-dependent impedance and effective permittivity.
+    ///
+    /// Native/Qucs modes apply the Frankel-Gevorgian dispersion model. ADS
+    /// compatibility retains the quasi-static result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when dielectric dispersion is singular or the
+    /// quasi-static elliptic calculations are invalid.
     pub fn frequency_dependent_characteristics(
         &self,
     ) -> Result<(Array1<Complex64>, Array1<Complex64>)> {
@@ -296,8 +370,12 @@ impl Cpw {
             return Ok((quasi_impedance, quasi_effective));
         }
         let geometry_log = (self.width / self.substrate_height).ln();
-        let u = 0.54 - (0.64 - 0.015 * geometry_log) * geometry_log;
-        let v = 0.43 - (0.86 - 0.54 * geometry_log) * geometry_log;
+        let u = 0.015f64
+            .mul_add(-geometry_log, 0.64)
+            .mul_add(-geometry_log, 0.54);
+        let v = 0.54f64
+            .mul_add(-geometry_log, 0.86)
+            .mul_add(-geometry_log, 0.43);
         let dispersion_factor = (u * (self.width / self.gap).ln() + v).exp();
         let impedance = Array1::from_shape_fn(self.frequency.points(), |point| {
             let substrate = input[point];
@@ -326,6 +404,15 @@ impl Cpw {
         Ok((impedance, effective))
     }
 
+    /// Calculate conductor and dielectric attenuation in nepers per meter.
+    ///
+    /// Conductor loss uses Wheeler's incremental-inductance rule; dielectric
+    /// loss uses the frequency-dependent effective permittivity and tangent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when dielectric dispersion or the quasi-static and
+    /// frequency-dependent CPW calculations are invalid.
     pub fn attenuation(&self) -> Result<(Array1<f64>, Array1<f64>)> {
         let (permittivity, tangent) = self.dielectric_properties()?;
         let input = if self.compatibility_mode == CpwCompatibilityMode::Qucs {
@@ -356,7 +443,7 @@ impl Cpw {
                         * free_space_impedance
                         * elliptic
                         * complementary_elliptic
-                        * (1.0 - modulus.powi(2)))
+                        * modulus.mul_add(-modulus, 1.0))
             })
         } else {
             Array1::zeros(self.frequency.points())

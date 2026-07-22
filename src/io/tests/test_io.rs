@@ -1,3 +1,8 @@
+//! General I/O regressions.
+//!
+//! These tests cover object read/write equivalence, directory discovery,
+//! network JSON round trips, statistical conversion, and spreadsheet output.
+
 use std::collections::BTreeMap;
 
 use ndarray::{Array2, Array3};
@@ -9,9 +14,12 @@ use rust_rf::io::general::{
 };
 use rust_rf::{Frequency, Network, NetworkSet};
 
+type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+/// Verifies that JSON serialization preserves the complete network state.
 #[test]
-fn json_round_trips_complete_network_state() {
-    let mut network = one_port();
+fn json_round_trips_complete_network_state() -> TestResult {
+    let mut network = one_port()?;
     network.name = Some("json".to_owned());
     network.comments = "comment".to_owned();
     network.port_names = vec!["input".to_owned()];
@@ -26,12 +34,14 @@ fn json_round_trips_complete_network_state() {
     assert_eq!(restored.comments, network.comments);
     assert_eq!(restored.port_names, network.port_names);
     assert_eq!(restored.variables, network.variables);
+    Ok(())
 }
 
+/// Writes, reads, and discovers supported network and mixed-object files.
 #[test]
-fn stores_reads_and_discovers_network_objects() {
-    let directory = temporary_directory("objects");
-    let network = one_port();
+fn stores_reads_and_discovers_network_objects() -> TestResult {
+    let directory = temporary_directory("objects")?;
+    let network = one_port()?;
     let path = write_object(
         directory.join("sample"),
         &StoredObject::Network(Box::new(network.clone())),
@@ -74,11 +84,13 @@ fn stores_reads_and_discovers_network_objects() {
         StoredObject::Frequency(_)
     ));
     std::fs::remove_dir_all(directory).unwrap();
+    Ok(())
 }
 
+/// Converts statistical data and writes network tables in supported formats.
 #[test]
-fn writes_statistical_touchstone_and_spreadsheet_tables() {
-    let directory = temporary_directory("tables");
+fn writes_statistical_touchstone_and_spreadsheet_tables() -> TestResult {
+    let directory = temporary_directory("tables")?;
     let source = directory.join("statistical.txt");
     let touchstone = directory.join("converted.s1p");
     std::fs::write(&source, "1 0 0\n").unwrap();
@@ -88,7 +100,7 @@ fn writes_statistical_touchstone_and_spreadsheet_tables() {
         "# GHz S RI R 50.0\n1 0 0\n"
     );
 
-    let network = one_port();
+    let network = one_port()?;
     let (columns, table) = network_table(&network, NetworkDataFormat::RealImaginary);
     assert_eq!(columns, vec!["Freq(Hz)", "S11 Real", "S11 Imag"]);
     assert_eq!(table.row(0).to_vec(), vec![1.0, 0.5, -0.25]);
@@ -107,13 +119,15 @@ fn writes_statistical_touchstone_and_spreadsheet_tables() {
             .contains("<th>S11 Log Mag(dB)</th>")
     );
     std::fs::remove_dir_all(directory).unwrap();
+    Ok(())
 }
 
 #[cfg(feature = "dataframe")]
+/// Builds data frames with unambiguous scattering-parameter port names.
 #[test]
-fn builds_network_dataframes_with_unambiguous_port_names() {
+fn builds_network_dataframes_with_unambiguous_port_names() -> TestResult {
     let frame =
-        rust_rf::io::general::network_to_dataframe(&one_port(), &["s_db", "s_deg"], None, None)
+        rust_rf::io::general::network_to_dataframe(&one_port()?, &["s_db", "s_deg"], None, None)
             .unwrap();
     assert_eq!(frame.height(), 2);
     assert_eq!(
@@ -124,13 +138,15 @@ fn builds_network_dataframes_with_unambiguous_port_names() {
             .collect::<Vec<_>>(),
         vec!["s_db 11", "s_deg 11"]
     );
+    Ok(())
 }
 
 #[cfg(feature = "xlsx")]
+/// Writes individual networks and network sets to Excel workbooks.
 #[test]
-fn writes_network_and_network_set_xlsx_workbooks() {
-    let directory = temporary_directory("xlsx");
-    let mut network = one_port();
+fn writes_network_and_network_set_xlsx_workbooks() -> TestResult {
+    let directory = temporary_directory("xlsx")?;
+    let mut network = one_port()?;
     network.name = Some("First".to_owned());
     let network_path = directory.join("network.xlsx");
     rust_rf::io::general::write_network_xlsx(
@@ -146,23 +162,28 @@ fn writes_network_and_network_set_xlsx_workbooks() {
         .unwrap();
     assert_eq!(&std::fs::read(&set_path).unwrap()[..2], b"PK");
     std::fs::remove_dir_all(directory).unwrap();
+    Ok(())
 }
 
-fn temporary_directory(label: &str) -> std::path::PathBuf {
+fn temporary_directory(label: &str) -> std::io::Result<std::path::PathBuf> {
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join(".temp")
         .join(format!("general-{label}-{}", std::process::id()));
-    std::fs::create_dir_all(&directory).unwrap();
-    directory
+    std::fs::create_dir_all(&directory)?;
+    Ok(directory)
 }
 
-fn one_port() -> Network {
-    let frequency = Frequency::from_hz(ndarray::arr1(&[1.0, 2.0])).unwrap();
+fn one_port() -> rust_rf::Result<Network> {
+    let frequency = Frequency::from_hz(ndarray::arr1(&[1.0, 2.0]))?;
     let s = Array3::from_shape_vec(
         (2, 1, 1),
         vec![Complex64::new(0.5, -0.25), Complex64::new(0.25, 0.5)],
     )
-    .unwrap();
+    .map_err(|error| {
+        rust_rf::Error::IncompatibleShape(format!(
+            "one-port fixture S-parameter shape is invalid: {error}"
+        ))
+    })?;
     let z0 = Array2::from_elem((2, 1), Complex64::new(50.0, 0.0));
-    Network::new(frequency, s, z0).unwrap()
+    Network::new(frequency, s, z0)
 }

@@ -1,14 +1,18 @@
 #![forbid(unsafe_code)]
 #![doc = "Rust port of scikit-rf for RF and microwave engineering."]
 
+/// Calibration algorithms and de-embedding support.
 pub mod calibration;
 pub mod circuit;
 pub mod constants;
 pub mod data;
 pub mod docs;
+/// Error and result types shared by the crate.
 pub mod error;
 pub mod frequency;
+/// Ready-to-use frequency bands and rectangular-waveguide media.
 pub mod instances;
+/// Network-data readers, writers, and interchange formats.
 pub mod io;
 pub mod math;
 pub mod media;
@@ -40,6 +44,10 @@ pub use num_complex::Complex64;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Resolves the plotting environment configured for this process.
+///
+/// This is the Rust counterpart of `skrf.setup_plotting`. It reads `SKRF_PLOT_ENV` and returns
+/// the configured plotting style when the selected environment is supported.
+#[must_use]
 pub fn setup_plotting() -> Option<&'static str> {
     plotting::configured_style()
 }

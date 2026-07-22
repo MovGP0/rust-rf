@@ -1,12 +1,17 @@
-//! Keysight VNA driver implementation.
+//! Driver for Keysight PNA, PNA-L, and PNA-X vector network analyzers.
 //!
-//! Origin: `skrf/vi/vna/keysight/pna.py`.
+//! Supported PNA models include E8361A/B/C through E8364A/B/C, E8356A through
+//! E8358A, E8801A through E8803A, N3381A through N3383A, N5221A/B through
+//! N5227A/B, and N5250C. PNA-L support covers the N5230, N5231, N5232, N5234,
+//! N5235, and N5239 families; PNA-X support covers the N5241, N5242, N5244,
+//! N5245, N5247, N5249, and N5264 families.
 
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use ndarray::{Array2, Array3};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 
 use crate::vi::validators::{BooleanValidator, FloatValidator, FrequencyValidator, IntValidator};
 use crate::{Error, Frequency, FrequencyUnit, Network, Result, SweepType as FrequencySweepType};
@@ -37,12 +42,19 @@ macro_rules! scpi_enum {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Sweep-axis type used by a PNA channel.
 pub enum PnaSweepType {
+    /// Linearly spaced frequency sweep.
     Linear,
+    /// Logarithmically spaced frequency sweep.
     Log,
+    /// Power sweep.
     Power,
+    /// Continuous-wave sweep.
     ContinuousWave,
+    /// Segmented sweep.
     Segment,
+    /// Phase sweep.
     Phase,
 }
 
@@ -56,10 +68,15 @@ scpi_enum!(PnaSweepType {
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Trigger behavior for a PNA channel sweep.
 pub enum PnaSweepMode {
+    /// Hold the channel without sweeping.
     Hold,
+    /// Sweep continuously.
     Continuous,
+    /// Acquire the configured number of sweep groups.
     Groups,
+    /// Acquire one sweep.
     Single,
 }
 
@@ -71,9 +88,13 @@ scpi_enum!(PnaSweepMode {
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Source of the sweep trigger signal.
 pub enum TriggerSource {
+    /// Trigger from the external input.
     External,
+    /// Trigger immediately.
     Immediate,
+    /// Trigger only when requested manually.
     Manual,
 }
 
@@ -84,8 +105,11 @@ scpi_enum!(TriggerSource {
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// How measurements are combined when averaging is enabled.
 pub enum PnaAveragingMode {
+    /// Average each point across repeated measurements.
     Point,
+    /// Average complete sweeps.
     Sweep,
 }
 
@@ -94,12 +118,20 @@ scpi_enum!(PnaAveragingMode {
     Sweep => "SWE",
 });
 
+/// Keysight PNA, PNA-L, or PNA-X instrument.
 pub struct Pna<S: InstrumentSession> {
+    /// Shared SCPI instrument connection and channel registry.
     pub vna: Vna<S>,
+    /// Model identifier reported by the instrument.
     pub model: String,
 }
 
 impl<S: InstrumentSession> Pna<S> {
+    /// Connects to a PNA and derives its model from the identification response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if instrument communication, identification parsing, or channel setup fails.
     pub fn new(address: impl Into<String>, session: S) -> Result<Self> {
         let mut vna = Vna::new(address, session, None);
         let model = vna
@@ -112,6 +144,11 @@ impl<S: InstrumentSession> Pna<S> {
         Self::from_model(vna, model)
     }
 
+    /// Builds a PNA driver from an existing VNA connection and known model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the default instrument channel cannot be created.
     pub fn from_model(vna: Vna<S>, model: impl Into<String>) -> Result<Self> {
         let mut pna = Self {
             vna,
@@ -121,6 +158,11 @@ impl<S: InstrumentSession> Pna<S> {
         Ok(pna)
     }
 
+    /// Creates a numbered channel and its default S11 measurement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the channel or its default measurement cannot be created.
     pub fn create_channel(&mut self, number: usize, name: impl Into<String>) -> Result<()> {
         self.vna.create_channel(number, name)?;
         if number != 1 {
@@ -129,6 +171,11 @@ impl<S: InstrumentSession> Pna<S> {
         Ok(())
     }
 
+    /// Deletes a numbered channel when it exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the channel deletion command.
     pub fn delete_channel(&mut self, number: usize) -> Result<()> {
         if self
             .vna
@@ -142,6 +189,11 @@ impl<S: InstrumentSession> Pna<S> {
         Ok(())
     }
 
+    /// Returns a controller for an existing numbered channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `number` does not identify an existing channel.
     pub fn channel(&mut self, number: usize) -> Result<PnaChannel<'_, S>> {
         if !self
             .vna
@@ -159,33 +211,67 @@ impl<S: InstrumentSession> Pna<S> {
         })
     }
 
+    /// Returns the source of the sweep trigger signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the trigger source cannot be queried or parsed.
     pub fn trigger_source(&mut self) -> Result<TriggerSource> {
         self.vna.query("TRIG:SOUR?")?.parse()
     }
 
+    /// Selects the source of the sweep trigger signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the trigger source command.
     pub fn set_trigger_source(&mut self, source: TriggerSource) -> Result<()> {
         self.vna.write(&format!("TRIG:SOUR {source}"))
     }
 
+    /// Returns the number of errors since the error queue was last cleared.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the error count cannot be queried, parsed, or represented as `usize`.
     pub fn error_count(&mut self) -> Result<usize> {
-        parse_integer(self.vna.query("SYST:ERR:COUN?")?, Some(0), None).map(|value| value as usize)
+        parse_integer(self.vna.query("SYST:ERR:COUN?")?, Some(0), None)
+            .and_then(|value| integer_to_usize(value, "PNA error count"))
     }
 
+    /// Returns the channel numbers currently in use.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the channel catalog cannot be queried or parsed.
     pub fn channel_numbers(&mut self) -> Result<Vec<usize>> {
         parse_integer_list(&self.vna.query("SYST:CHAN:CAT?")?)
     }
 
+    /// Returns the number of physical test ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hardware port count cannot be queried, parsed, or represented as `usize`.
     pub fn ports(&mut self) -> Result<usize> {
         if self.supports("nports") {
             parse_integer(self.vna.query("SYST:CAP:HARD:PORT:COUN?")?, Some(1), None)
-                .map(|value| value as usize)
+                .and_then(|value| integer_to_usize(value, "PNA port count"))
         } else {
             Ok(self.model_ports())
         }
     }
 
+    /// Returns the active channel number, if it is registered by this driver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the active channel cannot be queried, parsed, or represented as `usize`.
     pub fn active_channel_number(&mut self) -> Result<Option<usize>> {
-        let number = parse_integer(self.vna.query("SYST:ACT:CHAN?")?, Some(0), None)? as usize;
+        let number = integer_to_usize(
+            parse_integer(self.vna.query("SYST:ACT:CHAN?")?, Some(0), None)?,
+            "active PNA channel number",
+        )?;
         Ok(self
             .vna
             .channels()
@@ -194,6 +280,11 @@ impl<S: InstrumentSession> Pna<S> {
             .then_some(number))
     }
 
+    /// Activates a channel by selecting its first measurement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the channel has no measurement or cannot be selected.
     pub fn set_active_channel(&mut self, number: usize) -> Result<()> {
         if self.active_channel_number()? == Some(number) {
             return Ok(());
@@ -208,12 +299,22 @@ impl<S: InstrumentSession> Pna<S> {
         self.vna.set_active_channel(number)
     }
 
+    /// Queries the numeric transfer format used for instrument responses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transfer format cannot be queried or parsed.
     pub fn query_format(&mut self) -> Result<ValuesFormat> {
         let format = parse_values_format(&self.vna.query("FORM?")?.replace('+', ""))?;
         self.vna.values_format = format;
         Ok(format)
     }
 
+    /// Sets the numeric transfer format used for instrument responses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects a transfer-format command.
     pub fn set_query_format(&mut self, format: ValuesFormat) -> Result<()> {
         match format {
             ValuesFormat::Ascii => self.vna.write("FORM ASC,0")?,
@@ -230,18 +331,23 @@ impl<S: InstrumentSession> Pna<S> {
         Ok(())
     }
 
+    /// Returns the name of the active measurement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the active measurement cannot be queried.
     pub fn active_measurement(&mut self) -> Result<String> {
         Ok(self.vna.query("SYST:ACT:MEAS?")?.replace('"', ""))
     }
 
+    /// Selects an existing measurement by name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if channel measurements cannot be queried or `name` does not exist.
     pub fn set_active_measurement(&mut self, name: &str) -> Result<()> {
-        for number in self
-            .vna
-            .channels()
-            .iter()
-            .map(|channel| channel.number)
-            .collect::<Vec<_>>()
-        {
+        for index in 0..self.vna.channels().len() {
+            let number = self.vna.channels()[index].number;
             if self
                 .measurement_names(number)?
                 .iter()
@@ -262,6 +368,11 @@ impl<S: InstrumentSession> Pna<S> {
         )))
     }
 
+    /// Returns `(name, parameter)` pairs for a channel's measurements.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement catalog cannot be queried.
     pub fn measurements(&mut self, channel: usize) -> Result<Vec<(String, String)>> {
         let values = self
             .vna
@@ -276,6 +387,11 @@ impl<S: InstrumentSession> Pna<S> {
             .collect())
     }
 
+    /// Returns the measurement names defined on a channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement catalog cannot be queried.
     pub fn measurement_names(&mut self, channel: usize) -> Result<Vec<String>> {
         Ok(self
             .measurements(channel)?
@@ -284,10 +400,20 @@ impl<S: InstrumentSession> Pna<S> {
             .collect())
     }
 
+    /// Returns the instrument-assigned measurement numbers on a channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement catalog cannot be queried or parsed.
     pub fn measurement_numbers(&mut self, channel: usize) -> Result<Vec<usize>> {
         parse_integer_list(&self.vna.query(&format!("SYST:MEAS:CAT? {channel}"))?)
     }
 
+    /// Creates and displays a measurement on a channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement cannot be created or assigned to a trace.
     pub fn create_measurement(
         &mut self,
         channel: usize,
@@ -306,6 +432,11 @@ impl<S: InstrumentSession> Pna<S> {
             .write(&format!("DISP:WIND:TRAC{next_trace}:FEED '{name}'"))
     }
 
+    /// Deletes a named measurement from a channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the measurement deletion command.
     pub fn delete_measurement(&mut self, channel: usize, name: &str) -> Result<()> {
         self.vna.write(&format!("CALC{channel}:PAR:DEL '{name}'"))
     }
@@ -319,44 +450,93 @@ impl<S: InstrumentSession> Pna<S> {
     }
 }
 
+/// Controller for one channel of a [`Pna`].
 pub struct PnaChannel<'a, S: InstrumentSession> {
     parent: &'a mut Pna<S>,
+    /// Instrument channel number.
     pub number: usize,
 }
 
 impl<S: InstrumentSession> PnaChannel<'_, S> {
+    /// Returns the start frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the start frequency cannot be queried or parsed.
     pub fn frequency_start(&mut self) -> Result<u64> {
         self.query_frequency("FREQ:STAR?")
     }
 
+    /// Sets the start frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is invalid or the instrument rejects it.
     pub fn set_frequency_start(&mut self, value: impl ToString) -> Result<()> {
         self.set_frequency_value("FREQ:STAR", value)
     }
 
+    /// Returns the stop frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stop frequency cannot be queried or parsed.
     pub fn frequency_stop(&mut self) -> Result<u64> {
         self.query_frequency("FREQ:STOP?")
     }
 
+    /// Sets the stop frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is invalid or the instrument rejects it.
     pub fn set_frequency_stop(&mut self, value: impl ToString) -> Result<()> {
         self.set_frequency_value("FREQ:STOP", value)
     }
 
+    /// Returns the frequency span in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency span cannot be queried or parsed.
     pub fn frequency_span(&mut self) -> Result<u64> {
         self.query_frequency("FREQ:SPAN?")
     }
 
+    /// Sets the frequency span in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is invalid or the instrument rejects it.
     pub fn set_frequency_span(&mut self, value: impl ToString) -> Result<()> {
         self.set_frequency_value("FREQ:SPAN", value)
     }
 
+    /// Returns the center frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the center frequency cannot be queried or parsed.
     pub fn frequency_center(&mut self) -> Result<u64> {
         self.query_frequency("FREQ:CENT?")
     }
 
+    /// Sets the center frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is invalid or the instrument rejects it.
     pub fn set_frequency_center(&mut self, value: impl ToString) -> Result<()> {
         self.set_frequency_value("FREQ:CENT", value)
     }
 
+    /// Returns the number of frequency points.
+    ///
+    /// Changing this value also changes the frequency step.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the point count cannot be queried, parsed, or represented as `usize`.
     pub fn points(&mut self) -> Result<usize> {
         parse_integer(
             self.parent
@@ -365,23 +545,45 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             Some(1),
             None,
         )
-        .map(|value| value as usize)
+        .and_then(|value| integer_to_usize(value, "PNA frequency point count"))
     }
 
+    /// Sets the number of frequency points.
+    ///
+    /// This also changes the frequency step.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the point-count command.
     pub fn set_points(&mut self, points: usize) -> Result<()> {
         self.parent
             .vna
             .write(&format!("SENS{}:SWE:POIN {points}", self.number))
     }
 
+    /// Returns the intermediate-frequency bandwidth in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bandwidth cannot be queried or parsed.
     pub fn if_bandwidth(&mut self) -> Result<u64> {
         self.query_frequency("BWID?")
     }
 
+    /// Sets the intermediate-frequency bandwidth in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is invalid or the instrument rejects it.
     pub fn set_if_bandwidth(&mut self, value: impl ToString) -> Result<()> {
         self.set_frequency_value("BWID", value)
     }
 
+    /// Returns the duration of one sweep in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sweep time cannot be queried or parsed.
     pub fn sweep_time(&mut self) -> Result<f64> {
         parse_float(
             self.parent
@@ -393,6 +595,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
         )
     }
 
+    /// Sets the duration of one sweep in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `seconds` is invalid or the instrument rejects it.
     pub fn set_sweep_time(&mut self, seconds: f64) -> Result<()> {
         let seconds = FloatValidator::new(None, None, 2)
             .validate_input(seconds)
@@ -402,6 +609,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .write(&format!("SENS{}:SWE:TIME {seconds}", self.number))
     }
 
+    /// Returns the channel's sweep-axis type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sweep type cannot be queried or parsed.
     pub fn sweep_type(&mut self) -> Result<PnaSweepType> {
         self.parent
             .vna
@@ -409,12 +621,22 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .parse()
     }
 
+    /// Sets the channel's sweep-axis type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the sweep-type command.
     pub fn set_sweep_type(&mut self, sweep_type: PnaSweepType) -> Result<()> {
         self.parent
             .vna
             .write(&format!("SENS{}:SWE:TYPE {sweep_type}", self.number))
     }
 
+    /// Returns this channel's trigger mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sweep mode cannot be queried or parsed.
     pub fn sweep_mode(&mut self) -> Result<PnaSweepMode> {
         self.parent
             .vna
@@ -422,16 +644,31 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .parse()
     }
 
+    /// Sets this channel's trigger mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the sweep-mode command.
     pub fn set_sweep_mode(&mut self, mode: PnaSweepMode) -> Result<()> {
         self.parent
             .vna
             .write(&format!("SENS{}:SWE:MODE {mode}", self.number))
     }
 
+    /// Returns the instrument-assigned measurement numbers on this channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement catalog cannot be queried or parsed.
     pub fn measurement_numbers(&mut self) -> Result<Vec<usize>> {
         self.parent.measurement_numbers(self.number)
     }
 
+    /// Returns whether measurement averaging is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the averaging state cannot be queried.
     pub fn averaging_on(&mut self) -> Result<bool> {
         Ok(BooleanValidator::default().validate_output(
             self.parent
@@ -440,6 +677,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
         ))
     }
 
+    /// Enables or disables measurement averaging.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state is invalid or the instrument rejects it.
     pub fn set_averaging_on(&mut self, enabled: bool) -> Result<()> {
         let value = BooleanValidator::default()
             .validate_input(enabled)
@@ -449,6 +691,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .write(&format!("SENS{}:AVER:STATE {value}", self.number))
     }
 
+    /// Returns the number of measurements combined for an average.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the averaging count cannot be queried, parsed, or represented as `usize`.
     pub fn averaging_count(&mut self) -> Result<usize> {
         parse_integer(
             self.parent
@@ -457,9 +704,14 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             Some(1),
             Some(65_536),
         )
-        .map(|value| value as usize)
+        .and_then(|value| integer_to_usize(value, "PNA averaging count"))
     }
 
+    /// Sets the number of measurements combined for an average.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `count` is outside the supported range or cannot be sent.
     pub fn set_averaging_count(&mut self, count: usize) -> Result<()> {
         parse_integer(count.to_string(), Some(1), Some(65_536))?;
         self.parent
@@ -467,6 +719,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .write(&format!("SENS{}:AVER:COUN {count}", self.number))
     }
 
+    /// Returns how measurements are averaged together.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the averaging mode cannot be queried or parsed.
     pub fn averaging_mode(&mut self) -> Result<PnaAveragingMode> {
         self.parent
             .vna
@@ -474,12 +731,22 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .parse()
     }
 
+    /// Selects how measurements are averaged together.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the averaging-mode command.
     pub fn set_averaging_mode(&mut self, mode: PnaAveragingMode) -> Result<()> {
         self.parent
             .vna
             .write(&format!("SENS{}:AVER:MODE {mode}", self.number))
     }
 
+    /// Returns the number of triggers issued by one grouped trigger command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the group count cannot be queried, parsed, or represented as `usize`.
     pub fn sweep_groups(&mut self) -> Result<usize> {
         parse_integer(
             self.parent
@@ -488,9 +755,14 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             Some(1),
             Some(2_000_000),
         )
-        .map(|value| value as usize)
+        .and_then(|value| integer_to_usize(value, "PNA sweep group count"))
     }
 
+    /// Sets the number of triggers issued by one grouped trigger command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `groups` is outside the supported range or cannot be sent.
     pub fn set_sweep_groups(&mut self, groups: usize) -> Result<()> {
         parse_integer(groups.to_string(), Some(1), Some(2_000_000))?;
         self.parent
@@ -498,10 +770,29 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .write(&format!("SENS{}:SWE:GRO:COUN {groups}", self.number))
     }
 
+    /// Returns the frequency step in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency axis cannot be queried or its step cannot be represented as `u64`.
     pub fn frequency_step(&mut self) -> Result<u64> {
-        Ok(self.frequency()?.step().unwrap_or(0.0) as u64)
+        self.frequency()?
+            .step()
+            .unwrap_or(0.0)
+            .to_u64()
+            .ok_or_else(|| {
+                Error::InvalidFrequency("PNA frequency step is outside the u64 range".into())
+            })
     }
 
+    /// Sets the frequency step by adjusting the number of points.
+    ///
+    /// This calculation is used because not every instrument supports the
+    /// `SENS:FREQ:STEP` command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `step` is invalid or the required point count cannot be represented.
     pub fn set_frequency_step(&mut self, step: impl ToString) -> Result<()> {
         let step = FrequencyValidator
             .validate_input(step)
@@ -512,34 +803,72 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             ));
         }
         let frequency = self.frequency()?;
-        let span = frequency.stop().unwrap_or(0.0) as u64 - frequency.start().unwrap_or(0.0) as u64;
-        self.set_points((span / step + 1) as usize)
+        let span = (frequency.stop().unwrap_or(0.0) - frequency.start().unwrap_or(0.0))
+            .to_u64()
+            .ok_or_else(|| {
+                Error::InvalidFrequency("PNA frequency span is outside the u64 range".into())
+            })?;
+        let points = usize::try_from(span / step + 1).map_err(|error| {
+            Error::InvalidFrequency(format!("PNA point count is too large: {error}"))
+        })?;
+        self.set_points(points)
     }
 
+    /// Returns the channel's frequency axis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency limits or point count cannot be queried or represented.
     pub fn frequency(&mut self) -> Result<Frequency> {
+        let start = self.frequency_start()?.to_f64().ok_or_else(|| {
+            Error::InvalidFrequency("PNA start frequency cannot be represented as f64".into())
+        })?;
+        let stop = self.frequency_stop()?.to_f64().ok_or_else(|| {
+            Error::InvalidFrequency("PNA stop frequency cannot be represented as f64".into())
+        })?;
         Frequency::new(
-            self.frequency_start()? as f64,
-            self.frequency_stop()? as f64,
+            start,
+            stop,
             self.points()?,
             FrequencyUnit::Hz,
             FrequencySweepType::Linear,
         )
     }
 
+    /// Configures the channel from a frequency axis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency limits or point count cannot be applied.
     pub fn set_frequency(&mut self, frequency: &Frequency) -> Result<()> {
         self.set_frequency_start(frequency.start().unwrap_or(0.0))?;
         self.set_frequency_stop(frequency.stop().unwrap_or(0.0))?;
         self.set_points(frequency.points())
     }
 
+    /// Returns `(name, parameter)` pairs for measurements on this channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement catalog cannot be queried.
     pub fn measurements(&mut self) -> Result<Vec<(String, String)>> {
         self.parent.measurements(self.number)
     }
 
+    /// Returns the measurement names defined on this channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement catalog cannot be queried.
     pub fn measurement_names(&mut self) -> Result<Vec<String>> {
         self.parent.measurement_names(self.number)
     }
 
+    /// Reads complex S-parameter data from the active trace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no trace is active or its data cannot be queried.
     pub fn active_trace_s_data(&mut self) -> Result<Vec<Complex64>> {
         let selected = self
             .parent
@@ -556,20 +885,40 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             .query_complex_values(&format!("CALC{}:DATA? SDATA", self.number))
     }
 
+    /// Clears accumulated averaging data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the averaging-clear command.
     pub fn clear_averaging(&mut self) -> Result<()> {
         self.parent
             .vna
             .write(&format!("SENS{}:AVER:CLE", self.number))
     }
 
+    /// Creates and displays a named measurement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the measurement cannot be created or displayed.
     pub fn create_measurement(&mut self, name: &str, parameter: &str) -> Result<()> {
         self.parent.create_measurement(self.number, name, parameter)
     }
 
+    /// Deletes a named measurement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the instrument rejects the measurement deletion command.
     pub fn delete_measurement(&mut self, name: &str) -> Result<()> {
         self.parent.delete_measurement(self.number, name)
     }
 
+    /// Sweeps and returns the active trace as a one-port network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if acquisition, transfer-format restoration, or network construction fails.
     pub fn get_active_trace(&mut self) -> Result<Network> {
         self.sweep()?;
         let original = self.parent.vna.values_format;
@@ -583,6 +932,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
         result
     }
 
+    /// Selects, sweeps, and returns a named measurement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `name` does not exist or acquisition fails.
     pub fn get_measurement(&mut self, name: &str) -> Result<Network> {
         if !self
             .measurement_names()?
@@ -599,6 +953,14 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
         Ok(network)
     }
 
+    /// Acquires one S-parameter as a one-port network.
+    ///
+    /// `output` and `input` identify the driven and measured ports in the
+    /// parameter name $S_{output,input}$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the temporary measurement cannot be acquired or converted to a network.
     pub fn get_s_data(&mut self, output: impl Display, input: impl Display) -> Result<Network> {
         let original = self.parent.vna.values_format;
         self.parent.set_query_format(ValuesFormat::Binary64)?;
@@ -616,6 +978,11 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
         result
     }
 
+    /// Acquires an $n$-port network for the requested physical ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `ports` is empty, acquisition fails, or the response shape is invalid.
     pub fn get_snp_network(&mut self, ports: &[usize]) -> Result<Network> {
         if ports.is_empty() {
             return Err(Error::Unsupported("PNA SNP port list is empty".into()));
@@ -682,6 +1049,14 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
         network(frequency, s)
     }
 
+    /// Performs a complete acquisition and restores the prior sweep settings.
+    ///
+    /// Sweep averaging uses grouped triggering; other modes use a single sweep.
+    /// The instrument timeout is expanded to cover all ports and averages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if acquisition or restoration of the previous sweep settings fails.
     pub fn sweep(&mut self) -> Result<()> {
         self.parent.set_trigger_source(TriggerSource::Immediate)?;
         self.parent.vna.clear()?;
@@ -701,8 +1076,13 @@ impl<S: InstrumentSession> PnaChannel<'_, S> {
             self.set_sweep_mode(PnaSweepMode::Single)?;
             ports
         };
-        self.parent.vna.timeout_ms =
-            Some(((original_time * sweeps as f64 * 1_000.0) as u64).max(5_000));
+        let sweeps = sweeps
+            .to_f64()
+            .ok_or_else(|| Error::Parse("PNA sweep count cannot be represented as f64".into()))?;
+        let timeout_ms = (original_time * sweeps * 1_000.0)
+            .to_u64()
+            .ok_or_else(|| Error::Parse("PNA sweep timeout is outside the u64 range".into()))?;
+        self.parent.vna.timeout_ms = Some(timeout_ms.max(5_000));
         let acquisition = self.parent.vna.wait_for_complete().map(|_| ());
         self.parent.vna.clear()?;
         self.parent.vna.timeout_ms = original_timeout;
@@ -770,6 +1150,11 @@ fn parse_integer(value: String, min: Option<i64>, max: Option<i64>) -> Result<i6
     IntValidator::new(min, max)
         .validate_output(value)
         .map_err(validation_error)
+}
+
+fn integer_to_usize(value: i64, description: &str) -> Result<usize> {
+    usize::try_from(value)
+        .map_err(|error| Error::Parse(format!("{description} is outside the usize range: {error}")))
 }
 
 fn parse_integer_list(value: &str) -> Result<Vec<usize>> {

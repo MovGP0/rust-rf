@@ -1,6 +1,10 @@
 use rust_rf::docs::{DocumentationConfig, NumpyDocString, process_signature};
 
-const DOC: &str = r#"
+/// Representative NumPy-style documentation used to verify the parser.
+///
+/// The embedded reStructuredText is intentional test input; assertions below verify that its
+/// signature, summary, fields, sections, references, examples, and index are recognized.
+const DOC: &str = r"
   numpy.multivariate_normal(mean, cov, shape=None, spam=None)
 
   Draw values from a multivariate normal distribution with specified
@@ -57,9 +61,10 @@ const DOC: &str = r#"
 
   .. index:: random
      :refguide: random;distributions, random;gauss
-"#;
+";
 
 #[test]
+/// Verifies the stable documentation-build configuration translated from `conf.py`.
 fn exposes_the_documentation_build_configuration() {
     let configuration = DocumentationConfig::scikit_rf();
     assert_eq!(configuration.project, "scikit-rf");
@@ -76,6 +81,7 @@ fn exposes_the_documentation_build_configuration() {
 }
 
 #[test]
+/// Verifies generated plot signatures omit their Python receiver and attribute arguments.
 fn strips_generated_plot_receiver_arguments_from_signatures() {
     assert_eq!(
         process_signature(
@@ -92,6 +98,7 @@ fn strips_generated_plot_receiver_arguments_from_signatures() {
 }
 
 #[test]
+/// Verifies NumPy-style signatures, summaries, fields, sections, references, examples, and index entries.
 fn parses_numpy_docstring_summaries_sections_fields_and_index() {
     let documentation = NumpyDocString::parse(DOC);
     assert_eq!(
@@ -127,6 +134,7 @@ fn parses_numpy_docstring_summaries_sections_fields_and_index() {
 }
 
 #[test]
+/// Verifies a parameter section can follow the summary without an extended summary.
 fn parses_parameter_sections_without_extended_summary() {
     let documentation = NumpyDocString::parse(
         "Returns indices.\n\nParameters\n----------\na : {array_like}\n    Array to inspect.\n",

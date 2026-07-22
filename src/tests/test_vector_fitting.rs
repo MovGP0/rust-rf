@@ -1,3 +1,6 @@
+//! Integration tests for vector fitting, model persistence, passivity, and
+//! state-space export.
+
 use approx::assert_relative_eq;
 use ndarray::{Array2, Array3};
 use num_complex::Complex64;
@@ -10,6 +13,8 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
+/// Fits a real pole with residue, constant, and proportional terms and verifies
+/// both direct and state-space responses.
 fn fits_real_pole_residue_constant_and_proportional_terms() {
     let pole = Complex64::new(-std::f64::consts::TAU * 1.0e9, 0.0);
     let residue = Complex64::new(3.0e9, 0.0);
@@ -18,7 +23,8 @@ fn fits_real_pole_residue_constant_and_proportional_terms() {
     let network = model_network(101, |frequency| {
         let s = Complex64::new(0.0, std::f64::consts::TAU * frequency);
         constant + proportional * s + residue / (s - pole)
-    });
+    })
+    .expect("analytic model network should be valid");
     let sampled = network.frequency.values_hz().clone();
     let expected = network.s.clone();
     let mut fitting = VectorFitting::new(network);
@@ -74,6 +80,7 @@ fn fits_real_pole_residue_constant_and_proportional_terms() {
 }
 
 #[test]
+/// Fits a complex-conjugate pole pair and verifies its state-space realization.
 fn fits_complex_conjugate_pole_pair() {
     let omega = std::f64::consts::TAU * 1.0e9;
     let pole = Complex64::new(-0.01 * omega, omega);
@@ -81,7 +88,8 @@ fn fits_complex_conjugate_pole_pair() {
     let network = model_network(101, |frequency| {
         let s = Complex64::new(0.0, std::f64::consts::TAU * frequency);
         0.1 + residue / (s - pole) + residue.conj() / (s - pole.conj())
-    });
+    })
+    .expect("analytic model network should be valid");
     let sampled = network.frequency.values_hz().clone();
     let mut fitting = VectorFitting::new(network);
 
@@ -131,8 +139,10 @@ fn fits_complex_conjugate_pole_pair() {
 }
 
 #[test]
+/// Rejects invalid model state and exercises automatic model fitting.
 fn validates_model_state_and_auto_fit() {
-    let network = model_network(101, |_| Complex64::new(0.25, 0.0));
+    let network = model_network(101, |_| Complex64::new(0.25, 0.0))
+        .expect("analytic model network should be valid");
     let mut fitting = VectorFitting::new(network);
     assert!(
         fitting
@@ -151,6 +161,7 @@ fn validates_model_state_and_auto_fit() {
 }
 
 #[test]
+/// Classifies complex poles with negligible residue energy as spurious.
 fn classifies_low_energy_complex_poles_as_spurious() {
     let poles = ndarray::array![
         Complex64::new(-1.0e8, 1.0e9),
@@ -176,11 +187,13 @@ fn classifies_low_energy_complex_poles_as_spurious() {
 }
 
 #[test]
+/// Writes fitted parameters to a `NumPy` archive and restores them unchanged.
 fn writes_and_reads_numpy_model_archives() {
     let network = model_network(101, |frequency| {
         let s = Complex64::new(0.0, std::f64::consts::TAU * frequency);
         0.2 + Complex64::new(3.0e9, 0.0) / (s - Complex64::new(-std::f64::consts::TAU * 1.0e9, 0.0))
-    });
+    })
+    .expect("analytic model network should be valid");
     let mut fitting = VectorFitting::new(network.clone());
     fitting.vector_fit(1, 0).expect("model should fit");
     let directory = std::env::temp_dir().join(format!(
@@ -216,8 +229,10 @@ fn writes_and_reads_numpy_model_archives() {
 }
 
 #[test]
+/// Detects sampled passivity violations and enforces a passive response.
 fn detects_and_enforces_sampled_passivity() {
-    let network = model_network(21, |_| Complex64::new(1.2, 0.0));
+    let network = model_network(21, |_| Complex64::new(1.2, 0.0))
+        .expect("analytic model network should be valid");
     let mut fitting = VectorFitting::new(network);
     fitting.poles = ndarray::array![Complex64::new(-1.0e9, 0.0)];
     fitting.residues = ndarray::array![[Complex64::new(0.0, 0.0)]];
@@ -239,12 +254,14 @@ fn detects_and_enforces_sampled_passivity() {
 }
 
 #[test]
+/// Retains the smallest model that satisfies the adaptive-fit tolerance.
 fn adaptive_fit_retains_the_smallest_sufficient_model() {
     let network = model_network(101, |frequency| {
         let s = Complex64::new(0.0, std::f64::consts::TAU * frequency);
         0.25 + Complex64::new(3.0e9, 0.0)
             / (s - Complex64::new(-std::f64::consts::TAU * 1.0e9, 0.0))
-    });
+    })
+    .expect("analytic model network should be valid");
     let mut fitting = VectorFitting::new(network);
 
     fitting
@@ -256,12 +273,14 @@ fn adaptive_fit_retains_the_smallest_sufficient_model() {
 }
 
 #[test]
+/// Fits caller-supplied poles and builds response and singular-value plot data.
 fn fits_with_caller_supplied_poles_and_builds_plot_data() {
     let pole = Complex64::new(-std::f64::consts::TAU * 1.0e9, 0.0);
     let network = model_network(101, |frequency| {
         let s = Complex64::new(0.0, std::f64::consts::TAU * frequency);
         0.2 + Complex64::new(3.0e9, 0.0) / (s - pole)
-    });
+    })
+    .expect("analytic model network should be valid");
     let mut fitting = VectorFitting::new(network);
 
     fitting
@@ -288,8 +307,10 @@ fn fits_with_caller_supplied_poles_and_builds_plot_data() {
 }
 
 #[test]
+/// Writes the fitted state-space model as a SPICE subcircuit.
 fn writes_state_space_spice_subcircuit() {
-    let network = model_network(21, |_| Complex64::new(0.2, 0.0));
+    let network = model_network(21, |_| Complex64::new(0.2, 0.0))
+        .expect("analytic model network should be valid");
     let mut fitting = VectorFitting::new(network);
     fitting.poles = ndarray::array![Complex64::new(-1.0e9, 0.0), Complex64::new(-2.0e9, 3.0e9)];
     fitting.residues = ndarray::array![[Complex64::new(1.0e8, 0.0), Complex64::new(2.0e8, 3.0e8)]];
@@ -322,12 +343,14 @@ fn writes_state_space_spice_subcircuit() {
 }
 
 #[test]
+/// Relocates initial poles toward the measured response and improves fit error.
 fn relocates_initial_poles_to_the_measured_response() {
     let pole = Complex64::new(-std::f64::consts::TAU * 3.25e9, 0.0);
     let network = model_network(201, |frequency| {
         let s = Complex64::new(0.0, std::f64::consts::TAU * frequency);
         0.15 + Complex64::new(4.0e9, 0.0) / (s - pole)
-    });
+    })
+    .expect("analytic model network should be valid");
     let mut fixed = VectorFitting::new(network.clone());
     fixed
         .vector_fit(1, 0)
@@ -355,6 +378,7 @@ fn relocates_initial_poles_to_the_measured_response() {
 }
 
 #[test]
+/// Preserves the real measured response at the DC sample.
 fn preserves_the_measured_dc_sample() {
     let pole = Complex64::new(-1.0e9, 0.0);
     let frequency = Frequency::from_hz(ndarray::Array1::linspace(0.0, 10.0e9, 101))
@@ -381,6 +405,7 @@ fn preserves_the_measured_dc_sample() {
 }
 
 #[test]
+/// Fits the upstream ring-slot example within the expected RMS error.
 fn fits_the_upstream_ring_slot_example() {
     let network = DATA.ring_slot().expect("ring-slot fixture should parse");
     let mut fitting = VectorFitting::new(network);
@@ -393,6 +418,7 @@ fn fits_the_upstream_ring_slot_example() {
 }
 
 #[test]
+/// Fits the upstream 190 GHz measured network within the expected RMS error.
 fn fits_the_upstream_190_ghz_measurement() {
     let network = Network::read_touchstone(vector_fixture("190ghz_tx_measured.s2p"))
         .expect("190 GHz fixture should parse");
@@ -405,9 +431,9 @@ fn fits_the_upstream_190_ghz_measurement() {
     assert!(fitting.rms_error().expect("RMS error should be available") < 0.02);
 }
 
-fn model_network(points: usize, model: impl Fn(f64) -> Complex64) -> Network {
-    let frequency = Frequency::from_hz(ndarray::Array1::linspace(1.0e9, 10.0e9, points))
-        .expect("frequency should be valid");
+/// Builds a one-port network by sampling an analytic model.
+fn model_network(points: usize, model: impl Fn(f64) -> Complex64) -> rust_rf::Result<Network> {
+    let frequency = Frequency::from_hz(ndarray::Array1::linspace(1.0e9, 10.0e9, points))?;
     let s = Array3::from_shape_fn((points, 1, 1), |(point, _, _)| {
         model(frequency.values_hz()[point])
     });
@@ -416,9 +442,9 @@ fn model_network(points: usize, model: impl Fn(f64) -> Complex64) -> Network {
         s,
         Array2::from_elem((points, 1), Complex64::new(50.0, 0.0)),
     )
-    .expect("network should be valid")
 }
 
+/// Locates a vector-fitting fixture in the Rust integration-test data.
 fn vector_fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")

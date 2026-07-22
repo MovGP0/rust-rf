@@ -1,3 +1,5 @@
+//! Integration tests for general utility helpers and homogeneous collections.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -12,15 +14,17 @@ use rust_rf::util::{
 };
 
 #[test]
+/// Finds the nearest sample and the inclusive index range for a domain.
 fn finds_nearest_values_and_domain_ranges() {
     let values = array![0.0, 2.0, 5.0, 9.0];
     assert_eq!(
         find_nearest_index(&values, 4.0).expect("nearest should exist"),
         2
     );
-    assert_eq!(
+    assert_relative_eq!(
         find_nearest(&values, 4.0).expect("nearest should exist"),
-        5.0
+        5.0,
+        epsilon = f64::EPSILON
     );
     assert_eq!(
         slice_domain(&values, (1.0, 8.0)).expect("range should exist"),
@@ -30,6 +34,7 @@ fn finds_nearest_values_and_domain_ranges() {
 }
 
 #[test]
+/// Handles path extensions, duplicate detection, and unique-name suffixes.
 fn handles_path_names_duplicates_and_unique_suffixes() {
     assert_eq!(extension("fixtures/example.s2p").as_deref(), Some("s2p"));
     assert_eq!(extension("fixtures/example"), None);
@@ -47,6 +52,7 @@ fn handles_path_names_duplicates_and_unique_suffixes() {
 }
 
 #[test]
+/// Smooths reflected one-dimensional signals and rejects invalid window lengths.
 fn smooths_reflected_one_dimensional_signals() {
     let values = array![1.0, 2.0, 3.0, 4.0, 5.0];
     let smoothed =
@@ -63,6 +69,8 @@ fn smooths_reflected_one_dimensional_signals() {
 }
 
 #[test]
+/// Exercises indexing, mapping, boolean-style matching, and selection for
+/// homogeneous lists and dictionaries.
 fn maps_and_selects_homogeneous_collections() {
     let list = HomoList::new(["asdf".to_owned(), "ZZZZ".to_owned()]);
     assert_eq!(&list[0], "asdf");
@@ -97,6 +105,7 @@ fn maps_and_selects_homogeneous_collections() {
 }
 
 #[test]
+/// Round-trips sortable timestamp strings and rejects invalid timestamps.
 fn round_trips_sortable_timestamps() {
     let timestamp = now_string();
     let parsed = parse_now_string(&timestamp).expect("generated timestamp should parse");
@@ -120,6 +129,7 @@ fn round_trips_sortable_timestamps() {
 }
 
 #[test]
+/// Converts delimited dictionary keys into structured records.
 fn converts_structured_dictionary_keys_to_records() {
     let values = BTreeMap::from([("a,1.5,-2".to_owned(), 10), ("b,3.0,4".to_owned(), 20)]);
     let records = dictionary_to_records(&values, ",").expect("records should convert");
@@ -132,6 +142,7 @@ fn converts_structured_dictionary_keys_to_records() {
 }
 
 #[test]
+/// Recursively replaces matching text only in files selected by the glob.
 fn recursively_replaces_only_matching_files() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -168,6 +179,7 @@ fn recursively_replaces_only_matching_files() {
 }
 
 #[test]
+/// Renders progress updates and reads the repository's Git description.
 fn renders_progress_and_reads_git_description() {
     let mut progress = ProgressBar::new(10, "measurements").expect("progress bar should construct");
     assert!(progress.render().contains("0%"));

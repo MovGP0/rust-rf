@@ -1,4 +1,17 @@
-﻿use std::collections::BTreeMap;
+﻿//! Read and write Touchstone network-parameter files.
+//!
+//! The parser supports Touchstone 1 and 2, S/Z/Y/H/G parameters, RI/MA/DB
+//! value formats, mixed-mode ordering, noise data, and HFSS per-frequency
+//! propagation constants and port impedances.
+//!
+//! The implementation follows the [Touchstone 2.0 specification] and its
+//! earlier [draft].
+//!
+//! [Touchstone 2.0 specification]: https://ibis.org/touchstone_ver2.0/touchstone_ver2_0.pdf
+//! [draft]: https://ibis.org/interconnect_wip/touchstone_spec2_draft.pdf
+
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -10,9 +23,17 @@ use num_complex::Complex64;
 use crate::media::DefinedGammaZ0;
 use crate::network::{h_to_z, s_to_g, s_to_h, s_to_y, s_to_z, y_to_s, z_to_s};
 use crate::{Error, Frequency, FrequencyUnit, Network, PortMode, Result, SParameterDefinition};
-/// Extracts the frequency, propagation constants, and port impedances from an HFSS file.
+
+/// Extract the frequency, propagation constants, and port impedances from an
+/// HFSS-style Touchstone file.
 ///
-/// Origin: `skrf.io.touchstone.hfss_touchstone_2_gamma_z0`.
+/// HFSS stores the complex propagation constant $\gamma$ and reference
+/// impedance $`Z_0`$ in comment records. Both returned matrices are arranged as
+/// `(frequency, port)`.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be parsed or lacks the required HFSS comments.
 pub fn hfss_touchstone_2_gamma_z0(
     path: impl AsRef<Path>,
 ) -> Result<(Frequency, Array2<Complex64>, Array2<Complex64>)> {
@@ -27,9 +48,14 @@ pub fn hfss_touchstone_2_gamma_z0(
     Ok((frequency, gamma, z0))
 }
 
-/// Builds one defined medium per HFSS port.
+/// Build one transmission-line medium for each port in an HFSS Touchstone file.
 ///
-/// Origin: `skrf.io.touchstone.hfss_touchstone_2_media`.
+/// Each [`DefinedGammaZ0`] uses the file's frequency axis and the corresponding
+/// columns of $\gamma$ and $`Z_0`$. See [`hfss_touchstone_2_gamma_z0`].
+///
+/// # Errors
+///
+/// Returns an error if the file or a per-port medium cannot be constructed.
 pub fn hfss_touchstone_2_media(path: impl AsRef<Path>) -> Result<Vec<DefinedGammaZ0>> {
     let (frequency, gamma, z0) = hfss_touchstone_2_gamma_z0(path)?;
     (0..gamma.ncols())
@@ -44,16 +70,23 @@ pub fn hfss_touchstone_2_media(path: impl AsRef<Path>) -> Result<Vec<DefinedGamm
         .collect()
 }
 
-/// Reads an HFSS Touchstone file into a Network with per-frequency port metadata.
+/// Read an HFSS Touchstone file as a network with per-frequency port metadata.
 ///
-/// Origin: `skrf.io.touchstone.hfss_touchstone_2_network`.
+/// # Errors
+///
+/// Returns an error if the file cannot be read, parsed, or converted to a network.
 pub fn hfss_touchstone_2_network(path: impl AsRef<Path>) -> Result<Network> {
     Network::read_touchstone(path)
 }
 
-/// Reads every Touchstone member of a ZIP archive.
+/// Read every Touchstone member of a ZIP archive.
 ///
-/// Origin: `skrf.io.touchstone.read_zipped_touchstones`.
+/// Keys are member file stems and values are parsed networks. Directories and
+/// members whose suffix does not declare a Touchstone port count are skipped.
+///
+/// # Errors
+///
+/// Returns an error if the archive or a Touchstone member cannot be read or parsed.
 pub fn read_zipped_touchstones(path: impl AsRef<Path>) -> Result<BTreeMap<String, Network>> {
     let file = File::open(path)?;
     let mut archive = zip::ZipArchive::new(file)
@@ -83,9 +116,14 @@ pub fn read_zipped_touchstones(path: impl AsRef<Path>) -> Result<BTreeMap<String
     Ok(networks)
 }
 
-/// Writes a Touchstone 2.0 file using the selected network parameter and value format.
+/// Write a Touchstone 2.0 file in the selected parameter and value formats.
 ///
-/// Origin: `skrf.network.Network.write_touchstone`.
+/// The writer supports the parameter kinds in [`TouchstoneParameter`] and the
+/// representations in [`TouchstoneFormat`].
+///
+/// # Errors
+///
+/// Returns an error if the network cannot be represented or the file cannot be written.
 pub fn write_touchstone(
     network: &Network,
     path: impl AsRef<Path>,
@@ -97,7 +135,14 @@ pub fn write_touchstone(
     Ok(())
 }
 
-/// Renders a complete Touchstone 2.0 document without requiring a filesystem.
+/// Render a complete Touchstone 2.0 document without using the filesystem.
+///
+/// Reference impedances must be real and constant with frequency. Network
+/// comments are preserved as leading Touchstone comment lines.
+///
+/// # Errors
+///
+/// Returns an error if the network cannot be represented in the requested Touchstone format.
 pub fn touchstone_string(
     network: &Network,
     parameter: TouchstoneParameter,
@@ -152,16 +197,16 @@ pub fn touchstone_string(
         text.push('\n');
     }
     text.push_str("[Version] 2.0\n");
-    text.push_str(&format!("# Hz {parameter_name} {format_name} R 50\n"));
-    text.push_str(&format!("[Number of Ports] {ports}\n"));
-    text.push_str(&format!("[Number of Frequencies] {points}\n"));
+    let _ = writeln!(&mut text, "# Hz {parameter_name} {format_name} R 50");
+    let _ = writeln!(&mut text, "[Number of Ports] {ports}");
+    let _ = writeln!(&mut text, "[Number of Frequencies] {points}");
     text.push_str("[Reference]");
     for value in &reference {
-        text.push_str(&format!(" {:.17e}", value.re));
+        let _ = write!(&mut text, " {:.17e}", value.re);
     }
     text.push_str("\n[Network Data]\n");
     for point in 0..points {
-        text.push_str(&format!("{:.17e}", network.frequency.values_hz()[point]));
+        let _ = write!(&mut text, "{:.17e}", network.frequency.values_hz()[point]);
         for row in 0..ports {
             for column in 0..ports {
                 let value = values[(point, row, column)];
@@ -172,7 +217,7 @@ pub fn touchstone_string(
                         (20.0 * value.norm().log10(), value.arg().to_degrees())
                     }
                 };
-                text.push_str(&format!(" {:.17e} {:.17e}", first, second));
+                let _ = write!(&mut text, " {first:.17e} {second:.17e}");
             }
         }
         text.push('\n');
@@ -181,21 +226,31 @@ pub fn touchstone_string(
     Ok(text)
 }
 
+/// Numeric representation of each complex value in a Touchstone file.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TouchstoneFormat {
+    /// Linear magnitude and angle in degrees (`MA`).
     #[default]
     MagnitudeAngle,
+    /// Logarithmic magnitude in decibels and angle in degrees (`DB`).
     DecibelAngle,
+    /// Real and imaginary components (`RI`).
     RealImaginary,
 }
 
+/// Network-parameter family stored in a Touchstone file.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TouchstoneParameter {
+    /// Scattering parameters (`S`).
     #[default]
     Scattering,
+    /// Impedance parameters (`Z`).
     Impedance,
+    /// Admittance parameters (`Y`).
     Admittance,
+    /// Two-port hybrid parameters (`H`).
     Hybrid,
+    /// Two-port inverse-hybrid parameters (`G`).
     InverseHybrid,
 }
 
@@ -215,30 +270,68 @@ enum ParseSection {
     Other,
 }
 
-/// Origin: `skrf/io/touchstone.py::Touchstone`.
+/// Parsed representation of a Touchstone network-parameter file.
+///
+/// File data is normalized to hertz and scattering parameters while the
+/// original version, frequency unit, parameter family, and numeric format are
+/// retained as metadata.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::io::Touchstone;
+///
+/// let touchstone = Touchstone::from_path("network.s2p")?;
+/// let network = touchstone.network()?;
+/// assert_eq!(network.ports(), 2);
+/// # Ok::<(), rust_rf::Error>(())
+/// ```
 #[derive(Clone, Debug)]
 pub struct Touchstone {
+    /// Source filename, or `None` when read from a stream.
     pub filename: Option<String>,
+    /// Comments that appear before the option line.
     pub comments: Vec<String>,
+    /// Comments that appear after the option line.
     pub comments_after_option_line: Vec<String>,
+    /// Number of network ports.
     pub rank: usize,
+    /// Touchstone file-format version, such as `1.0` or `2.0`.
     pub version: String,
+    /// Frequency unit declared in the original option line.
     pub frequency_unit: FrequencyUnit,
+    /// Parameter family declared in the original file.
     pub parameter: TouchstoneParameter,
+    /// Numeric representation declared in the original file.
     pub format: TouchstoneFormat,
+    /// Reference resistance from the option line.
     pub resistance: Complex64,
+    /// Port names indexed in network-port order.
     pub port_names: Vec<String>,
+    /// Per-port reference impedances from the Touchstone 2 `[Reference]` section.
     pub reference_impedances: Vec<Complex64>,
+    /// HFSS per-frequency port impedances arranged as `(frequency, port)`.
     pub port_impedances: Option<Array2<Complex64>>,
+    /// HFSS propagation constants arranged as `(frequency, port)`.
     pub propagation_constants: Option<Array2<Complex64>>,
+    /// Raw noise rows: frequency, minimum noise figure, optimal-reflection
+    /// magnitude and angle, and normalized equivalent noise resistance.
     pub noise: Option<Array2<f64>>,
+    /// Single-ended, differential, or common mode of every normalized port.
     pub port_modes: Vec<PortMode>,
     frequencies_hz: Array1<f64>,
     s: Array3<Complex64>,
 }
 
 impl Touchstone {
-    /// Port of `skrf.io.touchstone.Touchstone.__init__` for filesystem input.
+    /// Read a Touchstone file from a path.
+    ///
+    /// The port count is inferred from `.sNp` or read from Touchstone 2
+    /// keywords. UTF-8, UTF-8 with BOM, and Windows-1252 input are accepted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, its rank cannot be inferred, or parsing fails.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let bytes = fs::read(path)?;
@@ -249,33 +342,50 @@ impl Touchstone {
         Ok(touchstone)
     }
 
-    /// Rust reader equivalent of constructing `Touchstone` from a Python file
-    /// object. The rank is explicit because a stream has no required suffix.
+    /// Read Touchstone data from a stream.
+    ///
+    /// `rank` supplies the port count when the stream has no filename suffix;
+    /// pass zero for Touchstone 2 input that declares `[Number of Ports]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream cannot be read or the Touchstone data is invalid.
     pub fn from_reader(mut reader: impl Read, rank: usize) -> Result<Self> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes)?;
         Self::parse(&decode_touchstone(&bytes), rank)
     }
 
-    pub fn frequencies_hz(&self) -> &Array1<f64> {
+    /// Return the frequency vector in hertz.
+    #[must_use]
+    pub const fn frequencies_hz(&self) -> &Array1<f64> {
         &self.frequencies_hz
     }
 
-    pub fn s_parameters(&self) -> &Array3<Complex64> {
+    /// Return the complex scattering matrix arranged as `(frequency, output, input)`.
+    #[must_use]
+    pub const fn s_parameters(&self) -> &Array3<Complex64> {
         &self.s
     }
 
-    /// Whether the file supplies HFSS per-frequency port impedances.
-    pub fn has_hfss_port_impedances(&self) -> bool {
+    /// Return whether the file supplies HFSS per-frequency port impedances.
+    #[must_use]
+    pub const fn has_hfss_port_impedances(&self) -> bool {
         self.port_impedances.is_some()
     }
 
-    /// Port of `skrf.io.touchstone.Touchstone.get_sparameter_arrays`.
+    /// Return owned copies of the frequency vector and scattering matrix.
+    #[must_use]
     pub fn s_parameter_arrays(&self) -> (Array1<f64>, Array3<Complex64>) {
         (self.frequencies_hz.clone(), self.s.clone())
     }
 
-    /// Port of `skrf.io.touchstone.Touchstone.get_sparameter_data`.
+    /// Return scattering traces as named one-dimensional arrays.
+    ///
+    /// Names use `R`/`I` for real/imaginary, `M`/`A` for magnitude/angle,
+    /// and `DB`/`A` for decibel/angle data. Angles are in degrees and the
+    /// `frequency` entry is always in hertz.
+    #[must_use]
     pub fn s_parameter_data(&self, format: TouchstoneFormat) -> BTreeMap<String, Array1<f64>> {
         let mut data = BTreeMap::new();
         data.insert("frequency".to_owned(), self.frequencies_hz.clone());
@@ -291,7 +401,7 @@ impl Touchstone {
                         data.insert(format!("{name}I"), values.mapv(|value| value.im));
                     }
                     TouchstoneFormat::MagnitudeAngle => {
-                        data.insert(format!("{name}M"), values.mapv(|value| value.norm()));
+                        data.insert(format!("{name}M"), values.mapv(Complex64::norm));
                         data.insert(
                             format!("{name}A"),
                             values.mapv(|value| value.arg().to_degrees()),
@@ -313,7 +423,9 @@ impl Touchstone {
         data
     }
 
-    /// Port of `Touchstone.get_comments` without Python's mutable fallback state.
+    /// Return user comments, excluding lines that contain any ignored marker.
+    ///
+    /// The remaining comment lines are joined with newline characters.
     pub fn comments_excluding(&self, ignored_comments: &[&str]) -> String {
         self.comments
             .iter()
@@ -327,7 +439,10 @@ impl Touchstone {
             .join("\n")
     }
 
-    /// Extracts HFSS-style `name = value unit` comment variables.
+    /// Extract HFSS-style `name = value unit` variables from comments.
+    ///
+    /// Each map value contains the textual number and optional unit.
+    #[must_use]
     pub fn comment_variables(&self) -> BTreeMap<String, (String, String)> {
         let Ok(assignment) =
             regex::Regex::new(r"^\s*([A-Za-z0-9_]*)\s*=\s*([0-9]*\.?[0-9]+)\s*(\w*)")
@@ -349,7 +464,11 @@ impl Touchstone {
             .collect()
     }
 
-    /// Port of `Touchstone.get_format`. `None` reports the original file format.
+    /// Return the Touchstone option-line description.
+    ///
+    /// `None` reports the original file format and unit. Supplying a format
+    /// describes normalized hertz data in that representation.
+    #[must_use]
     pub fn format_description(&self, format: Option<TouchstoneFormat>) -> String {
         let unit = if format.is_some() {
             "Hz".to_owned()
@@ -371,11 +490,14 @@ impl Touchstone {
         format!("{unit} {parameter} {format} R {}", self.resistance)
     }
 
+    /// Generate the column names returned by [`Self::s_parameter_data`].
+    #[must_use]
     pub fn s_parameter_names(&self, format: TouchstoneFormat) -> Vec<String> {
         self.s_parameter_data(format).into_keys().collect()
     }
 
-    /// Port of `Touchstone.get_gamma_z0`.
+    /// Return the optional HFSS propagation constants and port impedances.
+    #[must_use]
     pub fn gamma_z0(&self) -> (Option<Array2<Complex64>>, Option<Array2<Complex64>>) {
         (
             self.propagation_constants.clone(),
@@ -383,6 +505,14 @@ impl Touchstone {
         )
     }
 
+    /// Build a [`Network`] from the parsed Touchstone data.
+    ///
+    /// File comments, name, port names, port modes, propagation constants,
+    /// per-frequency impedances, and noise parameters are preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency axis, network, or noise metadata is invalid.
     pub fn network(&self) -> Result<Network> {
         let frequency = Frequency::from_hz(self.frequencies_hz.clone())?;
         let z0 = self.port_impedances.clone().unwrap_or_else(|| {
@@ -431,6 +561,10 @@ impl Touchstone {
         Ok(network)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the ordered Touchstone grammar shares continuation and section state"
+    )]
     fn parse(text: &str, rank_hint: usize) -> Result<Self> {
         let mut comments = Vec::new();
         let mut comments_after_option_line = Vec::new();
@@ -524,7 +658,7 @@ impl Touchstone {
                 let keyword = line[1..closing_bracket].trim().to_ascii_lowercase();
                 let value = line[closing_bracket + 1..].trim();
                 match keyword.as_str() {
-                    "version" => version = value.to_owned(),
+                    "version" => value.clone_into(&mut version),
                     "number of ports" => {
                         let declared_rank = value.parse::<usize>().map_err(|error| {
                             Error::Parse(format!("invalid Touchstone port count: {error}"))
@@ -668,19 +802,20 @@ impl Touchstone {
         }
         port_names.resize(rank, String::new());
         let port_impedances =
-            complex_rows_to_array(hfss_port_impedances, points, rank, "HFSS port impedance")?;
+            complex_rows_to_array(&hfss_port_impedances, points, rank, "HFSS port impedance")?;
         let conversion_reference = port_impedances.clone().unwrap_or_else(|| {
             Array2::from_shape_fn((points, rank), |(_, port)| reference_impedances[port])
         });
-        let mut port_modes = vec![PortMode::SingleEnded; rank];
-        if let Some(order) = mixed_mode_order {
+        let port_modes = if let Some(order) = mixed_mode_order {
             let mixed = parse_mixed_mode_order(&order, rank, &reference_impedances)?;
             parameters = Array3::from_shape_fn((points, rank, rank), |(point, row, column)| {
                 parameters[(point, mixed[row].source_index, mixed[column].source_index)]
             });
             reference_impedances = mixed.iter().map(|entry| entry.reference).collect();
-            port_modes = mixed.iter().map(|entry| entry.mode).collect();
-        }
+            mixed.iter().map(|entry| entry.mode).collect()
+        } else {
+            vec![PortMode::SingleEnded; rank]
+        };
         let mut conversion_parameters = parameters;
         if version == "1.0" && parameter != TouchstoneParameter::Scattering {
             for point in 0..points {
@@ -716,13 +851,13 @@ impl Touchstone {
             )?,
         };
         let propagation_constants = complex_rows_to_array(
-            hfss_propagation_constants,
+            &hfss_propagation_constants,
             points,
             rank,
             "HFSS propagation constant",
         )?;
         let noise = noise_rows_to_array(
-            noise_rows,
+            &noise_rows,
             expected_noise_points,
             frequency_unit.multiplier(),
         )?;
@@ -838,12 +973,13 @@ fn parse_mixed_mode_order(
 }
 
 fn decode_touchstone(bytes: &[u8]) -> String {
-    if let Ok(text) = std::str::from_utf8(bytes) {
-        text.trim_start_matches('\u{feff}').to_owned()
-    } else {
-        let (text, _, _) = WINDOWS_1252.decode(bytes);
-        text.into_owned()
-    }
+    std::str::from_utf8(bytes).map_or_else(
+        |_| {
+            let (text, _, _) = WINDOWS_1252.decode(bytes);
+            text.into_owned()
+        },
+        |text| text.trim_start_matches('\u{feff}').to_owned(),
+    )
 }
 
 fn parse_port_name(comment: &str, port_names: &mut Vec<String>) {
@@ -859,11 +995,11 @@ fn parse_port_name(comment: &str, port_names: &mut Vec<String>) {
     if index == 0 {
         return;
     }
-    let name = name.trim().strip_prefix('=').map(str::trim).unwrap_or("");
+    let name = name.trim().strip_prefix('=').map_or("", str::trim);
     if port_names.len() < index {
         port_names.resize(index, String::new());
     }
-    port_names[index - 1] = name.to_owned();
+    name.clone_into(&mut port_names[index - 1]);
 }
 
 fn parse_hfss_complex_comment(comment: &str, prefix: &str) -> Result<Option<Vec<Complex64>>> {
@@ -920,7 +1056,7 @@ enum HfssContinuation {
 }
 
 fn complex_rows_to_array(
-    rows: Vec<Vec<Complex64>>,
+    rows: &[Vec<Complex64>],
     points: usize,
     rank: usize,
     description: &str,
@@ -940,7 +1076,7 @@ fn complex_rows_to_array(
 }
 
 fn noise_rows_to_array(
-    rows: Vec<Vec<f64>>,
+    rows: &[Vec<f64>],
     expected_points: Option<usize>,
     frequency_multiplier: f64,
 ) -> Result<Option<Array2<f64>>> {

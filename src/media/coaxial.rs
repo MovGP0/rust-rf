@@ -1,31 +1,59 @@
-use super::media::*;
-use super::*;
+//! Coaxial transmission lines defined by electrical or physical properties.
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{
+    Array1, Complex64, DistributedCircuit, Error, FREE_SPACE_PERMEABILITY, FREE_SPACE_PERMITTIVITY,
+    Frequency, Network, Result, SPEED_OF_LIGHT, db_to_nepers, fmt,
+};
+/// Unit used to specify coaxial attenuation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AttenuationUnit {
+    /// Decibels per meter.
     DecibelsPerMeter,
+    /// Decibels per 100 meters.
     DecibelsPerHundredMeters,
+    /// Decibels per foot.
     DecibelsPerFoot,
+    /// Decibels per 100 feet.
     DecibelsPerHundredFeet,
+    /// Nepers per meter.
     NepersPerMeter,
+    /// Nepers per foot.
     NepersPerFoot,
 }
 
-/// A coaxial transmission line defined by its conductor geometry.
+/// A coaxial transmission line defined by conductor geometry and dielectric properties.
 ///
-/// Origin: `skrf/media/coaxial.py::Coaxial`.
+/// Diameter, relative permittivity, loss tangent, and conductivity may vary
+/// with frequency, but all arrays must have the same length.
+///
+/// See Pozar, *Microwave Engineering* (Wiley, 2009).
 #[derive(Clone, Debug)]
 pub struct Coaxial {
+    /// Frequency band.
     pub frequency: Frequency,
+    /// Inner-conductor diameter in meters.
     pub inner_diameter: Array1<f64>,
+    /// Outer-conductor inside diameter in meters.
     pub outer_diameter: Array1<f64>,
+    /// Dielectric relative permittivity.
     pub relative_permittivity: Array1<f64>,
+    /// Dielectric loss tangent.
     pub loss_tangent: Array1<f64>,
+    /// Conductor conductivity in siemens per meter; infinity is lossless.
     pub conductivity: Array1<f64>,
+    /// Optional port impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Optional override for the calculated characteristic impedance.
     pub characteristic_impedance_override: Option<Array1<Complex64>>,
 }
 
 impl Coaxial {
+    /// Construct a coaxial line from frequency-dependent physical properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if array lengths or physical property values are invalid.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
@@ -103,6 +131,11 @@ impl Coaxial {
         })
     }
 
+    /// Construct a coaxial line from scalar properties repeated over frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any scalar physical property is invalid.
     pub fn from_scalars(
         frequency: Frequency,
         inner_diameter: f64,
@@ -125,7 +158,16 @@ impl Coaxial {
         )
     }
 
-    /// Port of `skrf.media.Coaxial.from_attenuation_VF`.
+    /// Construct a line from attenuation, velocity factor, and impedance.
+    ///
+    /// Attenuation is converted from [`AttenuationUnit`] to nepers per meter.
+    /// Phase constant is $\beta=2\pi f/(c\,\mathrm{VF})$.
+    ///
+    /// See [velocity factor](https://www.microwaves101.com/encyclopedias/light-phase-and-group-velocities).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if input lengths or velocity-factor values are invalid.
     pub fn from_attenuation_and_velocity_factor(
         frequency: Frequency,
         attenuation: Array1<f64>,
@@ -150,7 +192,7 @@ impl Coaxial {
             ));
         }
         let feet_per_meter = 1.0 / 0.3048;
-        let alpha = attenuation.mapv(|value| match unit {
+        let alpha = attenuation.mapv_into(|value| match unit {
             AttenuationUnit::DecibelsPerMeter => db_to_nepers(value),
             AttenuationUnit::DecibelsPerHundredMeters => db_to_nepers(value) / 100.0,
             AttenuationUnit::DecibelsPerFoot => db_to_nepers(value) * feet_per_meter,
@@ -158,10 +200,11 @@ impl Coaxial {
             AttenuationUnit::NepersPerMeter => value,
             AttenuationUnit::NepersPerFoot => value * feet_per_meter,
         });
-        let gamma = Array1::from_shape_fn(points, |point| {
+        let frequencies_hz = frequency.values_hz().clone();
+        let gamma = Array1::from_shape_fn(points, move |point| {
             Complex64::new(
                 alpha[point],
-                std::f64::consts::TAU * frequency.values_hz()[point]
+                std::f64::consts::TAU * frequencies_hz[point]
                     / (SPEED_OF_LIGHT * velocity_factor[point]),
             )
         });
@@ -173,7 +216,13 @@ impl Coaxial {
         )
     }
 
-    /// Port of `skrf.media.Coaxial.from_Z0_Dout` for a real impedance.
+    /// Construct a lossless coax from characteristic impedance and outer diameter.
+    ///
+    /// The inner diameter is derived for the specified relative permittivity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the requested impedance or derived geometry is invalid.
     pub fn from_characteristic_impedance_and_outer_diameter(
         frequency: Frequency,
         characteristic_impedance: f64,
@@ -201,14 +250,20 @@ impl Coaxial {
         )
     }
 
+    /// Return inner-conductor radius in meters.
+    #[must_use]
     pub fn inner_radius(&self) -> Array1<f64> {
         &self.inner_diameter / 2.0
     }
 
+    /// Return outer-conductor radius in meters.
+    #[must_use]
     pub fn outer_radius(&self) -> Array1<f64> {
         &self.outer_diameter / 2.0
     }
 
+    /// Return conductor surface resistance in ohms per square.
+    #[must_use]
     pub fn surface_resistivity(&self) -> Array1<f64> {
         Array1::from_shape_fn(self.frequency.points(), |point| {
             if self.conductivity[point].is_infinite() {
@@ -221,6 +276,11 @@ impl Coaxial {
         })
     }
 
+    /// Return distributed series resistance $R$ in ohms per meter.
+    ///
+    /// DC uses the inner-conductor cross section; nonzero frequency includes
+    /// skin effect in both conductors. See [coax attenuation](https://www.microwaves101.com/encyclopedias/a-more-exact-coax-attenuation-solution).
+    #[must_use]
     pub fn resistance_per_meter(&self) -> Array1<f64> {
         let inner = self.inner_radius();
         let outer = self.outer_radius();
@@ -239,13 +299,17 @@ impl Coaxial {
                 .sqrt()
                 .min(1.0e6);
             let inner_denominator = std::f64::consts::TAU
-                * (depth * inner[point] + depth.powi(2) * (-inner[point] / depth).exp_m1());
+                * depth
+                    .powi(2)
+                    .mul_add((-inner[point] / depth).exp_m1(), depth * inner[point]);
             let inner_resistance = resistivity / inner_denominator;
             let outer_resistance = resistivity / (std::f64::consts::TAU * depth * outer[point]);
             inner_resistance + outer_resistance
         })
     }
 
+    /// Return distributed inductance $L$ in henries per meter.
+    #[must_use]
     pub fn inductance_per_meter(&self) -> Array1<f64> {
         let inner = self.inner_radius();
         let outer = self.outer_radius();
@@ -254,6 +318,8 @@ impl Coaxial {
         })
     }
 
+    /// Return distributed capacitance $C$ in farads per meter.
+    #[must_use]
     pub fn capacitance_per_meter(&self) -> Array1<f64> {
         let inner = self.inner_radius();
         let outer = self.outer_radius();
@@ -263,6 +329,8 @@ impl Coaxial {
         })
     }
 
+    /// Return distributed shunt conductance $G$ in siemens per meter.
+    #[must_use]
     pub fn conductance_per_meter(&self) -> Array1<f64> {
         let inner = self.inner_radius();
         let outer = self.outer_radius();

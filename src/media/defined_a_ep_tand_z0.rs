@@ -1,38 +1,68 @@
-use super::media::*;
-use super::*;
+//! Transmission-line media defined by attenuation, permittivity, loss tangent,
+//! and nominal or explicit impedance.
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{Array1, Complex64, Error, Frequency, Network, Result, SPEED_OF_LIGHT, fmt};
+/// Dielectric frequency-dispersion model.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum DielectricDispersionModel {
+    /// Repeat the specified permittivity and loss tangent at every frequency.
     #[default]
     FrequencyInvariant,
+    /// Causal wideband Debye model by Djordjevic and Svensson.
     DjordjevicSvensson {
+        /// Lower model frequency in hertz.
         low_frequency_hz: f64,
+        /// Upper model frequency in hertz.
         high_frequency_hz: f64,
+        /// Frequency at which permittivity and loss tangent are specified.
         specification_frequency_hz: f64,
     },
 }
 
+/// How characteristic impedance is supplied for a defined medium.
 #[derive(Clone, Debug)]
 pub enum DefinedCharacteristicImpedance {
+    /// Nominal real impedance used to derive a dispersive RLGC impedance.
     Nominal(f64),
+    /// Explicit complex impedance, either one value or one per frequency.
     Raw(Array1<Complex64>),
 }
 
 /// Transmission-line medium defined by attenuation, permittivity, loss tangent, and impedance.
 ///
-/// Origin: `skrf/media/definedAEpTandZ0.py::DefinedAEpTandZ0`.
+/// Conductor attenuation follows a square-root frequency law. Dielectric
+/// properties may be invariant or use the causal Djordjevic-Svensson model.
+///
+/// See [Svensson and Dermer](https://doi.org/10.1109/6040.928754) and
+/// [Djordjevic et al.](https://doi.org/10.1109/15.974647).
 #[derive(Clone, Debug)]
 pub struct DefinedAEpTandZ0 {
+    /// Frequency band.
     pub frequency: Frequency,
+    /// Conductor attenuation coefficient in dB/m at the reference frequency.
     pub conductor_attenuation: Array1<f64>,
+    /// Reference frequency `f_A` for conductor attenuation, in hertz.
     pub attenuation_reference_frequency_hz: f64,
+    /// Specified real relative permittivity.
     pub relative_permittivity: Array1<f64>,
+    /// Specified dielectric loss tangent $\tan\delta$.
     pub loss_tangent: Array1<f64>,
+    /// Nominal or explicit characteristic impedance.
     pub impedance: DefinedCharacteristicImpedance,
+    /// Optional port impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Dielectric frequency-dispersion model.
     pub dispersion_model: DielectricDispersionModel,
 }
 
 impl DefinedAEpTandZ0 {
+    /// Construct a defined medium from frequency-dependent inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for input lengths that do not match the frequency axis, invalid physical
+    /// values, invalid impedance lengths, or inconsistent dispersion-model frequencies.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
@@ -145,6 +175,11 @@ impl DefinedAEpTandZ0 {
         })
     }
 
+    /// Construct a defined medium from scalar inputs repeated over frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid physical values or inconsistent dispersion-model frequencies.
     #[allow(clippy::too_many_arguments)]
     pub fn from_scalars(
         frequency: Frequency,
@@ -169,6 +204,15 @@ impl DefinedAEpTandZ0 {
         )
     }
 
+    /// Return complex relative permittivity over frequency.
+    ///
+    /// The invariant model uses
+    /// `\varepsilon_r(f)=\varepsilon'_r-j\varepsilon'_r\tan\delta`;
+    /// the wideband model applies the Djordjevic-Svensson logarithmic law.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the Djordjevic-Svensson logarithmic slope is singular.
     pub fn relative_permittivity_at_frequency(&self) -> Result<Array1<Complex64>> {
         match self.dispersion_model {
             DielectricDispersionModel::FrequencyInvariant => {
@@ -207,6 +251,11 @@ impl DefinedAEpTandZ0 {
         }
     }
 
+    /// Return frequency-dependent dielectric loss tangent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when relative-permittivity evaluation fails or produces a zero real part.
     pub fn frequency_dependent_loss_tangent(&self) -> Result<Array1<f64>> {
         let permittivity = self.relative_permittivity_at_frequency()?;
         if permittivity.iter().any(|value| value.re == 0.0) {
@@ -217,6 +266,14 @@ impl DefinedAEpTandZ0 {
         Ok(permittivity.mapv(|value| -value.im / value.re))
     }
 
+    /// Return conductor attenuation in nepers per meter.
+    ///
+    /// Conductor attenuation `\alpha_c(f)` is
+    /// `A\frac{\ln 10}{20}\sqrt{\frac{f}{f_A}}`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the frequency axis contains a negative value.
     pub fn conductor_attenuation_per_meter(&self) -> Result<Array1<f64>> {
         if self
             .frequency
@@ -235,6 +292,11 @@ impl DefinedAEpTandZ0 {
         }))
     }
 
+    /// Return dielectric attenuation in nepers per meter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when dispersive permittivity evaluation fails or its real part is zero.
     pub fn dielectric_attenuation_per_meter(&self) -> Result<Array1<f64>> {
         let permittivity = self.relative_permittivity_at_frequency()?;
         let loss_tangent = self.frequency_dependent_loss_tangent()?;
@@ -245,6 +307,11 @@ impl DefinedAEpTandZ0 {
         }))
     }
 
+    /// Return phase constant $\beta$ in radians per meter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when dispersive permittivity evaluation fails.
     pub fn phase_constant(&self) -> Result<Array1<f64>> {
         let permittivity = self.relative_permittivity_at_frequency()?;
         Ok(Array1::from_shape_fn(self.frequency.points(), |point| {
@@ -284,6 +351,7 @@ impl Media for DefinedAEpTandZ0 {
         &self.frequency
     }
 
+    /// Return `\gamma=\alpha_c+\alpha_d+j\beta`.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         let conductor = self.conductor_attenuation_per_meter()?;
         let dielectric = self.dielectric_attenuation_per_meter()?;
@@ -293,6 +361,11 @@ impl Media for DefinedAEpTandZ0 {
         }))
     }
 
+    /// Return characteristic impedance in ohms.
+    ///
+    /// Explicit raw impedance is returned unchanged. Nominal impedance derives
+    /// $R$, $L$, $G$, and $C$, then computes
+    /// `Z_0=\sqrt{(R+j\omega L)/(G+j\omega C)}`.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         match &self.impedance {
             DefinedCharacteristicImpedance::Raw(values) if values.len() == 1 => {

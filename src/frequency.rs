@@ -1,6 +1,9 @@
+//! Frequency-axis construction, scaling, slicing, and time-domain helpers.
+
 use std::fmt;
 
 use ndarray::Array1;
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result};
@@ -8,10 +11,26 @@ use crate::{Error, Result};
 const FREQUENCY_EQUALITY_TOLERANCE_HZ: f64 = 1.0e-4;
 const SWEEP_RELATIVE_TOLERANCE: f64 = 0.05;
 
-/// Origin: `skrf/frequency.py::Frequency`.
+/// A frequency band or arbitrary frequency axis.
 ///
-/// Frequency values are stored internally in hertz. The fields are private so
-/// callers cannot create an inconsistent axis by changing individual values.
+/// Values are stored internally in hertz while [`Self::unit`] controls their
+/// preferred display and input scaling. Linear or logarithmic bands can be
+/// created with [`Self::new`]; arbitrary vectors use [`Self::from_values`].
+///
+/// # Examples
+///
+/// ```
+/// use ndarray::array;
+/// use rust_rf::{Frequency, FrequencyUnit, SweepType};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let wr1p5 = Frequency::new(500.0, 750.0, 401, FrequencyUnit::GHz, SweepType::Linear)?;
+/// let measured = Frequency::from_values(array![75.0, 80.0, 100.0], FrequencyUnit::GHz)?;
+/// assert_eq!(wr1p5.points(), 401);
+/// assert_eq!(measured.start_scaled(), Some(75.0));
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Frequency {
     values_hz: Array1<f64>,
@@ -20,16 +39,24 @@ pub struct Frequency {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+/// Scaling unit for frequency input and display.
 pub enum FrequencyUnit {
+    /// Hertz.
     Hz,
+    /// Kilohertz.
     KHz,
+    /// Megahertz.
     MHz,
+    /// Gigahertz.
     #[default]
     GHz,
+    /// Terahertz.
     THz,
 }
 
 impl FrequencyUnit {
+    /// Returns the multiplier that converts this unit to hertz.
+    #[must_use]
     pub const fn multiplier(self) -> f64 {
         match self {
             Self::Hz => 1.0,
@@ -40,6 +67,8 @@ impl FrequencyUnit {
         }
     }
 
+    /// Returns the correctly capitalized unit symbol.
+    #[must_use]
     pub const fn symbol(self) -> &'static str {
         match self {
             Self::Hz => "Hz",
@@ -52,10 +81,14 @@ impl FrequencyUnit {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+/// Frequency sweep classification.
 pub enum SweepType {
+    /// Evenly spaced frequency values.
     #[default]
     Linear,
+    /// Geometrically spaced positive frequency values.
     Logarithmic,
+    /// Explicit values that are neither linear nor logarithmic.
     Arbitrary,
 }
 
@@ -70,7 +103,17 @@ enum BinaryOperation {
 }
 
 impl Frequency {
-    /// Port of `skrf.frequency.Frequency.__init__`.
+    /// Creates a frequency band from start, stop, point count, and unit.
+    ///
+    /// `start` and `stop` are expressed in `unit`. [`SweepType::Arbitrary`]
+    /// must instead be constructed with [`Self::from_values`]. A logarithmic
+    /// sweep requires positive endpoints.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when an endpoint or its scaled value
+    /// is not finite, a logarithmic endpoint is not positive, or an arbitrary
+    /// sweep is requested without explicit values.
     pub fn new(
         start: f64,
         stop: f64,
@@ -114,17 +157,28 @@ impl Frequency {
         })
     }
 
-    /// Port of `skrf.frequency.Frequency.from_f` for values already in hertz.
+    /// Creates a frequency axis from explicit values already expressed in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when a value is not finite.
     pub fn from_hz(values_hz: Array1<f64>) -> Result<Self> {
         Self::from_values(values_hz, FrequencyUnit::Hz)
     }
 
-    /// Port of `skrf.frequency.Frequency.from_f`.
+    /// Creates a frequency axis from an explicit vector expressed in `unit`.
+    ///
+    /// The sweep type is inferred from the resulting values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when an input value or its scaled
+    /// value is not finite.
     pub fn from_values(values: Array1<f64>, unit: FrequencyUnit) -> Result<Self> {
         validate_finite(values.as_slice().unwrap_or(&[]))?;
 
         let multiplier = unit.multiplier();
-        let values_hz = values.mapv(|value| value * multiplier);
+        let values_hz = values.mapv_into(|value| value * multiplier);
         validate_finite(values_hz.as_slice().unwrap_or(&[]))?;
         let sweep_type = classify_sweep(&values_hz);
 
@@ -135,99 +189,164 @@ impl Frequency {
         })
     }
 
-    pub fn values_hz(&self) -> &Array1<f64> {
+    /// Returns the frequency vector in hertz.
+    #[must_use]
+    pub const fn values_hz(&self) -> &Array1<f64> {
         &self.values_hz
     }
 
+    /// Returns the preferred scaling unit.
+    #[must_use]
     pub const fn unit(&self) -> FrequencyUnit {
         self.unit
     }
 
-    /// Changes only the preferred display/input scaling unit; stored values remain in hertz.
+    /// Changes the preferred display/input scaling unit.
     ///
-    /// Origin: `skrf.frequency.Frequency.unit` setter.
-    pub fn set_unit(&mut self, unit: FrequencyUnit) {
+    /// Stored values remain unchanged in hertz.
+    pub const fn set_unit(&mut self, unit: FrequencyUnit) {
         self.unit = unit;
     }
 
+    /// Returns the classified sweep type.
+    #[must_use]
     pub const fn sweep_type(&self) -> SweepType {
         self.sweep_type
     }
 
+    /// Returns the starting frequency in hertz, or `None` for an empty axis.
+    #[must_use]
     pub fn start(&self) -> Option<f64> {
         self.values_hz.first().copied()
     }
 
+    /// Returns the final frequency in hertz, or `None` for an empty axis.
+    #[must_use]
     pub fn stop(&self) -> Option<f64> {
         self.values_hz.last().copied()
     }
 
+    /// Returns the starting frequency in [`Self::unit`].
+    #[must_use]
     pub fn start_scaled(&self) -> Option<f64> {
         self.start().map(|value| value / self.unit.multiplier())
     }
 
+    /// Returns the final frequency in [`Self::unit`].
+    #[must_use]
     pub fn stop_scaled(&self) -> Option<f64> {
         self.stop().map(|value| value / self.unit.multiplier())
     }
 
+    /// Returns the number of frequency points.
+    #[must_use]
     pub fn points(&self) -> usize {
         self.values_hz.len()
     }
 
+    /// Returns the exact center frequency in hertz.
+    #[must_use]
     pub fn center(&self) -> Option<f64> {
         Some(self.start()? + (self.stop()? - self.start()?) / 2.0)
     }
 
+    /// Returns the index closest to the center frequency.
+    #[must_use]
     pub fn center_index(&self) -> Option<usize> {
         (!self.values_hz.is_empty()).then_some(self.points() / 2)
     }
 
+    /// Returns the exact center frequency in [`Self::unit`].
+    #[must_use]
     pub fn center_scaled(&self) -> Option<f64> {
         self.center().map(|value| value / self.unit.multiplier())
     }
 
+    /// Returns the inter-frequency step in hertz for an evenly spaced sweep.
+    ///
+    /// Use [`Self::gradient_hz`] for a general, nonuniform axis.
+    #[must_use]
     pub fn step(&self) -> Option<f64> {
         let span = self.span()?;
         if span == 0.0 {
             Some(0.0)
         } else {
-            Some(span / (self.points() - 1) as f64)
+            Some(span / (self.points() - 1).to_f64().unwrap_or(f64::INFINITY))
         }
     }
 
+    /// Returns the inter-frequency step in [`Self::unit`].
+    #[must_use]
     pub fn step_scaled(&self) -> Option<f64> {
         self.step().map(|value| value / self.unit.multiplier())
     }
 
+    /// Returns the absolute frequency span in hertz.
+    #[must_use]
     pub fn span(&self) -> Option<f64> {
         Some((self.stop()? - self.start()?).abs())
     }
 
+    /// Returns the absolute frequency span in [`Self::unit`].
+    #[must_use]
     pub fn span_scaled(&self) -> Option<f64> {
         self.span().map(|value| value / self.unit.multiplier())
     }
 
+    /// Returns the frequency vector in [`Self::unit`].
+    #[must_use]
     pub fn scaled(&self) -> Array1<f64> {
         self.values_hz.mapv(|value| value / self.unit.multiplier())
     }
 
+    /// Returns angular frequency in radians per second.
+    ///
+    /// Angular frequency is $\omega = 2\pi f$.
+    #[must_use]
     pub fn angular(&self) -> Array1<f64> {
         self.values_hz.mapv(|value| std::f64::consts::TAU * value)
     }
 
+    /// Returns the numerical gradient of the frequency vector in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axis has fewer than two
+    /// points.
     pub fn gradient_hz(&self) -> Result<Array1<f64>> {
         gradient(&self.values_hz)
     }
 
+    /// Returns the numerical gradient in [`Self::unit`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axis has fewer than two
+    /// points.
     pub fn gradient_scaled(&self) -> Result<Array1<f64>> {
         Ok(self.gradient_hz()? / self.unit.multiplier())
     }
 
+    /// Returns the numerical gradient of angular frequency in radians per second.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axis has fewer than two
+    /// points.
     pub fn angular_gradient(&self) -> Result<Array1<f64>> {
         Ok(self.gradient_hz()? * std::f64::consts::TAU)
     }
 
-    /// Port of `skrf.frequency.Frequency._t_padded`.
+    /// Returns the time vector corresponding to a padded frequency axis.
+    ///
+    /// `padding_points` extends the default output length, while
+    /// `output_points` overrides it. If `bandpass` is omitted, an axis that
+    /// starts above DC is treated as band-pass.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the point-count calculation
+    /// overflows, the axis is empty, or its frequency step is not positive.
     pub fn padded_time(
         &self,
         padding_points: usize,
@@ -235,7 +354,7 @@ impl Frequency {
         bandpass: Option<bool>,
     ) -> Result<Array1<f64>> {
         let bandpass = bandpass.unwrap_or_else(|| self.start() != Some(0.0));
-        let mut points = output_points.unwrap_or(self.points() + padding_points);
+        let mut points = output_points.unwrap_or_else(|| self.points() + padding_points);
         if !bandpass {
             points = points
                 .checked_mul(2)
@@ -256,32 +375,47 @@ impl Frequency {
                 "a positive frequency step is required for a time transform".to_owned(),
             ));
         }
-        let time_step = 1.0 / (points as f64 * step);
+        let time_step = 1.0 / (points.to_f64().unwrap_or(f64::INFINITY) * step);
 
         if bandpass {
-            let stop = ((points - 1) / 2) as f64 * time_step;
+            let positive_extent = ((points - 1) / 2).to_f64().unwrap_or(f64::INFINITY) * time_step;
             let start = if points % 2 == 0 {
-                -stop - time_step
+                -positive_extent - time_step
             } else {
-                -((points / 2) as f64) * time_step
+                -(points / 2).to_f64().unwrap_or(f64::INFINITY) * time_step
             };
-            Ok(linear_space(start, stop, points))
+            Ok(linear_space(start, positive_extent, points))
         } else {
-            let extent = time_step * (points / 2) as f64;
+            let extent = time_step * (points / 2).to_f64().unwrap_or(f64::INFINITY);
             Ok(linear_space(-extent, extent, points))
         }
     }
 
-    /// Port of `skrf.frequency.Frequency.t`.
+    /// Returns the time vector in seconds.
+    ///
+    /// For an evenly spaced sweep, the time period is
+    /// $2(N-1)/\Delta f$.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axis is empty or its
+    /// frequency step is not positive.
     pub fn time(&self) -> Result<Array1<f64>> {
         self.padded_time(0, None, Some(true))
     }
 
-    /// Port of `skrf.frequency.Frequency.t_ns`.
+    /// Returns the time vector in nanoseconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axis is empty or its
+    /// frequency step is not positive.
     pub fn time_nanoseconds(&self) -> Result<Array1<f64>> {
         Ok(self.time()? * 1.0e9)
     }
 
+    /// Returns whether every frequency is strictly greater than its predecessor.
+    #[must_use]
     pub fn is_monotonic_increasing(&self) -> bool {
         self.values_hz
             .iter()
@@ -289,7 +423,9 @@ impl Frequency {
             .all(|(left, right)| right > left)
     }
 
-    /// Port of `Frequency.drop_non_monotonic_increasing`.
+    /// Removes duplicate and non-increasing frequency values.
+    ///
+    /// Returns the original zero-based indices that were dropped.
     pub fn drop_non_monotonic_increasing(&mut self) -> Vec<usize> {
         if self.values_hz.len() < 2 {
             return Vec::new();
@@ -312,8 +448,15 @@ impl Frequency {
         invalid_indices
     }
 
-    /// Inclusive value-domain slice corresponding to a string such as
-    /// `"2-5ghz"` in scikit-rf.
+    /// Returns the inclusive range between `start` and `stop`.
+    ///
+    /// This is the typed Rust counterpart of a scikit-rf string slice such as
+    /// `"2-5ghz"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when a boundary or its scaled value
+    /// is not finite, or when `start` exceeds `stop`.
     pub fn slice_range(&self, start: f64, stop: f64, unit: FrequencyUnit) -> Result<Self> {
         validate_finite(&[start, stop])?;
         let start_hz = scale_to_hz(start, unit)?;
@@ -335,8 +478,15 @@ impl Frequency {
         Ok(frequency)
     }
 
-    /// Select the nearest frequency point, corresponding to a one-value
-    /// scikit-rf frequency slice.
+    /// Returns the frequency point nearest `value` in `unit`.
+    ///
+    /// This is the typed Rust counterpart of a one-value scikit-rf frequency
+    /// slice.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axis is empty or `value`
+    /// cannot be represented as a finite frequency in `unit`.
     pub fn nearest(&self, value: f64, unit: FrequencyUnit) -> Result<Self> {
         if self.values_hz.is_empty() {
             return Err(Error::InvalidFrequency(
@@ -361,7 +511,15 @@ impl Frequency {
         Ok(frequency)
     }
 
-    /// Port of `skrf.frequency.overlap_freq`, retaining points from `self`.
+    /// Returns the overlapping band between this axis and `other`.
+    ///
+    /// Values are retained from `self`; an error is returned if the axes do not
+    /// overlap.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when either axis is empty or the two
+    /// axes do not overlap.
     pub fn overlap(&self, other: &Self) -> Result<Self> {
         let self_start = self.start().ok_or_else(|| {
             Error::InvalidFrequency("cannot overlap an empty frequency axis".to_owned())
@@ -395,6 +553,15 @@ impl Frequency {
         Ok(overlap)
     }
 
+    /// Rounds frequency values to `precision_hz`.
+    ///
+    /// This is useful for finite-precision limitations in VNAs and other
+    /// measurement software.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when `precision_hz` is not finite or
+    /// is not positive.
     pub fn round_to(&mut self, precision_hz: f64) -> Result<()> {
         if !precision_hz.is_finite() || precision_hz <= 0.0 {
             return Err(Error::InvalidFrequency(
@@ -408,30 +575,74 @@ impl Frequency {
         Ok(())
     }
 
+    /// Adds two frequency vectors element-wise with scalar broadcasting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axes cannot be broadcast or
+    /// the resulting values are not finite.
     pub fn try_add(&self, other: &Self) -> Result<Self> {
         self.binary_operation(other, BinaryOperation::Add)
     }
 
+    /// Subtracts two frequency vectors element-wise with scalar broadcasting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axes cannot be broadcast or
+    /// the resulting values are not finite.
     pub fn try_subtract(&self, other: &Self) -> Result<Self> {
         self.binary_operation(other, BinaryOperation::Subtract)
     }
 
+    /// Multiplies two frequency vectors element-wise with scalar broadcasting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axes cannot be broadcast or
+    /// the resulting values are not finite.
     pub fn try_multiply(&self, other: &Self) -> Result<Self> {
         self.binary_operation(other, BinaryOperation::Multiply)
     }
 
+    /// Divides two frequency vectors element-wise with scalar broadcasting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axes cannot be broadcast or
+    /// division produces a non-finite value.
     pub fn try_divide(&self, other: &Self) -> Result<Self> {
         self.binary_operation(other, BinaryOperation::Divide)
     }
 
+    /// Floor-divides two frequency vectors element-wise with scalar broadcasting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axes cannot be broadcast or
+    /// division produces a non-finite value.
     pub fn try_floor_divide(&self, other: &Self) -> Result<Self> {
         self.binary_operation(other, BinaryOperation::FloorDivide)
     }
 
+    /// Calculates element-wise remainders with scalar broadcasting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when the axes cannot be broadcast or
+    /// the operation produces a non-finite value.
     pub fn try_remainder(&self, other: &Self) -> Result<Self> {
         self.binary_operation(other, BinaryOperation::Remainder)
     }
 
+    /// Applies `operation` to every stored hertz value.
+    ///
+    /// The preferred unit is retained and the sweep type is reclassified.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFrequency`] when `operation` produces a
+    /// non-finite value.
     pub fn map_values(&self, operation: impl Fn(f64) -> f64) -> Result<Self> {
         let values_hz = self.values_hz.mapv(operation);
         validate_finite(values_hz.as_slice().unwrap_or(&[]))?;
@@ -501,12 +712,15 @@ fn linear_space(start: f64, stop: f64, points: usize) -> Array1<f64> {
         return Array1::from_vec(vec![start]);
     }
 
-    let step = (stop - start) / (points - 1) as f64;
+    let increment = (stop - start) / (points - 1).to_f64().unwrap_or(f64::INFINITY);
     Array1::from_iter((0..points).map(|index| {
         if index + 1 == points {
             stop
         } else {
-            start + index as f64 * step
+            index
+                .to_f64()
+                .unwrap_or(f64::INFINITY)
+                .mul_add(increment, start)
         }
     }))
 }
@@ -516,14 +730,19 @@ fn logarithmic_space(start: f64, stop: f64, points: usize) -> Array1<f64> {
         return Array1::from_vec(vec![start]);
     }
 
-    let logarithmic_step = (stop.ln() - start.ln()) / (points - 1) as f64;
+    let logarithmic_step =
+        (stop.ln() - start.ln()) / (points - 1).to_f64().unwrap_or(f64::INFINITY);
     Array1::from_iter((0..points).map(|index| {
         if index == 0 {
             start
         } else if index + 1 == points {
             stop
         } else {
-            (start.ln() + index as f64 * logarithmic_step).exp()
+            index
+                .to_f64()
+                .unwrap_or(f64::INFINITY)
+                .mul_add(logarithmic_step, start.ln())
+                .exp()
         }
     }))
 }
@@ -605,6 +824,6 @@ fn apply_binary_operation(left: f64, right: f64, operation: BinaryOperation) -> 
         BinaryOperation::Multiply => left * right,
         BinaryOperation::Divide => left / right,
         BinaryOperation::FloorDivide => (left / right).floor(),
-        BinaryOperation::Remainder => left - (left / right).floor() * right,
+        BinaryOperation::Remainder => (left / right).floor().mul_add(-right, left),
     }
 }

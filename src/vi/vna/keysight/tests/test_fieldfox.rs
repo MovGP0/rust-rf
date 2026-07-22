@@ -1,14 +1,17 @@
 #![allow(dead_code)]
 #![cfg(feature = "visa")]
+//! `FieldFox` driver tests using a deterministic SCPI session.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::io::{Read, Write};
 
+use approx::assert_relative_eq;
 use rust_rf::Result;
 use rust_rf::vi::vna::keysight::{FieldFox, Pna, WindowFormat};
 use rust_rf::vi::vna::{InstrumentSession, ValuesFormat, Vna};
 
 #[derive(Default)]
+/// In-memory SCPI session that records writes and returns queued responses.
 struct ScpiMock {
     responses: BTreeMap<String, VecDeque<Vec<u8>>>,
     writes: Vec<u8>,
@@ -16,6 +19,7 @@ struct ScpiMock {
 }
 
 impl ScpiMock {
+    /// Creates a mock with one text response for each command.
     fn with_text(responses: impl IntoIterator<Item = (&'static str, &'static str)>) -> Self {
         let mut session = Self::default();
         for (command, response) in responses {
@@ -28,6 +32,7 @@ impl ScpiMock {
         session
     }
 
+    /// Queues another response for a command.
     fn push(&mut self, command: &str, response: impl Into<Vec<u8>>) {
         self.responses
             .entry(command.into())
@@ -68,15 +73,18 @@ impl InstrumentSession for ScpiMock {
     }
 }
 
+/// Creates a `FieldFox` backed by the supplied mock session.
 fn field_fox(session: ScpiMock) -> FieldFox<ScpiMock> {
     FieldFox::from_vna(Vna::new("mock", session, None))
 }
 
-fn make_pna(session: ScpiMock, model: &str) -> Pna<ScpiMock> {
-    Pna::from_model(Vna::new("mock", session, None), model).unwrap()
+/// Creates a PNA backed by the supplied mock session.
+fn make_pna(session: ScpiMock, model: &str) -> Result<Pna<ScpiMock>> {
+    Pna::from_model(Vna::new("mock", session, None), model)
 }
 
 #[test]
+/// Verifies typed `FieldFox` parameter queries and writes.
 fn field_fox_queries_and_sets_typed_parameters() {
     let session = ScpiMock::with_text([
         ("SENS:FREQ:STAR?", "100"),
@@ -102,6 +110,7 @@ fn field_fox_queries_and_sets_typed_parameters() {
 }
 
 #[test]
+/// Verifies frequency, transfer-format, measurement, and sweep commands.
 fn field_fox_handles_frequency_formats_measurements_and_sweep() {
     let session = ScpiMock::with_text([
         ("SENS:FREQ:STAR?", "100"),
@@ -127,6 +136,7 @@ fn field_fox_handles_frequency_formats_measurements_and_sweep() {
 }
 
 #[test]
+/// Verifies that four acquired S-parameters form a two-port network.
 fn field_fox_assembles_a_two_port_network() {
     let mut session = ScpiMock::default();
     for _ in 0..4 {
@@ -145,8 +155,8 @@ fn field_fox_assembles_a_two_port_network() {
     let mut field_fox = field_fox(session);
     let network = field_fox.get_snp_network(&[1, 2], false).unwrap();
     assert_eq!(network.s.dim(), (2, 2, 2));
-    assert_eq!(network.s[[0, 0, 0]].re, 1.0);
-    assert_eq!(network.s[[0, 0, 1]].re, 2.0);
-    assert_eq!(network.s[[0, 1, 0]].re, 3.0);
-    assert_eq!(network.s[[0, 1, 1]].re, 4.0);
+    assert_relative_eq!(network.s[[0, 0, 0]].re, 1.0, epsilon = f64::EPSILON);
+    assert_relative_eq!(network.s[[0, 0, 1]].re, 2.0, epsilon = f64::EPSILON);
+    assert_relative_eq!(network.s[[0, 1, 0]].re, 3.0, epsilon = f64::EPSILON);
+    assert_relative_eq!(network.s[[0, 1, 1]].re, 4.0, epsilon = f64::EPSILON);
 }

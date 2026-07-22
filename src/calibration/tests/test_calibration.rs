@@ -1,3 +1,9 @@
+//! Calibration regression tests ported from scikit-rf.
+//!
+//! The suite exercises common calibration invariants: solving coefficients,
+//! correcting a DUT, rebuilding error networks, and embedding a corrected DUT
+//! back into its raw measurement.
+
 use std::collections::BTreeMap;
 
 use approx::assert_relative_eq;
@@ -13,8 +19,13 @@ use rust_rf::calibration::{
 };
 use rust_rf::{Frequency, Network, NetworkSet};
 
+/// Verifies the generic one-port calibration contract.
+///
+/// A calibration must solve its coefficients, accurately correct a DUT,
+/// expose coefficient and calibrated-standard networks, and invert correction
+/// by embedding the corrected network again.
 #[test]
-fn solves_and_applies_three_term_one_port_calibration() {
+fn solves_and_applies_three_term_one_port_calibration() -> rust_rf::Result<()> {
     let frequency =
         Frequency::from_hz(array![1.0e9, 2.0e9, 3.0e9]).expect("frequency should be valid");
     let directivity = Complex64::new(0.02, 0.01);
@@ -29,7 +40,7 @@ fn solves_and_applies_three_term_one_port_calibration() {
     let ideals = standards
         .iter()
         .map(|standard| constant_one_port(frequency.clone(), *standard))
-        .collect::<Vec<_>>();
+        .collect::<rust_rf::Result<Vec<_>>>()?;
     let measured = standards
         .iter()
         .map(|standard| {
@@ -38,7 +49,7 @@ fn solves_and_applies_three_term_one_port_calibration() {
                 embed_value(*standard, directivity, tracking, source_match),
             )
         })
-        .collect::<Vec<_>>();
+        .collect::<rust_rf::Result<Vec<_>>>()?;
     let mut calibration = OnePort::new(measured, ideals).expect("standards should be valid");
     let raw_dut = one_port(
         frequency.clone(),
@@ -48,20 +59,12 @@ fn solves_and_applies_three_term_one_port_calibration() {
             Complex64::new(0.1, -0.4),
         ]
         .map(|ideal| embed_value(ideal, directivity, tracking, source_match)),
-    );
+    )?;
     assert!(calibration.apply(&raw_dut).is_err());
 
     calibration.run().expect("calibration should solve");
 
-    for value in &calibration.coefficients()["directivity"] {
-        assert_complex_close(*value, directivity);
-    }
-    for value in &calibration.coefficients()["reflection tracking"] {
-        assert_complex_close(*value, tracking);
-    }
-    for value in &calibration.coefficients()["source match"] {
-        assert_complex_close(*value, source_match);
-    }
+    assert_one_port_coefficients(&calibration, directivity, tracking, source_match);
     let corrected = calibration
         .apply(&raw_dut)
         .expect("DUT correction should succeed");
@@ -122,6 +125,11 @@ fn solves_and_applies_three_term_one_port_calibration() {
     let calibrated_set = calibration
         .apply_network_set(&set)
         .expect("network set calibration should succeed");
+    assert_calibrated_network_set(calibrated_set, &expected);
+    Ok(())
+}
+
+fn assert_calibrated_network_set(calibrated_set: NetworkSet, expected: &[Complex64; 3]) {
     assert_eq!(calibrated_set.name.as_deref(), Some("dut-set"));
     assert_eq!(calibrated_set.parameters["temperature"], vec![20.0, 30.0]);
     for network in calibrated_set.networks {
@@ -131,8 +139,26 @@ fn solves_and_applies_three_term_one_port_calibration() {
     }
 }
 
+fn assert_one_port_coefficients(
+    calibration: &OnePort,
+    directivity: Complex64,
+    tracking: Complex64,
+    source_match: Complex64,
+) {
+    for value in &calibration.coefficients()["directivity"] {
+        assert_complex_close(*value, directivity);
+    }
+    for value in &calibration.coefficients()["reflection tracking"] {
+        assert_complex_close(*value, tracking);
+    }
+    for value in &calibration.coefficients()["source match"] {
+        assert_complex_close(*value, source_match);
+    }
+}
+
+/// Terminates a measured network with switch terms and then removes them.
 #[test]
-fn terminates_and_unterminates_two_port_switch_terms() {
+fn terminates_and_unterminates_two_port_switch_terms() -> rust_rf::Result<()> {
     let frequency =
         Frequency::from_hz(array![1.0e9, 2.0e9, 3.0e9]).expect("frequency should be valid");
     let ideal = complex_two_port(
@@ -141,7 +167,7 @@ fn terminates_and_unterminates_two_port_switch_terms() {
             [Complex64::new(0.12, 0.03), Complex64::new(0.62, -0.08)],
             [Complex64::new(0.71, 0.05), Complex64::new(-0.09, 0.02)],
         ],
-    );
+    )?;
     let forward = array![
         Complex64::new(0.04, 0.01),
         Complex64::new(0.03, -0.01),
@@ -159,10 +185,12 @@ fn terminates_and_unterminates_two_port_switch_terms() {
     for (actual, expected) in corrected.s.iter().zip(ideal.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
+/// Terminates an N-port measurement using the upstream two-port gamma order.
 #[test]
-fn terminates_nport_with_the_upstream_two_port_gamma_order() {
+fn terminates_nport_with_the_upstream_two_port_gamma_order() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency should be valid");
     let network = complex_two_port(
         frequency.clone(),
@@ -170,7 +198,7 @@ fn terminates_nport_with_the_upstream_two_port_gamma_order() {
             [Complex64::new(0.12, 0.03), Complex64::new(0.71, -0.04)],
             [Complex64::new(0.68, 0.06), Complex64::new(-0.09, 0.02)],
         ],
-    );
+    )?;
     let forward = ndarray::Array1::from_vec(vec![
         Complex64::new(0.04, 0.01),
         Complex64::new(0.03, -0.02),
@@ -180,17 +208,19 @@ fn terminates_nport_with_the_upstream_two_port_gamma_order() {
         Complex64::new(0.01, 0.03),
     ]);
     let expected = terminate(&network, &forward, &reverse).expect("termination should succeed");
-    let reverse_network = one_port(frequency.clone(), reverse.as_slice().expect("contiguous"));
-    let forward_network = one_port(frequency, forward.as_slice().expect("contiguous"));
+    let reverse_network = one_port(frequency.clone(), reverse.as_slice().expect("contiguous"))?;
+    let forward_network = one_port(frequency, forward.as_slice().expect("contiguous"))?;
     let actual = terminate_nport(&network, &[reverse_network, forward_network])
         .expect("N-port termination should succeed");
     for (actual, expected) in actual.s.iter().zip(expected.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
+/// Tests indirect switch-term calculation from at least three reciprocal devices.
 #[test]
-fn computes_switch_terms_from_reciprocal_device_measurements() {
+fn computes_switch_terms_from_reciprocal_device_measurements() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency should be valid");
     let forward = ndarray::Array1::from_vec(vec![
         Complex64::new(0.04, 0.01),
@@ -221,14 +251,10 @@ fn computes_switch_terms_from_reciprocal_device_measurements() {
     let measurements = reciprocal_devices
         .into_iter()
         .map(|values| {
-            terminate(
-                &complex_two_port(frequency.clone(), values),
-                &forward,
-                &reverse,
-            )
-            .expect("termination should succeed")
+            let network = complex_two_port(frequency.clone(), values)?;
+            terminate(&network, &forward, &reverse)
         })
-        .collect::<Vec<_>>();
+        .collect::<rust_rf::Result<Vec<_>>>()?;
 
     let (computed_forward, computed_reverse) =
         compute_switch_terms(&measurements).expect("switch terms should solve");
@@ -236,8 +262,10 @@ fn computes_switch_terms_from_reciprocal_device_measurements() {
         assert_complex_close(computed_forward.s[(point, 0, 0)], forward[point]);
         assert_complex_close(computed_reverse.s[(point, 0, 0)], reverse[point]);
     }
+    Ok(())
 }
 
+/// Verifies a twelve-term calibration converted to an eight-term error-box model.
 #[test]
 fn converts_between_twelve_and_eight_term_coefficients() {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency should be valid");
@@ -333,12 +361,16 @@ fn converts_pna_coefficient_names_without_losing_values() {
     );
 }
 
+/// Verifies named measured and ideal standards are aligned before error networks are built.
+///
+/// This covers the upstream sloppy-input behavior that reorders standards
+/// rather than requiring the caller to provide them in canonical order.
 #[test]
-fn aligns_named_standards_and_builds_error_networks() {
+fn aligns_named_standards_and_builds_error_networks() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
-    let mut ideal_open = constant_one_port(frequency.clone(), Complex64::new(1.0, 0.0));
+    let mut ideal_open = constant_one_port(frequency.clone(), Complex64::new(1.0, 0.0))?;
     ideal_open.name = Some("open".to_owned());
-    let mut ideal_short = constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0));
+    let mut ideal_short = constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0))?;
     ideal_short.name = Some("short".to_owned());
     let mut measured_short = ideal_short.clone();
     measured_short.name = Some("measured-short-01".to_owned());
@@ -366,6 +398,7 @@ fn aligns_named_standards_and_builds_error_networks() {
     assert_complex_close(error_network.s[(0, 1, 1)], Complex64::new(0.02, 0.0));
     assert_complex_close(error_network.s[(0, 0, 1)], Complex64::new(0.9, 0.0));
     assert_complex_close(error_network.s[(0, 1, 0)], Complex64::new(0.9, 0.0));
+    Ok(())
 }
 
 #[test]
@@ -391,27 +424,29 @@ fn builds_two_port_error_t_matrices() {
     assert_complex_close(t4[(0, 1, 1)], Complex64::new(8.0, 0.0));
 }
 
+/// Verifies calibration input validation for standard count and network shape.
 #[test]
-fn validates_one_port_standard_count_and_shape() {
+fn validates_one_port_standard_count_and_shape() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
     let standards = vec![
-        constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0)),
-        constant_one_port(frequency, Complex64::new(1.0, 0.0)),
+        constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0))?,
+        constant_one_port(frequency, Complex64::new(1.0, 0.0))?,
     ];
     assert!(OnePort::new(standards.clone(), standards).is_err());
+    Ok(())
 }
 
 #[test]
-fn applies_simple_thru_normalization() {
+fn applies_simple_thru_normalization() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency should be valid");
     let first = one_port(
         frequency.clone(),
         &[Complex64::new(2.0, 0.0), Complex64::new(4.0, 0.0)],
-    );
+    )?;
     let second = one_port(
         frequency.clone(),
         &[Complex64::new(4.0, 0.0), Complex64::new(8.0, 0.0)],
-    );
+    )?;
     let mut calibration =
         Normalization::new(vec![first, second]).expect("normalization should be valid");
     calibration
@@ -420,7 +455,7 @@ fn applies_simple_thru_normalization() {
     let measured = one_port(
         frequency,
         &[Complex64::new(6.0, 0.0), Complex64::new(18.0, 0.0)],
-    );
+    )?;
 
     let corrected = calibration
         .apply(&measured)
@@ -433,16 +468,28 @@ fn applies_simple_thru_normalization() {
     for (actual, expected) in restored.s.iter().zip(measured.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
+/// Verifies the generic twelve-term SOLT calibration contract.
+///
+/// Measurements use separate forward and reverse error networks:
+///
+/// $$`M_f` = `X_f` \mathbin{**} S \mathbin{**} `Y_f`$$
+///
+/// for $S_{21}$ and $S_{11}$, and
+///
+/// $$`M_r` = `X_r` \mathbin{**} S \mathbin{**} `Y_r`$$
+///
+/// for $S_{12}$ and $S_{22}$.
 #[test]
-fn solves_applies_and_embeds_twelve_term_two_port_calibration() {
+fn solves_applies_and_embeds_twelve_term_two_port_calibration() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let reflects = [-1.0, 0.0, 1.0]
         .into_iter()
         .map(|reflection| two_port(frequency.clone(), [[reflection, 0.0], [0.0, reflection]]))
-        .collect::<Vec<_>>();
-    let thru = two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]]);
+        .collect::<rust_rf::Result<Vec<_>>>()?;
+    let thru = two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]])?;
     let mut ideals = reflects;
     ideals.push(thru);
     let coefficients = BTreeMap::from([
@@ -487,7 +534,7 @@ fn solves_applies_and_embeds_twelve_term_two_port_calibration() {
         .run()
         .expect("twelve-term calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
@@ -497,16 +544,17 @@ fn solves_applies_and_embeds_twelve_term_two_port_calibration() {
     for (actual, expected) in restored.s.iter().zip(raw.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn corrects_one_path_measurements_in_both_orientations() {
+fn corrects_one_path_measurements_in_both_orientations() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let ideals = vec![
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
-        two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]]),
-        two_port(frequency.clone(), [[1.0, 0.0], [0.0, 1.0]]),
-        two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
+        two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]])?,
+        two_port(frequency.clone(), [[1.0, 0.0], [0.0, 1.0]])?,
+        two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]])?,
     ];
     let coefficients = BTreeMap::from([
         ("forward directivity".to_owned(), constant_array(2, 0.01)),
@@ -556,7 +604,7 @@ fn corrects_one_path_measurements_in_both_orientations() {
         .run()
         .expect("enhanced-response calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let forward = seed.embed(&dut).expect("forward DUT should embed");
     let reverse = seed
         .embed(&dut.flipped().expect("DUT should flip"))
@@ -584,8 +632,10 @@ fn corrects_one_path_measurements_in_both_orientations() {
         assert_complex_close(partial.s[(point, 0, 1)], Complex64::new(0.0, 0.0));
         assert_complex_close(partial.s[(point, 1, 1)], Complex64::new(0.0, 0.0));
     }
+    Ok(())
 }
 
+/// Verifies multi-port SOLT calibration using common-port thru standards.
 #[test]
 fn calibrates_three_port_solt_from_common_port_thrus() {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
@@ -627,14 +677,14 @@ fn calibrates_three_port_solt_from_common_port_thrus() {
 }
 
 #[test]
-fn solves_applies_and_embeds_eight_term_two_port_calibration() {
+fn solves_applies_and_embeds_eight_term_two_port_calibration() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let ideals = vec![
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
-        two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]]),
-        two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]]),
-        two_port(frequency.clone(), [[0.2, 0.7], [0.4, -0.1]]),
-        two_port(frequency.clone(), [[0.4, -0.3], [0.6, 0.2]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
+        two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]])?,
+        two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]])?,
+        two_port(frequency.clone(), [[0.2, 0.7], [0.4, -0.1]])?,
+        two_port(frequency.clone(), [[0.4, -0.3], [0.6, 0.2]])?,
     ];
     let coefficients = BTreeMap::from([
         ("forward directivity".to_owned(), constant_array(2, 0.01)),
@@ -671,7 +721,7 @@ fn solves_applies_and_embeds_eight_term_two_port_calibration() {
         .run()
         .expect("eight-term calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
@@ -681,21 +731,23 @@ fn solves_applies_and_embeds_eight_term_two_port_calibration() {
     for (actual, expected) in restored.s.iter().zip(raw.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
+/// Verifies a one-port short-delay-delay-load calibration.
 #[test]
-fn solves_sddl_with_partially_known_delay_shorts() {
+fn solves_sddl_with_partially_known_delay_shorts() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let actuals = vec![
-        constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0)),
-        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -2.4)),
-        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -1.2)),
-        constant_one_port(frequency.clone(), Complex64::new(0.2, 0.2)),
+        constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0))?,
+        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -2.4))?,
+        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -1.2))?,
+        constant_one_port(frequency.clone(), Complex64::new(0.2, 0.2))?,
     ];
     let ideals = vec![
         actuals[0].clone(),
-        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -2.0)),
-        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -0.8)),
+        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -2.0))?,
+        constant_one_port(frequency.clone(), Complex64::from_polar(1.0, -0.8))?,
         actuals[3].clone(),
     ];
     let seed = OnePort {
@@ -716,16 +768,17 @@ fn solves_sddl_with_partially_known_delay_shorts() {
 
     calibration.run().expect("SDDL calibration should solve");
 
-    let dut = constant_one_port(frequency, Complex64::new(0.3, -0.15));
+    let dut = constant_one_port(frequency, Complex64::new(0.3, -0.15))?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn solves_weikle_short_delay_delay_load_calibration() {
+fn solves_weikle_short_delay_delay_load_calibration() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let actuals = [
         Complex64::new(-1.0, 0.0),
@@ -739,8 +792,9 @@ fn solves_weikle_short_delay_delay_load_calibration() {
         Complex64::from_polar(1.0, -std::f64::consts::PI),
         Complex64::new(0.2, 0.2),
     ]
+    .into_iter()
     .map(|value| constant_one_port(frequency.clone(), value))
-    .to_vec();
+    .collect::<rust_rf::Result<Vec<_>>>()?;
     let seed = OnePort {
         measured: ideals.clone(),
         ideals: ideals.clone(),
@@ -752,7 +806,10 @@ fn solves_weikle_short_delay_delay_load_calibration() {
     };
     let measured = actuals
         .into_iter()
-        .map(|value| seed.embed(&constant_one_port(frequency.clone(), value)))
+        .map(|value| {
+            let standard = constant_one_port(frequency.clone(), value)?;
+            seed.embed(&standard)
+        })
         .collect::<rust_rf::Result<Vec<_>>>()
         .expect("standards should embed");
     let mut calibration =
@@ -762,20 +819,22 @@ fn solves_weikle_short_delay_delay_load_calibration() {
         .run()
         .expect("SDDLWeikle calibration should solve");
 
-    let dut = constant_one_port(frequency, Complex64::new(0.3, -0.15));
+    let dut = constant_one_port(frequency, Complex64::new(0.3, -0.15))?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
+/// Verifies TRL determines its unknown line and reflect before solving the error boxes.
 #[test]
-fn determines_trl_line_and_reflect_before_eight_term_solution() {
+fn determines_trl_line_and_reflect_before_eight_term_solution() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
-    let thru = two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]]);
-    let reflect = two_port(frequency.clone(), [[-0.9, 0.0], [0.0, -0.9]]);
-    let line = two_port(frequency.clone(), [[0.0, -0.7], [-0.7, 0.0]]);
+    let thru = two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]])?;
+    let reflect = two_port(frequency.clone(), [[-0.9, 0.0], [0.0, -0.9]])?;
+    let line = two_port(frequency.clone(), [[0.0, -0.7], [-0.7, 0.0]])?;
     let actuals = vec![thru.clone(), reflect, line];
     let seed = EightTerm {
         measured: actuals.clone(),
@@ -807,23 +866,28 @@ fn determines_trl_line_and_reflect_before_eight_term_solution() {
         .expect("standards should embed");
     let ideals = vec![
         thru,
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
-        two_port(frequency.clone(), [[0.0, -0.8], [-0.8, 0.0]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
+        two_port(frequency.clone(), [[0.0, -0.8], [-0.8, 0.0]])?,
     ];
     let mut calibration = Trl::single_reflect(measured, ideals).expect("TRL standards");
 
     calibration.run().expect("TRL calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
+/// Verifies NIST and TUG multiline TRL propagation-constant recovery.
+///
+/// This covers the upstream characteristic-impedance and reference-plane
+/// behavior shared by the multiline calibration variants.
 #[test]
-fn solves_nist_and_tug_multiline_trl_calibrations() {
+fn solves_nist_and_tug_multiline_trl_calibrations() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let line = |length: f64| {
         Network::new(
@@ -843,7 +907,7 @@ fn solves_nist_and_tug_multiline_trl_calibrations() {
     let lengths = vec![0.0, 0.03, 0.06];
     let actuals = vec![
         line(lengths[0]),
-        two_port(frequency.clone(), [[-0.9, 0.0], [0.0, -0.9]]),
+        two_port(frequency.clone(), [[-0.9, 0.0], [0.0, -0.9]])?,
         line(lengths[1]),
         line(lengths[2]),
     ];
@@ -871,7 +935,7 @@ fn solves_nist_and_tug_multiline_trl_calibrations() {
     nist.run().expect("NIST multiline TRL should solve");
     tug.run().expect("TUG multiline TRL should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     for corrected in [
         nist.apply(&raw).expect("NIST DUT correction"),
@@ -887,24 +951,30 @@ fn solves_nist_and_tug_multiline_trl_calibrations() {
         tug.propagation_constant.expect("TUG propagation constant"),
     ] {
         for (point, value) in propagation.iter().enumerate() {
-            let expected = 2.0 * std::f64::consts::PI * (point + 1) as f64 * 1.0e9 / 299_792_458.0;
+            let harmonic = u32::try_from(point + 1).expect("test point index should fit in u32");
+            let expected = 2.0 * std::f64::consts::PI * f64::from(harmonic) * 1.0e9 / 299_792_458.0;
             assert_relative_eq!(value.im, expected, epsilon = 1.0e-8);
         }
     }
+    Ok(())
 }
 
+/// Verifies sixteen-term solution, DUT correction, and re-embedding.
+///
+/// The coefficient seed includes the non-isolation terms using the same
+/// definitions as the eight-term coefficients.
 #[test]
-fn solves_applies_and_embeds_sixteen_term_calibration() {
+fn solves_applies_and_embeds_sixteen_term_calibration() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let ideals = vec![
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
-        two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]]),
-        two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]]),
-        two_port(frequency.clone(), [[0.2, 0.7], [0.4, -0.1]]),
-        two_port(frequency.clone(), [[0.4, -0.3], [0.6, 0.2]]),
-        two_port(frequency.clone(), [[-0.2, 0.5], [-0.4, 0.3]]),
-        two_port(frequency.clone(), [[0.1, -0.8], [0.2, 0.5]]),
-        two_port(frequency.clone(), [[0.7, 0.2], [-0.6, -0.4]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
+        two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]])?,
+        two_port(frequency.clone(), [[0.0, 1.0], [1.0, 0.0]])?,
+        two_port(frequency.clone(), [[0.2, 0.7], [0.4, -0.1]])?,
+        two_port(frequency.clone(), [[0.4, -0.3], [0.6, 0.2]])?,
+        two_port(frequency.clone(), [[-0.2, 0.5], [-0.4, 0.3]])?,
+        two_port(frequency.clone(), [[0.1, -0.8], [0.2, 0.5]])?,
+        two_port(frequency.clone(), [[0.7, 0.2], [-0.6, -0.4]])?,
     ];
     let coefficients = BTreeMap::from([
         ("forward directivity".to_owned(), constant_array(2, 0.01)),
@@ -965,7 +1035,7 @@ fn solves_applies_and_embeds_sixteen_term_calibration() {
         .run()
         .expect("sixteen-term calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
@@ -975,16 +1045,17 @@ fn solves_applies_and_embeds_sixteen_term_calibration() {
     for (actual, expected) in restored.s.iter().zip(raw.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn solves_unknown_reciprocal_thru_from_reflect_standards() {
+fn solves_unknown_reciprocal_thru_from_reflect_standards() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let mut ideals = [-1.0, 0.0, 1.0]
         .into_iter()
         .map(|reflection| two_port(frequency.clone(), [[reflection, 0.0], [0.0, reflection]]))
-        .collect::<Vec<_>>();
-    ideals.push(two_port(frequency.clone(), [[0.1, -0.7], [-0.7, -0.05]]));
+        .collect::<rust_rf::Result<Vec<_>>>()?;
+    ideals.push(two_port(frequency.clone(), [[0.1, -0.7], [-0.7, -0.05]])?);
     let seed = EightTerm {
         measured: ideals.clone(),
         ideals: ideals.clone(),
@@ -1014,7 +1085,7 @@ fn solves_unknown_reciprocal_thru_from_reflect_standards() {
         .collect::<rust_rf::Result<Vec<_>>>()
         .expect("standards should embed");
     let mut approximations = ideals.clone();
-    approximations[3] = two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]]);
+    approximations[3] = two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]])?;
     let mut calibration =
         UnknownThru::new(measured, approximations).expect("unknown-thru standards");
 
@@ -1022,35 +1093,36 @@ fn solves_unknown_reciprocal_thru_from_reflect_standards() {
         .run()
         .expect("unknown-thru calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn solves_misreflection_residual_calibration() {
+fn solves_misreflection_residual_calibration() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
     let actuals = vec![
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
         complex_two_port(
             frequency.clone(),
             [
                 [Complex64::from_polar(1.0, -2.2), Complex64::new(0.0, 0.0)],
                 [Complex64::new(0.0, 0.0), Complex64::from_polar(1.0, -1.1)],
             ],
-        ),
+        )?,
         complex_two_port(
             frequency.clone(),
             [
                 [Complex64::from_polar(1.0, -1.0), Complex64::new(0.0, 0.0)],
                 [Complex64::new(0.0, 0.0), Complex64::from_polar(1.0, -2.0)],
             ],
-        ),
-        two_port(frequency.clone(), [[0.2, 0.0], [0.0, 0.2]]),
-        two_port(frequency.clone(), [[0.1, -0.7], [-0.7, -0.05]]),
+        )?,
+        two_port(frequency.clone(), [[0.2, 0.0], [0.0, 0.2]])?,
+        two_port(frequency.clone(), [[0.1, -0.7], [-0.7, -0.05]])?,
     ];
     let seed = eight_term_seed(actuals.clone());
     let measured = actuals
@@ -1059,30 +1131,31 @@ fn solves_misreflection_residual_calibration() {
         .collect::<rust_rf::Result<Vec<_>>>()
         .expect("standards should embed");
     let approximations = vec![
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
-        two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]]),
-        two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]]),
-        two_port(frequency.clone(), [[0.2, 0.0], [0.0, 0.2]]),
-        two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
+        two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]])?,
+        two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]])?,
+        two_port(frequency.clone(), [[0.2, 0.0], [0.0, 0.2]])?,
+        two_port(frequency.clone(), [[0.0, -1.0], [-1.0, 0.0]])?,
     ];
     let mut calibration = Mrc::new(measured, approximations).expect("MRC standards");
 
     calibration.run().expect("MRC calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn solves_line_reflect_match_calibration() {
+fn solves_line_reflect_match_calibration() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
-    let line = two_port(frequency.clone(), [[0.0, -0.7], [-0.7, 0.0]]);
-    let reflect = two_port(frequency.clone(), [[-0.9, 0.0], [0.0, -0.9]]);
-    let matched = two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]]);
+    let line = two_port(frequency.clone(), [[0.0, -0.7], [-0.7, 0.0]])?;
+    let reflect = two_port(frequency.clone(), [[-0.9, 0.0], [0.0, -0.9]])?;
+    let matched = two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]])?;
     let actuals = vec![line.clone(), reflect, matched.clone()];
     let seed = EightTerm {
         measured: actuals.clone(),
@@ -1114,29 +1187,30 @@ fn solves_line_reflect_match_calibration() {
         .expect("standards should embed");
     let ideals = vec![
         line,
-        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]),
+        two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?,
         matched,
     ];
     let mut calibration = Lrm::new(measured, ideals).expect("LRM standards");
 
     calibration.run().expect("LRM calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn solves_lmr16_from_known_reflect() {
+fn solves_lmr16_from_known_reflect() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
-    let thru = two_port(frequency.clone(), [[0.0, 0.8], [0.8, 0.0]]);
-    let match_match = two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]]);
-    let reflect_reflect = two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]);
-    let reflect_match = two_port(frequency.clone(), [[-1.0, 0.0], [0.0, 0.0]]);
-    let match_reflect = two_port(frequency.clone(), [[0.0, 0.0], [0.0, -1.0]]);
+    let thru = two_port(frequency.clone(), [[0.0, 0.8], [0.8, 0.0]])?;
+    let match_match = two_port(frequency.clone(), [[0.0, 0.0], [0.0, 0.0]])?;
+    let reflect_reflect = two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?;
+    let reflect_match = two_port(frequency.clone(), [[-1.0, 0.0], [0.0, 0.0]])?;
+    let match_reflect = two_port(frequency.clone(), [[0.0, 0.0], [0.0, -1.0]])?;
     let actuals = vec![
         thru,
         match_match,
@@ -1154,78 +1228,28 @@ fn solves_lmr16_from_known_reflect() {
         .map(|ideal| seed.embed(ideal))
         .collect::<rust_rf::Result<Vec<_>>>()
         .expect("standards should embed");
-    let ideal_reflect = constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0));
+    let ideal_reflect = constant_one_port(frequency.clone(), Complex64::new(-1.0, 0.0))?;
     let mut calibration = Lmr16::new(measured, ideal_reflect, true, None).expect("LMR16 standards");
 
     calibration.run().expect("LMR16 calibration should solve");
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
         assert_complex_close(*actual, *expected);
     }
+    Ok(())
 }
 
 #[test]
-fn solves_line_reflect_reflect_match_per_frequency() {
+fn solves_line_reflect_reflect_match_per_frequency() -> rust_rf::Result<()> {
     let frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
-    let line = two_port(frequency.clone(), [[0.0, 0.8], [0.8, 0.0]]);
-    let ideal_reflect1 = two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]]);
-    let ideal_reflect2 = two_port(frequency.clone(), [[1.0, 0.0], [0.0, 1.0]]);
-    let angular = frequency
-        .values_hz()
-        .iter()
-        .map(|value| 2.0 * std::f64::consts::PI * value)
-        .collect::<Vec<_>>();
-    let reflect1_values = angular
-        .iter()
-        .map(|value| {
-            let resistance = 50.0 * (1.0 - 0.95) / (1.0 + 0.95);
-            let impedance = Complex64::new(resistance, value * 5.0e-12);
-            (impedance - 50.0) / (impedance + 50.0)
-        })
-        .collect::<Vec<_>>();
-    let reflect2_values = angular
-        .iter()
-        .map(|value| {
-            let impedance = Complex64::new(0.0, -1.0 / (value * 5.0e-15));
-            (impedance - 50.0) / (impedance + 50.0)
-        })
-        .collect::<Vec<_>>();
-    let match_values = angular
-        .iter()
-        .map(|value| {
-            let impedance = Complex64::new(50.0, value * 20.0e-12);
-            (impedance - 50.0) / (impedance + 50.0)
-        })
-        .collect::<Vec<_>>();
-    let diagonal = |port0: &[Complex64], port1: &[Complex64]| {
-        Network::new(
-            frequency.clone(),
-            Array3::from_shape_fn((2, 2, 2), |(point, row, column)| {
-                if row != column {
-                    Complex64::new(0.0, 0.0)
-                } else if row == 0 {
-                    port0[point]
-                } else {
-                    port1[point]
-                }
-            }),
-            Array2::from_elem((2, 2), Complex64::new(50.0, 0.0)),
-        )
-        .expect("reflect standard")
-    };
-    let reflect1 = diagonal(&reflect1_values, &reflect1_values);
-    let reflect2 = diagonal(&reflect2_values, &reflect2_values);
-    let matched = diagonal(&match_values, &reflect2_values);
-    let ideal_match = Network::new(
-        frequency.clone(),
-        Array3::zeros((2, 2, 2)),
-        Array2::from_elem((2, 2), Complex64::new(50.0, 0.0)),
-    )
-    .expect("ideal match");
-    let actuals = vec![line.clone(), reflect1.clone(), reflect2.clone(), matched];
+    let line = two_port(frequency.clone(), [[0.0, 0.8], [0.8, 0.0]])?;
+    let ideal_reflect1 = two_port(frequency.clone(), [[-1.0, 0.0], [0.0, -1.0]])?;
+    let ideal_reflect2 = two_port(frequency.clone(), [[1.0, 0.0], [0.0, 1.0]])?;
+    let (reflect1, reflect2, matched, ideal_match) = lrrm_reflect_and_match_standards(&frequency)?;
+    let actuals = vec![line.clone(), reflect1, reflect2, matched];
     let seed = EightTerm {
         measured: actuals.clone(),
         ideals: actuals.clone(),
@@ -1273,7 +1297,7 @@ fn solves_line_reflect_reflect_match_per_frequency() {
         assert_relative_eq!(*value, 20.0e-12, max_relative = 1.0e-3);
     }
 
-    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]]);
+    let dut = two_port(frequency, [[0.2, 0.1], [0.6, -0.1]])?;
     let raw = seed.embed(&dut).expect("DUT should embed");
     let corrected = calibration.apply(&raw).expect("DUT should calibrate");
     for (actual, expected) in corrected.s.iter().zip(dut.s.iter()) {
@@ -1300,6 +1324,63 @@ fn solves_line_reflect_reflect_match_per_frequency() {
             assert_relative_eq!(*value, 20.0e-12, max_relative = 1.0e-3);
         }
     }
+    Ok(())
+}
+
+fn lrrm_reflect_and_match_standards(
+    frequency: &Frequency,
+) -> rust_rf::Result<(Network, Network, Network, Network)> {
+    let angular = frequency
+        .values_hz()
+        .iter()
+        .map(|value| 2.0 * std::f64::consts::PI * value)
+        .collect::<Vec<_>>();
+    let reflect1_values = angular
+        .iter()
+        .map(|value| {
+            let resistance = 50.0 * (1.0 - 0.95) / (1.0 + 0.95);
+            let impedance = Complex64::new(resistance, value * 5.0e-12);
+            (impedance - 50.0) / (impedance + 50.0)
+        })
+        .collect::<Vec<_>>();
+    let reflect2_values = angular
+        .iter()
+        .map(|value| {
+            let impedance = Complex64::new(0.0, -1.0 / (value * 5.0e-15));
+            (impedance - 50.0) / (impedance + 50.0)
+        })
+        .collect::<Vec<_>>();
+    let match_values = angular
+        .iter()
+        .map(|value| {
+            let impedance = Complex64::new(50.0, value * 20.0e-12);
+            (impedance - 50.0) / (impedance + 50.0)
+        })
+        .collect::<Vec<_>>();
+    let diagonal = |port0: &[Complex64], port1: &[Complex64]| {
+        Network::new(
+            frequency.clone(),
+            Array3::from_shape_fn((2, 2, 2), |(point, row, column)| {
+                if row != column {
+                    Complex64::new(0.0, 0.0)
+                } else if row == 0 {
+                    port0[point]
+                } else {
+                    port1[point]
+                }
+            }),
+            Array2::from_elem((2, 2), Complex64::new(50.0, 0.0)),
+        )
+    };
+    let reflect1 = diagonal(&reflect1_values, &reflect1_values)?;
+    let reflect2 = diagonal(&reflect2_values, &reflect2_values)?;
+    let matched = diagonal(&match_values, &reflect2_values)?;
+    let ideal_match = Network::new(
+        frequency.clone(),
+        Array3::zeros((2, 2, 2)),
+        Array2::from_elem((2, 2), Complex64::new(50.0, 0.0)),
+    )?;
+    Ok((reflect1, reflect2, matched, ideal_match))
 }
 
 fn sixteen_term_coefficients(points: usize) -> BTreeMap<String, ndarray::Array1<Complex64>> {
@@ -1427,12 +1508,12 @@ fn embed_value(
     (directivity + a * ideal) / (Complex64::new(1.0, 0.0) - source_match * ideal)
 }
 
-fn constant_one_port(frequency: Frequency, value: Complex64) -> Network {
+fn constant_one_port(frequency: Frequency, value: Complex64) -> rust_rf::Result<Network> {
     let points = frequency.points();
     one_port(frequency, &vec![value; points])
 }
 
-fn one_port(frequency: Frequency, values: &[Complex64]) -> Network {
+fn one_port(frequency: Frequency, values: &[Complex64]) -> rust_rf::Result<Network> {
     let points = frequency.points();
     let s = Array3::from_shape_fn((points, 1, 1), |(point, _, _)| values[point]);
     Network::new(
@@ -1440,10 +1521,9 @@ fn one_port(frequency: Frequency, values: &[Complex64]) -> Network {
         s,
         Array2::from_elem((points, 1), Complex64::new(50.0, 0.0)),
     )
-    .expect("network should be valid")
 }
 
-fn two_port(frequency: Frequency, values: [[f64; 2]; 2]) -> Network {
+fn two_port(frequency: Frequency, values: [[f64; 2]; 2]) -> rust_rf::Result<Network> {
     let points = frequency.points();
     Network::new(
         frequency,
@@ -1452,17 +1532,15 @@ fn two_port(frequency: Frequency, values: [[f64; 2]; 2]) -> Network {
         }),
         Array2::from_elem((points, 2), Complex64::new(50.0, 0.0)),
     )
-    .expect("network should be valid")
 }
 
-fn complex_two_port(frequency: Frequency, values: [[Complex64; 2]; 2]) -> Network {
+fn complex_two_port(frequency: Frequency, values: [[Complex64; 2]; 2]) -> rust_rf::Result<Network> {
     let points = frequency.points();
     Network::new(
         frequency,
         Array3::from_shape_fn((points, 2, 2), |(_, output, input)| values[output][input]),
         Array2::from_elem((points, 2), Complex64::new(50.0, 0.0)),
     )
-    .expect("complex network should be valid")
 }
 
 fn constant_array(points: usize, value: f64) -> ndarray::Array1<Complex64> {

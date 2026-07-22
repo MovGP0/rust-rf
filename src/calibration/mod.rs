@@ -10,8 +10,11 @@ use crate::{Error, Result};
     clippy::module_inception,
     reason = "the nested module preserves the upstream skrf/calibration/calibration.py path"
 )]
+/// Calibration algorithms, standards, coefficients, and error models.
 pub mod calibration;
+/// Collections of related calibration results.
 pub mod calibration_set;
+/// Fixture de-embedding algorithms.
 pub mod deembedding;
 
 pub use calibration::*;

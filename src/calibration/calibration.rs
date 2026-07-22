@@ -1,11 +1,14 @@
-//! Calibration algorithms.
+//! VNA calibration algorithms ported from `skrf/calibration/calibration.py`.
 //!
-//! Origin: `skrf/calibration/calibration.py`.
+//! The module provides one-port, two-port, multi-port, and three-receiver
+//! calibration implementations together with switch-term, standard-determination,
+//! error-model conversion, standard-alignment, and coefficient-conversion helpers.
 
 use std::collections::BTreeMap;
 
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 
 use super::ensure_nonzero;
 use crate::math::sqrt_phase_unwrap;
@@ -17,6 +20,7 @@ type FourComplexMatrices = (
     ComplexMatrix2,
     ComplexMatrix2,
 );
+/// Four frequency-indexed $2 \times 2$ complex matrix arrays.
 pub type FourComplexArrayMatrices = (
     Array3<Complex64>,
     Array3<Complex64>,
@@ -24,26 +28,66 @@ pub type FourComplexArrayMatrices = (
     Array3<Complex64>,
 );
 
-/// Common structural surface originating from `skrf/calibration/calibration.py::Calibration`.
+/// Common interface implemented by every calibration algorithm.
+///
+/// Implementations solve error coefficients from aligned measured and ideal
+/// standards, apply those coefficients to measured networks, and can embed an
+/// ideal response back into the estimated error network.
+///
+/// Measured and ideal standards must be aligned. [`align_measured_ideals`] can
+/// align named standards for algorithms where order is not semantically significant;
+/// do not use name-based alignment for order-dependent methods such as [`Trl`].
+///
+/// The coefficient accessors expose the conventional one-port, eight-term, and
+/// twelve-term error models. Conversion between the two-port models is performed
+/// by [`convert_8term_2_12term`] and [`convert_12term_2_8term`].
+///
+/// Origin: `skrf/calibration/calibration.py::Calibration`.
 pub trait Calibration {
+    /// Measured calibration standards.
     fn measured(&self) -> &[Network];
 
+    /// Ideal responses corresponding to the measured standards.
     fn ideals(&self) -> &[Network];
 
+    /// Solves the calibration coefficients from the measured and ideal standards.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the standards cannot produce a valid coefficient solution.
     fn run(&mut self) -> Result<()>;
 
+    /// Applies the solved calibration to a measured network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network is incompatible with the calibration model.
     fn apply(&self, network: &Network) -> Result<Network>;
 
+    /// Embeds an ideal network in the calibration error model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network is incompatible with the calibration model.
     fn embed(&self, network: &Network) -> Result<Network>;
 
+    /// Solved error coefficients keyed by their conventional names.
     fn coefficients(&self) -> &BTreeMap<String, Array1<Complex64>>;
 
-    /// Port of `Calibration.apply_cal`.
+    /// Applies the calibration to a measured network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network is incompatible with the calibration model.
     fn apply_cal(&self, network: &Network) -> Result<Network> {
         self.apply(network)
     }
 
-    /// Port of `Calibration.frequency`.
+    /// Returns the frequency axis shared by the calibration standards.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the calibration has no measured standards.
     fn frequency(&self) -> Result<&Frequency> {
         self.measured()
             .first()
@@ -53,32 +97,44 @@ pub trait Calibration {
             })
     }
 
-    /// Port of `Calibration.nstandards`.
+    /// Returns the number of measured calibration standards.
     fn standards(&self) -> usize {
         self.measured().len()
     }
 
-    /// Port of `Calibration.nstandards`.
+    /// Returns the number of measured calibration standards.
     fn nstandards(&self) -> usize {
         self.standards()
     }
 
-    /// Port of `Calibration.coefs`.
+    /// Returns the solved coefficient arrays using conventional error-term names.
     fn coefs(&self) -> &BTreeMap<String, Array1<Complex64>> {
         self.coefficients()
     }
 
-    /// Port of `Calibration.apply_cal_to_list`.
+    /// Applies the calibration to every network in a slice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network is incompatible with the calibration model.
     fn apply_all(&self, networks: &[Network]) -> Result<Vec<Network>> {
         networks.iter().map(|network| self.apply(network)).collect()
     }
 
-    /// Port of `Calibration.apply_cal_to_list`.
+    /// Applies the calibration to every network in a slice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network is incompatible with the calibration model.
     fn apply_cal_to_list(&self, networks: &[Network]) -> Result<Vec<Network>> {
         self.apply_all(networks)
     }
 
-    /// Port of `Calibration.apply_cal_to_network_set`.
+    /// Applies the calibration while preserving network-set metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network in the set is incompatible with the calibration model.
     fn apply_network_set(&self, set: &NetworkSet) -> Result<NetworkSet> {
         Ok(NetworkSet {
             networks: self.apply_all(&set.networks)?,
@@ -88,22 +144,39 @@ pub trait Calibration {
         })
     }
 
-    /// Port of `Calibration.apply_cal_to_network_set`.
+    /// Applies the calibration while preserving network-set metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network in the set is incompatible with the calibration model.
     fn apply_cal_to_network_set(&self, set: &NetworkSet) -> Result<NetworkSet> {
         self.apply_network_set(set)
     }
 
-    /// Port of `Calibration.caled_ntwks`.
+    /// Applies the calibration to the standards used to solve it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any measured standard is incompatible with the calibration model.
     fn calibrated_standards(&self) -> Result<Vec<Network>> {
         self.apply_all(self.measured())
     }
 
-    /// Port of `Calibration.caled_ntwks`.
+    /// Returns the calibrated standard measurements.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any measured standard is incompatible with the calibration model.
     fn caled_ntwks(&self) -> Result<Vec<Network>> {
         self.calibrated_standards()
     }
 
-    /// Port of `Calibration.residual_ntwks`.
+    /// Returns the complex residual between each calibrated measurement and its
+    /// corresponding ideal standard.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when standards are not aligned or have incompatible shapes.
     fn residual_networks(&self) -> Result<Vec<Network>> {
         if self.measured().len() != self.ideals().len() {
             return Err(Error::IncompatibleShape(
@@ -126,12 +199,21 @@ pub trait Calibration {
             .collect()
     }
 
-    /// Port of `Calibration.residual_ntwks`.
+    /// Returns the residual networks for all aligned standards.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when standards are not aligned or have incompatible shapes.
     fn residual_ntwks(&self) -> Result<Vec<Network>> {
         self.residual_networks()
     }
 
-    /// Port of `Calibration.coefs_ntwks`.
+    /// Converts every coefficient array into a one-port [`Network`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no measured standard exists, a coefficient length is
+    /// inconsistent, or a coefficient network cannot be constructed.
     fn coefficient_networks(&self) -> Result<BTreeMap<String, Network>> {
         let frequency = self.frequency()?.clone();
         let points = frequency.points();
@@ -159,12 +241,21 @@ pub trait Calibration {
             .collect()
     }
 
-    /// Port of `Calibration.coefs_ntwks`.
+    /// Returns the error coefficients as one-port [`Network`] values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when coefficient arrays cannot be represented as networks.
     fn coefs_ntwks(&self) -> Result<BTreeMap<String, Network>> {
         self.coefficient_networks()
     }
 
-    /// Port of `Calibration.coefs_3term`.
+    /// Returns directivity, source match, and reflection tracking for the
+    /// one-port three-term error model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any required three-term coefficient is unavailable.
     fn coefs_3term(&self) -> Result<BTreeMap<String, Array1<Complex64>>> {
         ["directivity", "source match", "reflection tracking"]
             .into_iter()
@@ -180,7 +271,12 @@ pub trait Calibration {
             .collect()
     }
 
-    /// Port of `Calibration.coefs_8term`.
+    /// Returns the directional error-box coefficients, switch terms, isolation
+    /// terms, and $k$ coefficient for the eight-term model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the coefficient set cannot be converted to the eight-term model.
     fn coefs_8term(&self) -> Result<BTreeMap<String, Array1<Complex64>>> {
         if self.coefficients().contains_key("directivity") {
             return Err(Error::Unsupported(
@@ -197,7 +293,12 @@ pub trait Calibration {
         }
     }
 
-    /// Port of `Calibration.coefs_12term`.
+    /// Returns the forward and reverse directivity, match, reflection tracking,
+    /// transmission tracking, and isolation terms for the twelve-term model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the coefficient set cannot be converted to the twelve-term model.
     fn coefs_12term(&self) -> Result<BTreeMap<String, Array1<Complex64>>> {
         if self.coefficients().contains_key("directivity") {
             return Err(Error::Unsupported(
@@ -214,7 +315,11 @@ pub trait Calibration {
         }
     }
 
-    /// Port of `Calibration.verify_12term`.
+    /// Evaluates the twelve-term consistency relation at each frequency point.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when required twelve-term coefficients are missing or inconsistent.
     fn verify_12term(&self) -> Result<Array1<Complex64>> {
         let coefficients = self.coefs_12term()?;
         let points = coefficient_points(&coefficients)?;
@@ -235,23 +340,43 @@ pub trait Calibration {
         }))
     }
 
-    /// Port of `Calibration.verify_12term_ntwk`.
+    /// Returns the twelve-term consistency relation as a one-port [`Network`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the consistency values cannot be computed or represented as a network.
     fn verify_12term_network(&self) -> Result<Network> {
         let values = self.verify_12term()?;
-        coefficient_network(self.frequency()?.clone(), values, "verify 12-term")
+        coefficient_network(self.frequency()?.clone(), &values, "verify 12-term")
     }
 
-    /// Port of `Calibration.residual_ntwk_sets`.
+    /// Groups residual networks by ideal-standard name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when residuals cannot be computed or standards cannot be grouped.
     fn residual_ntwk_sets(&self) -> Result<BTreeMap<String, NetworkSet>> {
         group_networks_by_ideal_name(&self.residual_networks()?, self.ideals())
     }
 
-    /// Port of `Calibration.caled_ntwk_sets`.
+    /// Groups calibrated standards by ideal-standard name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when standards cannot be calibrated or grouped.
     fn caled_ntwk_sets(&self) -> Result<BTreeMap<String, NetworkSet>> {
         group_networks_by_ideal_name(&self.calibrated_standards()?, self.ideals())
     }
 
-    /// Port of `Calibration.biased_error`.
+    /// Estimates biased error across repeated connections of each standard.
+    ///
+    /// $$
+    /// \operatorname{mean}_s\left(\left|\operatorname{mean}_c(r)\right|\right)
+    /// $$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when residual sets cannot be computed or averaged.
     fn biased_error(&self) -> Result<Network> {
         let standard_means = self
             .residual_ntwk_sets()?
@@ -264,7 +389,15 @@ pub trait Calibration {
         Ok(error)
     }
 
-    /// Port of `Calibration.unbiased_error`.
+    /// Estimates connection-to-connection variation for each standard.
+    ///
+    /// $$
+    /// \operatorname{mean}_s\left(\operatorname{std}_c(r)\right)
+    /// $$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when residual sets cannot be computed or their deviations averaged.
     fn unbiased_error(&self) -> Result<Network> {
         let standard_deviations = self
             .residual_ntwk_sets()?
@@ -280,7 +413,15 @@ pub trait Calibration {
         Ok(error)
     }
 
-    /// Port of `Calibration.total_error`.
+    /// Estimates total residual error across connections and standards.
+    ///
+    /// $$
+    /// \operatorname{std}_{cs}(r)
+    /// $$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when residual networks cannot be computed or aggregated.
     fn total_error(&self) -> Result<Network> {
         let mut error = NetworkSet::new(
             self.residual_networks()?,
@@ -291,7 +432,12 @@ pub trait Calibration {
         Ok(error)
     }
 
-    /// Port of `Calibration.error_ntwk`.
+    /// Builds the estimated one-port or directional error network from the
+    /// solved coefficients.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when coefficients or frequency data cannot form an error network.
     fn error_ntwk(&self, reciprocal: bool) -> Result<ErrorNetworkResult> {
         error_dict_2_network(self.coefficients(), self.frequency()?, reciprocal)
     }
@@ -313,63 +459,151 @@ const TWELVE_TERM_COEFFICIENTS: [&str; 12] = [
 ];
 
 macro_rules! calibration_structure {
-    ($name:ident, $origin:literal) => {
+    ($name:ident, $origin:literal, $description:literal) => {
+        #[doc = $description]
+        ///
         #[doc = concat!("Origin: `", $origin, "`.")]
         #[derive(Clone, Debug, Default)]
         pub struct $name {
+            /// Measured calibration standards.
             pub measured: Vec<Network>,
+            /// Ideal standards aligned with [`Self::measured`].
             pub ideals: Vec<Network>,
+            /// Solved calibration coefficients.
             pub coefficients: BTreeMap<String, Array1<Complex64>>,
         }
     };
 }
 
-calibration_structure!(OnePort, "skrf/calibration/calibration.py::OnePort");
-calibration_structure!(SddlWeikle, "skrf/calibration/calibration.py::SDDLWeikle");
-calibration_structure!(Sddl, "skrf/calibration/calibration.py::SDDL");
-calibration_structure!(Phn, "skrf/calibration/calibration.py::PHN");
-calibration_structure!(EightTerm, "skrf/calibration/calibration.py::EightTerm");
-calibration_structure!(TwelveTerm, "skrf/calibration/calibration.py::TwelveTerm");
-calibration_structure!(SixteenTerm, "skrf/calibration/calibration.py::SixteenTerm");
-calibration_structure!(Solt, "skrf/calibration/calibration.py::SOLT");
+calibration_structure!(
+    OnePort,
+    "skrf/calibration/calibration.py::OnePort",
+    "Standard one-port calibration using three or more standards.\n\nThe solver determines directivity, source match, and reflection tracking from\n\n$$\ne_{11} i_n m_n - \\Delta e\\, i_{n} + e_{00} = m_{n}.\n$$\n\nWith more than three standards, it solves the overdetermined system by least squares.\n\n## References\n\n- [Agilent VNA Help: one-port calibration](http://na.tm.agilent.com/vnahelp/tip20.html)\n- R. F. Bauer Jr. and P. Penfield, \"De-Embedding and Unterminating,\" IEEE Transactions on Microwave Theory and Techniques, 1974, [doi:10.1109/TMTT.1974.1128212](https://doi.org/10.1109/TMTT.1974.1128212)."
+);
+calibration_structure!(
+    SddlWeikle,
+    "skrf/calibration/calibration.py::SDDLWeikle",
+    "Liu-Weikle short-delay-delay-load one-port self-calibration.\n\nThe standards are a known short, two delay shorts with unknown phase, and a known\nreflective load. The short may have a known offset; the delay shorts have unit\nreflection magnitude and unknown electrical length. A perfectly matched load makes\nthe calibration singular.\n\n> **Note:** The method is bandwidth-limited by phase wrapping. Wideband use requires\nsplitting measurements into subbands with suitable delay lengths.\n\n## References\n\n- Z. Liu and R. M. Weikle, *A reflectometer calibration method resistant to waveguide flange misalignment*, IEEE Transactions on Microwave Theory and Techniques, 2006.\n- W. Sigg and J. Simon, *Reflectometer calibration using load, short and offset shorts with unknown phase*, Electronics Letters, 1991.\n- A. Lewandowski et al., *Accuracy and Bandwidth Optimization of the Over-Determined Offset-Short Reflectometer Calibration*, IEEE Transactions on Microwave Theory and Techniques, 2015, [doi:10.1109/TMTT.2015.2396496](https://doi.org/10.1109/TMTT.2015.2396496)."
+);
+calibration_structure!(
+    Sddl,
+    "skrf/calibration/calibration.py::SDDL",
+    "Arsenovic short-delay-delay-load one-port self-calibration.\n\nThe standards are a known short, two unit-magnitude delay shorts with unknown phase,\nand a known load. The short may have a known offset. Unlike [`SddlWeikle`], the\nload may be matched or reflective.\n\n> **Note:** The method is bandwidth-limited by phase wrapping. Wideband use requires\nsplitting measurements into subbands with suitable delay lengths.\n\n## References\n\n- A. Arsenovic, R. M. Weikle, and J. L. Hesler, *Reflectometer calibration with a pair of partially known standards*, European Microwave Conference, 2015, [doi:10.1109/EUMC.2015.7345766](https://doi.org/10.1109/EUMC.2015.7345766).\n- Z. Liu and R. M. Weikle, *A reflectometer calibration method resistant to waveguide flange misalignment*, IEEE Transactions on Microwave Theory and Techniques, 2006.\n- W. Sigg and J. Simon, *Reflectometer calibration using load, short and offset shorts with unknown phase*, Electronics Letters, 1991.\n- A. Lewandowski et al., *Accuracy and Bandwidth Optimization of the Over-Determined Offset-Short Reflectometer Calibration*, IEEE Transactions on Microwave Theory and Techniques, 2015, [doi:10.1109/TMTT.2015.2396496](https://doi.org/10.1109/TMTT.2015.2396496)."
+);
+calibration_structure!(
+    Phn,
+    "skrf/calibration/calibration.py::PHN",
+    "Pair-of-half-knowns one-port self-calibration.\n\nUses two fully known standards and two standards whose reflection magnitude is\nknown but whose phase is solved.\n\n> **Important:** A square-root sign ambiguity can make this method unstable for\narbitrary reflection coefficients, although it has proven reliable for rectangular\nwaveguide calibration.\n\n## Reference\n\nA. Arsenovic, R. M. Weikle, and J. L. Hesler, *Reflectometer calibration with a pair of partially known standards*, European Microwave Conference, 2015, [doi:10.1109/EUMC.2015.7345766](https://doi.org/10.1109/EUMC.2015.7345766)."
+);
+calibration_structure!(
+    EightTerm,
+    "skrf/calibration/calibration.py::EightTerm",
+    "General eight-term, or error-box, two-port calibration.\n\nA least-squares estimator determines the error coefficients; no self-calibration\nis performed. Switched-source VNAs require switch terms to be unterminated before\napplying this model; use [`unterminate`] and [`terminate`] for that conversion.\n\n## References\n\n- R. A. Speciale, *A Generalization of the TSD Network-Analyzer Calibration Procedure, Covering n-Port Scattering-Parameter Measurements, Affected by Leakage Errors*, IEEE Transactions on Microwave Theory and Techniques, 1977.\n- D. Rytting, *Network Analyzer Error Models and Calibration Methods*, ARFTG/NIST Short Course Notes, 1996."
+);
+calibration_structure!(
+    TwelveTerm,
+    "skrf/calibration/calibration.py::TwelveTerm",
+    "Traditional full twelve-term two-port calibration.\n\nIt accepts arbitrary, including non-flush, reflect and transmissive standards. More\nthan three reflect standards produce a least-squares one-port solution. Repeated\ntransmissive standards produce load-match and transmission-tracking estimates that\nare averaged.\n\n## Reference\n\nStig Rehnmark, *Calibration Process of Automatic Network Analyzer Systems*."
+);
+calibration_structure!(
+    SixteenTerm,
+    "skrf/calibration/calibration.py::SixteenTerm",
+    "General sixteen-term two-port calibration for a leaky VNA.\n\nThe model includes crosstalk between all four receivers and requires at least five\ntwo-port measurements. Some thru, open, short, and load combinations are singular.\nOrdinary switch-term correction is not applicable when leakage is significant, so\nmeasurements are expected to have their switch termination handled beforehand.\n\n## Reference\n\nK. J. Silvonen, *Calibration of 16-term error model*, Electronics Letters, 1993."
+);
+calibration_structure!(
+    Solt,
+    "skrf/calibration/calibration.py::SOLT",
+    "Short-open-load-thru full two-port calibration.\n\nDespite the name, the implementation accepts any number of reflect standards and\ncan use redundant thru measurements. More than three reflect standards produce a\nleast-squares one-port solution. It is the standard-specific form of [`TwelveTerm`].\n\n## Reference\n\nW. Kruppa and K. F. Sodomsky, *An Explicit Solution for the Scattering Parameters of a Linear Two-Port Measured with an Imperfect Test Set*, IEEE Transactions on Microwave Theory and Techniques, 1971."
+);
+/// Two-port one-path calibration for a switchless three-receiver system.
+///
+/// Full correction requires measuring the DUT in both orientations and passing
+/// the forward and reverse measurements to [`Self::apply_pair`]. Applying the
+/// calibration to only one network yields an enhanced-response partial correction.
+///
 /// Origin: `skrf/calibration/calibration.py::TwoPortOnePath`.
 #[derive(Clone, Debug, Default)]
 pub struct TwoPortOnePath {
+    /// Measured calibration standards.
     pub measured: Vec<Network>,
+    /// Ideal standards aligned with the measurements.
     pub ideals: Vec<Network>,
+    /// Solved calibration coefficients.
     pub coefficients: BTreeMap<String, Array1<Complex64>>,
+    /// Zero-based source-port selection.
     pub source_port: usize,
 }
 
+/// Enhanced-response partial two-port calibration.
+///
+/// Only the actively sourced path is fully corrected, so accuracy depends on a
+/// good match at the passive DUT port. For full correction, measure both DUT
+/// orientations and use [`TwoPortOnePath`].
+///
 /// Origin: `skrf/calibration/calibration.py::EnhancedResponse`.
 #[derive(Clone, Debug, Default)]
 pub struct EnhancedResponse {
+    /// Measured calibration standards.
     pub measured: Vec<Network>,
+    /// Ideal standards aligned with the measurements.
     pub ideals: Vec<Network>,
+    /// Solved calibration coefficients.
     pub coefficients: BTreeMap<String, Array1<Complex64>>,
+    /// Zero-based source-port selection.
     pub source_port: usize,
 }
+/// Thru-reflect-line self-calibration.
+///
+/// Standards are ordered as thru, one or more reflects, and one or more lines.
+/// The calibration reference impedance is the characteristic impedance of the
+/// line standards.
+///
+/// See [`determine_line`] and [`determine_reflect`] for the two standard-solving
+/// stages.
+///
+/// ## References
+///
+/// - G. F. Engen and C. A. Hoer, *Thru-Reflect-Line: An Improved Technique for Calibrating the Dual Six-Port Automatic Network Analyzer*, IEEE Transactions on Microwave Theory and Techniques, 1979.
+/// - H.-J. Eul and B. Schiek, *A generalized theory and new calibration procedures for network analyzer self-calibration*, IEEE Transactions on Microwave Theory and Techniques, 1991.
+///
 /// Origin: `skrf/calibration/calibration.py::TRL`.
 #[derive(Clone, Debug, Default)]
 pub struct Trl {
+    /// Measured thru, reflect, and line standards.
     pub measured: Vec<Network>,
+    /// Ideal thru, reflect, and line standards when known.
     pub ideals: Vec<Network>,
+    /// Solved eight-term calibration coefficients.
     pub coefficients: BTreeMap<String, Array1<Complex64>>,
+    /// Number of reflect standards.
     pub reflects: usize,
+    /// Whether the line standard is estimated from its measurement.
     pub estimate_line: bool,
+    /// Whether the reflect standard is solved rather than taken as exact.
     pub solve_reflect: bool,
 }
 macro_rules! multiline_trl_structure {
-    ($name:ident, $origin:literal) => {
+    ($name:ident, $origin:literal, $description:literal) => {
+        #[doc = $description]
+        ///
         #[doc = concat!("Origin: `", $origin, "`.")]
         #[derive(Clone, Debug, Default)]
         pub struct $name {
+            /// Measured multiline TRL standards.
             pub measured: Vec<Network>,
+            /// Ideal standards aligned with the measurements.
             pub ideals: Vec<Network>,
+            /// Solved eight-term calibration coefficients.
             pub coefficients: BTreeMap<String, Array1<Complex64>>,
+            /// Physical lengths of the measured line standards, in meters.
             pub line_lengths: Vec<f64>,
+            /// Estimated reflection coefficients of the reflect standards.
             pub reflect_estimates: Vec<Complex64>,
+            /// Initial effective-permittivity estimate; a negative imaginary part
+            /// represents loss.
             pub effective_permittivity_estimate: Complex64,
+            /// Solved complex propagation constant versus frequency,
+            /// $\gamma = \alpha + j\beta$.
             pub propagation_constant: Option<Array1<Complex64>>,
         }
     };
@@ -377,61 +611,140 @@ macro_rules! multiline_trl_structure {
 
 multiline_trl_structure!(
     NistMultilineTrl,
-    "skrf/calibration/calibration.py::NISTMultilineTRL"
+    "skrf/calibration/calibration.py::NISTMultilineTRL",
+    "NIST multiline TRL calibration.\n\nMultiple line standards extend calibration bandwidth and improve accuracy. At each\nfrequency, at least one line pair must have a phase difference that is neither\nzero nor a multiple of $180^\\circ$, otherwise the calibration system is singular.\nThe reference plane lies at the line edges and the default reference impedance is\nthe line characteristic impedance.\n\n## References\n\n- D. C. `DeGroot`, J. A. Jargon, and R. B. Marks, *Multiline TRL revealed*, 60th ARFTG Conference Digest, 2002.\n- K. Yau, *On the metrology of nanoscale Silicon transistors above 100 GHz*, Ph.D. dissertation, University of Toronto, 2011."
 );
 multiline_trl_structure!(
     TugMultilineTrl,
-    "skrf/calibration/calibration.py::TUGMultilineTRL"
+    "skrf/calibration/calibration.py::TUGMultilineTRL",
+    "TUG multiline TRL calibration.\n\nSolves one weighted $4 \\times 4$ eigenvalue problem. The first measured line is\nthe thru and defines the reference plane. The default reference impedance is the\nline characteristic impedance. Without reflect data, only the transmission terms\ncan be calibrated accurately.\n\n## Example\n\n```rust,ignore\nlet mut calibration = TugMultilineTrl::new(\n    vec![thru, line_1, line_2],\n    vec![Complex64::new(-1.0, 0.0)],\n    vec![0.0, 1.0e-3, 5.0e-3],\n    Complex64::new(4.0, 0.0),\n)?;\ncalibration.run()?;\nlet calibrated = calibration.apply(&dut)?;\n```\n\n## References\n\n- Z. Hatab, M. Gadringer, and W. Bösch, *Improving The Reliability of The Multiline TRL Calibration Algorithm*, ARFTG, 2022, [doi:10.1109/ARFTG52954.2022.9844064](https://doi.org/10.1109/ARFTG52954.2022.9844064).\n- Z. Hatab, M. Gadringer, and W. Bösch, *Propagation of Linear Uncertainties Through Multiline Thru-Reflect-Line Calibration*, IEEE Transactions on Instrumentation and Measurement, 2023, [doi:10.1109/TIM.2023.3296123](https://doi.org/10.1109/TIM.2023.3296123).\n- [Multiline TRL calibration notes](https://ziadhatab.github.io/posts/multiline-trl-calibration/).\n- Z. Hatab, M. E. Gadringer, and W. Bösch, *A Thru-Free Multiline Calibration*, IEEE Transactions on Instrumentation and Measurement, 2023, [doi:10.1109/TIM.2023.3308226](https://doi.org/10.1109/TIM.2023.3308226).\n- Z. Hatab, M. E. Gadringer, and W. Bösch, *The Choice of Line Lengths in Multiline Thru-Reflect-Line Calibration*, [arXiv:2512.18641](https://arxiv.org/abs/2512.18641).\n\nSee also [`NistMultilineTrl`]."
 );
-calibration_structure!(UnknownThru, "skrf/calibration/calibration.py::UnknownThru");
-calibration_structure!(Mrc, "skrf/calibration/calibration.py::MRC");
+calibration_structure!(
+    UnknownThru,
+    "skrf/calibration/calibration.py::UnknownThru",
+    "Self-calibration using known reflect standards and a reciprocal but otherwise\nunknown thru. The approximate thru phase is used only to choose the square-root\nsign and therefore only needs to be known within $\\pi$. The solver uses the\n[`EightTerm`] error model.\n\n## Reference\n\nA. Ferrero and U. Pisani, *Two-port network analyzer calibration using an unknown thru*, IEEE Microwave and Guided Wave Letters, 1992."
+);
+calibration_structure!(
+    Mrc,
+    "skrf/calibration/calibration.py::MRC",
+    "Misalignment-resistant waveguide calibration combining [`Sddl`] and\n[`UnknownThru`]. It uses a short, two delay shorts, a load, and a thru in that\norder. Solving the delay-short phases and reciprocal thru response makes the method\nresistant to waveguide-flange misalignment.\n\n## References\n\n- Z. Liu and R. M. Weikle, *A reflectometer calibration method resistant to waveguide flange misalignment*, IEEE Transactions on Microwave Theory and Techniques, 2006.\n- A. Ferrero and U. Pisani, *Two-port network analyzer calibration using an unknown thru*, IEEE Microwave and Guided Wave Letters, 1992."
+);
+/// Line-reflect-match self-calibration.
+///
+/// Uses fully known line and match standards with a reflect standard whose phase
+/// is solved. The reflect phase must be known within $90^\circ$. Reflect and match
+/// standards are assumed to be identical at both ports, and standards must be
+/// supplied in line-reflect-match order.
+///
+/// ## Reference
+///
+/// W. Zhao et al., *A Unified Approach for Reformulations of LRM/LRMM/LRRM
+/// Calibration Algorithms Based on the T-Matrix Representation*, Applied Sciences,
+/// 2017.
+///
 /// Origin: `skrf/calibration/calibration.py::LRM`.
 #[derive(Clone, Debug, Default)]
 pub struct Lrm {
+    /// Measured line, reflect, and match standards.
     pub measured: Vec<Network>,
+    /// Ideal standards aligned with the measurements.
     pub ideals: Vec<Network>,
+    /// Solved eight-term calibration coefficients.
     pub coefficients: BTreeMap<String, Array1<Complex64>>,
+    /// Reflect standard solved by the LRM algorithm.
     pub solved_reflect: Option<Network>,
 }
+/// Model used to fit the LRRM match standard.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LrrmMatchFit {
+    /// Solve the match independently at each frequency.
     #[default]
     PerFrequency,
+    /// Fit a series-inductance model.
     Inductance,
+    /// Fit a series-inductance and shunt-capacitance model.
     InductanceCapacitance,
 }
 
+/// Line-reflect-reflect-match self-calibration.
+///
+/// The two reflect standards need not be known, but must differ sufficiently in
+/// phase. The first reflect magnitude may be unknown; the second magnitude must be
+/// known, and both phases must be known within $90^\circ$. Reflects are assumed
+/// identical at both ports. Only the first port of the match measurement is used.
+/// The match may be solved independently at each frequency or fitted to an
+/// inductance or inductance-capacitance model selected by [`LrrmMatchFit`].
+///
+/// ## References
+///
+/// - W. Zhao et al., *A Unified Approach for Reformulations of LRM/LRMM/LRRM Calibration Algorithms Based on the T-Matrix Representation*, Applied Sciences, 2017.
+/// - F. Purroy and L. Pradell, *New theoretical analysis of the LRRM calibration technique for vector network analyzers*, IEEE Transactions on Instrumentation and Measurement, 2001.
+/// - S. Liu et al., *An Improved Line-Reflect-Reflect-Match Calibration With an Enhanced Load Model*, IEEE Microwave and Wireless Components Letters, 2017.
+///
 /// Origin: `skrf/calibration/calibration.py::LRRM`.
 #[derive(Clone, Debug, Default)]
 pub struct Lrrm {
+    /// Measured line, two reflect, and match standards.
     pub measured: Vec<Network>,
+    /// Ideal standards aligned with the measurements.
     pub ideals: Vec<Network>,
+    /// Solved eight-term calibration coefficients.
     pub coefficients: BTreeMap<String, Array1<Complex64>>,
+    /// Reference impedance used by the match model.
     pub reference_impedance: f64,
+    /// Selected match-standard fitting model.
     pub match_fit: LrrmMatchFit,
+    /// Match standard solved by LRRM.
     pub solved_match: Option<Network>,
+    /// First solved reflect standard.
     pub solved_reflect1: Option<Network>,
+    /// Second solved reflect standard.
     pub solved_reflect2: Option<Network>,
+    /// Solved series inductance versus frequency.
     pub solved_inductance: Option<Array1<f64>>,
+    /// Solved shunt capacitance versus frequency.
     pub solved_capacitance: Option<Array1<f64>>,
 }
+/// Sixteen-term line-match-reflect self-calibration for a leaky VNA.
+///
+/// Measurements comprise thru, match-match, reflect-reflect, reflect-match, and
+/// match-reflect standards. Either the thru or reflect response must be supplied;
+/// the other is solved. The reflect must be highly reflective and consistent in
+/// all measurements; the thru and match are assumed perfectly matched and the thru
+/// lossless, although it may have nonzero length. The optional sign disambiguates
+/// the quadratic solution. Switch termination must already have been handled.
+///
+/// ## Reference
+///
+/// K. Silvonen, *LMR 16-a self-calibration procedure for a leaky network analyzer*,
+/// IEEE Transactions on Microwave Theory and Techniques, 1997.
+///
 /// Origin: `skrf/calibration/calibration.py::LMR16`.
 #[derive(Clone, Debug, Default)]
 pub struct Lmr16 {
+    /// Measured line, match, and reflect standards.
     pub measured: Vec<Network>,
+    /// Ideal standards aligned with the measurements.
     pub ideals: Vec<Network>,
+    /// Solved sixteen-term calibration coefficients.
     pub coefficients: BTreeMap<String, Array1<Complex64>>,
+    /// Whether the ideal standard supplied to the solver is the reflect standard.
     pub ideal_is_reflect: bool,
+    /// Optional sign used to disambiguate the solution.
     pub sign: Option<f64>,
+    /// Through standard solved by LMR16.
     pub solved_through: Option<Network>,
+    /// Reflect standard solved by LMR16.
     pub solved_reflect: Option<Network>,
 }
 
 /// Two-port method used by [`MultiportCal`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MultiportPairMethod {
+    /// Eight-term error model.
     #[default]
     EightTerm,
+    /// Twelve-term error model.
     TwelveTerm,
 }
 
@@ -440,40 +753,72 @@ pub enum MultiportPairMethod {
 /// Origin: `skrf/calibration/calibration.py::MultiportCal`.
 #[derive(Clone, Debug)]
 pub struct MultiportPairCalibration {
+    /// Zero-based N-port indices calibrated by this pair.
     pub ports: [usize; 2],
+    /// Measured two-port standards for the pair.
     pub measured: Vec<Network>,
+    /// Ideal two-port standards for the pair.
     pub ideals: Vec<Network>,
+    /// Error model used to solve the pair.
     pub method: MultiportPairMethod,
 }
 
 /// Multi-port calibration assembled from two-port calibrations sharing a common port.
 ///
+/// Each [`MultiportPairCalibration`] solves one connected port pair. All pairs must
+/// share at least one port so their error coefficients form a connected multi-port
+/// calibration. Pair measurements may be two-port subnetworks extracted from a
+/// larger measurement. An optional all-ports-matched network supplies isolation
+/// terms; omit it to assume zero leakage.
+///
 /// Origin: `skrf/calibration/calibration.py::MultiportCal`.
 #[derive(Clone, Debug, Default)]
 pub struct MultiportCal {
+    /// Two-port calibrations forming the multi-port calibration graph.
     pub pairs: Vec<MultiportPairCalibration>,
+    /// Optional measured isolation network.
     pub isolation: Option<Network>,
+    /// Solved one-port coefficients for each port.
     pub port_coefficients: Vec<BTreeMap<String, Array1<Complex64>>>,
+    /// Solved transmission coefficients for each calibrated port pair.
     pub pair_coefficients: BTreeMap<(usize, usize), BTreeMap<String, Array1<Complex64>>>,
+    /// Number of ports represented by the calibration.
     pub nports: usize,
 }
 
-/// SOLT convenience constructor for [`MultiportCal`].
+/// SOLT convenience wrapper for [`MultiportCal`].
+///
+/// The measured standards begin with $N-1$ thru networks that connect every port
+/// through a common port. Remaining standards are passed to the selected pairwise
+/// calibration method. All standards are N-port networks. Use [`MultiportCal`]
+/// directly for TRL-style methods whose line standards do not fit this interface.
 ///
 /// Origin: `skrf/calibration/calibration.py::MultiportSOLT`.
 #[derive(Clone, Debug)]
 pub struct MultiportSolt {
+    /// Underlying pairwise multi-port calibration.
     pub inner: MultiportCal,
+    /// Measured SOLT standards.
     pub measured: Vec<Network>,
+    /// Ideal SOLT standards.
     pub ideals: Vec<Network>,
+    /// Port pairs associated with the measured thru standards.
     pub thru_ports: Vec<[usize; 2]>,
 }
 calibration_structure!(
     Normalization,
-    "skrf/calibration/calibration.py::Normalization"
+    "skrf/calibration/calibration.py::Normalization",
+    "Simple thru normalization. Each measured scattering parameter is divided by\nthe average measured standard response; ideal standards are not used."
 );
 
 impl OnePort {
+    /// Creates an unsolved one-port calibration from aligned measured and ideal
+    /// standards. Three standards determine the model exactly; additional standards
+    /// produce a least-squares solution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the measured and ideal standards are invalid or misaligned.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         validate_one_port_standards(&measured, &ideals)?;
         Ok(Self {
@@ -493,7 +838,7 @@ impl Calibration for OnePort {
         &self.ideals
     }
 
-    /// Port of `skrf.calibration.calibration.OnePort.run`.
+    /// Solves directivity, source match, and reflection tracking by least squares.
     fn run(&mut self) -> Result<()> {
         validate_one_port_standards(&self.measured, &self.ideals)?;
         let points = self.measured[0].frequency_points();
@@ -533,7 +878,7 @@ impl Calibration for OnePort {
         Ok(())
     }
 
-    /// Port of `skrf.calibration.calibration.OnePort.apply_cal`.
+    /// Corrects a measured one-port reflection using the solved error coefficients.
     fn apply(&self, network: &Network) -> Result<Network> {
         validate_one_port_target(self, network)?;
         let directivity = coefficient(self, "directivity")?;
@@ -554,7 +899,7 @@ impl Calibration for OnePort {
         Ok(corrected)
     }
 
-    /// Port of `skrf.calibration.calibration.OnePort.embed`.
+    /// Applies the solved one-port error model to an ideal reflection response.
     fn embed(&self, network: &Network) -> Result<Network> {
         validate_one_port_target(self, network)?;
         let directivity = coefficient(self, "directivity")?;
@@ -581,8 +926,10 @@ impl Calibration for OnePort {
 }
 
 macro_rules! one_port_self_calibration {
-    ($type:ty, $solver:ident) => {
+    ($type:ty, $solver:ident, $constructor_doc:literal) => {
         impl $type {
+            #[doc = $constructor_doc]
+            #[doc = "\n\n# Errors\n\nReturns an error when the four measured and ideal standards are invalid or misaligned."]
             pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
                 validate_four_one_port_standards(&measured, &ideals)?;
                 Ok(Self {
@@ -632,13 +979,31 @@ macro_rules! one_port_self_calibration {
     };
 }
 
-one_port_self_calibration!(Sddl, solve_sddl);
-one_port_self_calibration!(SddlWeikle, solve_sddl_weikle);
-one_port_self_calibration!(Phn, solve_phn);
+one_port_self_calibration!(
+    Sddl,
+    solve_sddl,
+    "Creates an SDDL calibration. Standards must be ordered as short, first delay\nshort, second delay short, and load. The two ideal delay-short phases are solved."
+);
+one_port_self_calibration!(
+    SddlWeikle,
+    solve_sddl_weikle,
+    "Creates a Liu-Weikle SDDL calibration. Standards must be ordered as short,\nfirst delay short, second delay short, and reflective load."
+);
+one_port_self_calibration!(
+    Phn,
+    solve_phn,
+    "Creates a pair-of-half-knowns calibration. Standards must be ordered as the\ntwo half-known standards followed by the two fully known standards."
+);
 
 macro_rules! twelve_term_calibration {
     ($type:ty) => {
         impl $type {
+            /// Creates an unsolved full two-port calibration from aligned measured
+            /// and ideal standards.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error when the measured and ideal standards are invalid or misaligned.
             pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
                 validate_two_port_calibration_standards(&measured, &ideals)?;
                 Ok(Self {
@@ -684,6 +1049,12 @@ twelve_term_calibration!(Solt);
 macro_rules! one_path_calibration {
     ($type:ty) => {
         impl $type {
+            /// Creates a one-path calibration for `source_port`, using zero-based
+            /// port indices. Full correction requires [`Self::apply_pair`].
+            ///
+            /// # Errors
+            ///
+            /// Returns an error when standards are invalid or `source_port` is not zero or one.
             pub fn new(
                 measured: Vec<Network>,
                 ideals: Vec<Network>,
@@ -714,6 +1085,10 @@ macro_rules! one_path_calibration {
             }
 
             /// Ports the two-orientation correction performed by `TwoPortOnePath.apply_cal`.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error when either orientation is incompatible with the calibration.
             pub fn apply_pair(&self, forward: &Network, reverse: &Network) -> Result<Network> {
                 validate_two_port_target(&self.measured, forward)?;
                 validate_two_port_target(&self.measured, reverse)?;
@@ -778,6 +1153,11 @@ one_path_calibration!(TwoPortOnePath);
 one_path_calibration!(EnhancedResponse);
 
 impl EightTerm {
+    /// Creates an unsolved eight-term calibration from aligned measured and ideal standards.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the measured and ideal standards are invalid or misaligned.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         validate_eight_term_standards(&measured, &ideals)?;
         Ok(Self {
@@ -816,7 +1196,14 @@ impl Calibration for EightTerm {
 }
 
 impl Trl {
-    /// Creates a TRL calibration with standards ordered as thru, reflect(s), line(s).
+    /// Creates a TRL calibration with both `measured` and `ideals` ordered as thru,
+    /// `reflects` reflect standards, and the remaining line standards. Multiple
+    /// reflects and lines are supported. The implementation uses the [`EightTerm`]
+    /// error model; switch-term effects must already be handled by the caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the standard ordering, count, or network shapes are invalid.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>, reflects: usize) -> Result<Self> {
         if reflects == 0 || measured.len() < reflects + 2 {
             return Err(Error::IncompatibleShape(
@@ -835,6 +1222,10 @@ impl Trl {
     }
 
     /// Creates the conventional single-reflect TRL calibration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the standard ordering, count, or network shapes are invalid.
     pub fn single_reflect(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         Self::new(measured, ideals, 1)
     }
@@ -889,8 +1280,14 @@ impl Calibration for Trl {
 macro_rules! multiline_trl_calibration {
     ($type:ty, $name:literal) => {
         impl $type {
-            /// Creates a multiline TRL calibration with measurements ordered as
-            /// thru, reflect standards, and the remaining line standards.
+            /// Creates a multiline TRL calibration with measurements strictly ordered
+            /// as thru, reflect standards, and line standards. `reflect_estimates`
+            /// normally contains $-1$ for shorts or $+1$ for opens; `line_lengths`
+            /// are in meters and include the thru length.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error when the measurements or standard estimates are invalid.
             pub fn new(
                 measured: Vec<Network>,
                 reflect_estimates: Vec<Complex64>,
@@ -1069,8 +1466,11 @@ fn multiline_propagation_constant(
                 "multiline TRL needs at least one distinct line length".to_owned(),
             ));
         }
+        let candidate_count = u32::try_from(candidates.len()).map_err(|_| {
+            Error::Unsupported("multiline TRL has too many line candidates".to_owned())
+        })?;
         propagation[point] =
-            candidates.iter().copied().sum::<Complex64>() / candidates.len() as f64;
+            candidates.iter().copied().sum::<Complex64>() / f64::from(candidate_count);
     }
     Ok(propagation)
 }
@@ -1087,6 +1487,13 @@ fn multiline_gamma_estimate(
 }
 
 impl SixteenTerm {
+    /// Creates an unsolved sixteen-term calibration from aligned measured and ideal
+    /// standards. Switch termination must already be corrected because the ordinary
+    /// switch-term equations are invalid when crosstalk is significant.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the measured and ideal standards are invalid or misaligned.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         validate_sixteen_term_standards(&measured, &ideals)?;
         Ok(Self {
@@ -1125,6 +1532,13 @@ impl Calibration for SixteenTerm {
 }
 
 impl UnknownThru {
+    /// Creates an unknown-thru calibration from aligned measured and ideal standards.
+    /// The reciprocal thru must be last; its approximate transmission phase is used
+    /// only to choose a square-root sign and need only be known within $\pi$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the standards are invalid, misaligned, or incorrectly ordered.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         validate_unknown_thru_standards(&measured, &ideals)?;
         Ok(Self {
@@ -1163,6 +1577,14 @@ impl Calibration for UnknownThru {
 }
 
 impl Mrc {
+    /// Creates a misalignment-resistant calibration from exactly five standards,
+    /// ordered as short, first delay short, second delay short, load, and thru.
+    /// The ideal delay-short phases are solved, and the approximate thru phase need
+    /// only be known within $\pi$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly five compatible measured and ideal standards are provided.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         if measured.len() != 5 || ideals.len() != 5 {
             return Err(Error::IncompatibleShape(
@@ -1206,6 +1628,12 @@ impl Calibration for Mrc {
 }
 
 impl Lrm {
+    /// Creates a line-reflect-match calibration with standards ordered as line,
+    /// reflect, and match.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly three compatible measured and ideal standards are provided.
     pub fn new(measured: Vec<Network>, ideals: Vec<Network>) -> Result<Self> {
         validate_named_standard_count(&measured, &ideals, 3, "LRM")?;
         Ok(Self {
@@ -1247,6 +1675,12 @@ impl Calibration for Lrm {
 }
 
 impl Lrrm {
+    /// Creates a line-reflect-reflect-match calibration and selects the match fitting
+    /// model. Standards must be ordered as line, first reflect, second reflect, and match.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the standards or reference impedance are invalid.
     pub fn new(
         measured: Vec<Network>,
         ideals: Vec<Network>,
@@ -1313,6 +1747,14 @@ impl Calibration for Lrrm {
 }
 
 impl Lmr16 {
+    /// Creates a sixteen-term line-match-reflect calibration. `sign` may be $+1$
+    /// or $-1$ to choose the quadratic root. When omitted, the solver chooses the
+    /// sign that makes $k = \frac{t_{15}}{t_{12}}$ closest to $+1$, as expected
+    /// for a symmetric fixture.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the measurement count, frequency axes, or ideal are invalid.
     pub fn new(
         measured: Vec<Network>,
         ideal: Network,
@@ -1338,7 +1780,9 @@ impl Lmr16 {
                     .to_owned(),
             ));
         }
-        if sign.is_some_and(|value| value != 1.0 && value != -1.0) {
+        if sign.is_some_and(|value| {
+            value.to_bits() != 1.0f64.to_bits() && value.to_bits() != (-1.0f64).to_bits()
+        }) {
             return Err(Error::Unsupported(
                 "LMR16 root sign must be +1, -1, or automatic".to_owned(),
             ));
@@ -1448,29 +1892,34 @@ fn solve_sddl_weikle(calibration: &mut SddlWeikle) -> Result<()> {
             - alpha / delay1_prime.conj()
             - (Complex64::new(1.0, 0.0) + load) / (load * load_prime);
         ensure_nonzero(p_denominator, "SDDLWeikle p denominator is zero")?;
-        let p = alpha / p_denominator;
+        let equation_p = alpha / p_denominator;
         ensure_nonzero(alpha * load, "SDDLWeikle reflective load is required")?;
-        let q = p / (alpha * load);
-        let real_q_minus_p = (q - p).re;
-        let real_p_plus_q = (p + q).re;
+        let equation_q = equation_p / (alpha * load);
+        let real_q_minus_p = (equation_q - equation_p).re;
+        let real_p_plus_q = (equation_p + equation_q).re;
         if real_q_minus_p.abs() <= f64::EPSILON || real_p_plus_q.abs() <= f64::EPSILON {
             return Err(Error::Unsupported(
                 "SDDLWeikle standards produce a singular real-valued solution".to_owned(),
             ));
         }
-        let first_ratio = (p + q).im / real_q_minus_p;
-        let second_ratio = (q - p).im / real_p_plus_q;
-        let b_prime_real =
-            -((1.0 + first_ratio * second_ratio) / (1.0 + first_ratio.powi(2))) * real_p_plus_q;
-        let b_prime = Complex64::new(b_prime_real, (q + p).im / real_q_minus_p * b_prime_real);
+        let first_ratio = (equation_p + equation_q).im / real_q_minus_p;
+        let second_ratio = (equation_q - equation_p).im / real_p_plus_q;
+        let b_prime_real = -((1.0 + first_ratio * second_ratio)
+            / first_ratio.mul_add(first_ratio, 1.0))
+            * real_p_plus_q;
+        let b_prime = Complex64::new(
+            b_prime_real,
+            (equation_q + equation_p).im / real_q_minus_p * b_prime_real,
+        );
         ensure_nonzero(b_prime.conj(), "SDDLWeikle B coefficient is zero")?;
-        let b = b_prime + short;
-        let c = b_prime * (Complex64::new(1.0, 0.0) / delay1_prime - alpha / delay1_prime.conj())
+        let coefficient_b = b_prime + short;
+        let coefficient_c = b_prime
+            * (Complex64::new(1.0, 0.0) / delay1_prime - alpha / delay1_prime.conj())
             + alpha * b_prime / b_prime.conj();
-        let a = b - short + short * c;
-        directivity[point] = b;
-        source_match[point] = -c;
-        tracking[point] = a + b * source_match[point];
+        let coefficient_a = coefficient_b - short + short * coefficient_c;
+        directivity[point] = coefficient_b;
+        source_match[point] = -coefficient_c;
+        tracking[point] = coefficient_a + coefficient_b * source_match[point];
     }
     calibration.coefficients = BTreeMap::from([
         ("directivity".to_owned(), directivity),
@@ -1499,7 +1948,7 @@ fn solve_phn(calibration: &mut Phn) -> Result<()> {
         let quadratic_b = Complex64::new(0.0, (f * e.conj() + g.conj() * ratio).im);
         let quadratic_c = Complex64::new((g * e.conj()).re, 0.0);
         let (root1, root2) = quadratic_roots(quadratic_a, quadratic_b, quadratic_c)?;
-        let found = [root1, root2]
+        let found = <[Complex64; 2]>::from((root1, root2))
             .map(|found_b| {
                 let denominator = ratio * found_b + e;
                 ensure_nonzero(denominator, "PHN half-known solution is singular")?;
@@ -1575,7 +2024,29 @@ fn quadratic_roots(a: Complex64, b: Complex64, c: Complex64) -> Result<(Complex6
     ))
 }
 
-/// Port of `skrf.calibration.calibration.determine_line`.
+/// Determines the matched-line response from measured thru and line standards.
+///
+/// Combining the two measurements eliminates one error box and produces similar
+/// matrices:
+///
+/// $$
+/// \begin{aligned}
+/// M_{t} &= X A_{t} Y, \\
+/// M_{l} &= X A_{l} Y, \\
+/// M_{t} M_l^{-1} &= X A_{t} A_l^{-1} X^{-1}.
+/// \end{aligned}
+/// $$
+///
+/// Their eigenvalues determine the line's $S_{21}$. `line_approximation` selects
+/// the physically correct root; if it is omitted, the measured line-to-thru
+/// transmission ratio is used. The measurements must already have switch terms
+/// unterminated for the eight-term relationship to hold.
+///
+/// # Errors
+///
+/// Returns an error when the networks are incompatible or the line solution is singular.
+///
+/// Origin: `skrf.calibration/calibration.py::determine_line`.
 pub fn determine_line(
     thru_measured: &Network,
     line_measured: &Network,
@@ -1617,7 +2088,18 @@ pub fn determine_line(
     Ok(found)
 }
 
-/// Port of `skrf.calibration.calibration.determine_reflect`.
+/// Determines a reflect standard from measured thru, reflect, and line standards.
+///
+/// This is the reflect-solving stage of TRL. `line_approximation` selects the
+/// line root and `reflect_approximation` selects between the two possible reflect
+/// solutions. A flush short is used as the reflect approximation when none is
+/// supplied.
+///
+/// # Errors
+///
+/// Returns an error when the networks are incompatible or the reflect solution is singular.
+///
+/// Origin: `skrf/calibration/calibration.py::determine_reflect`.
 pub fn determine_reflect(
     thru_measured: &Network,
     reflect_measured: &Network,
@@ -1654,46 +2136,47 @@ pub fn determine_reflect(
         let x2 = (relation[1][0] * solution2 + relation[1][1]) / denominator2;
         let expected = line.s[(point, 0, 1)].powu(2);
         let first_is_closer = (x1 - expected).norm() < (x2 - expected).norm();
-        let x = if first_is_closer {
+        let selected_root = if first_is_closer {
             solution1
         } else {
             solution2
         };
-        let b = if first_is_closer {
+        let alternate_root = if first_is_closer {
             solution2
         } else {
             solution1
         };
-        ensure_nonzero(x, "TRL reflect selected root is zero")?;
-        let e = thru.s[(point, 0, 0)];
+        ensure_nonzero(selected_root, "TRL reflect selected root is zero")?;
+        let thru_s11 = thru.s[(point, 0, 0)];
         let determinant = thru.s[(point, 0, 0)] * thru.s[(point, 1, 1)]
             - thru.s[(point, 0, 1)] * thru.s[(point, 1, 0)];
-        let d = -determinant;
-        let f = -thru.s[(point, 1, 1)];
-        let gamma_denominator = Complex64::new(1.0, 0.0) - e / x;
+        let negated_determinant = -determinant;
+        let negated_thru_s22 = -thru.s[(point, 1, 1)];
+        let gamma_denominator = Complex64::new(1.0, 0.0) - thru_s11 / selected_root;
         ensure_nonzero(gamma_denominator, "TRL reflect gamma is singular")?;
-        let gamma = (f - d / x) / gamma_denominator;
-        let beta_denominator = d - b * f;
+        let gamma = (negated_thru_s22 - negated_determinant / selected_root) / gamma_denominator;
+        let beta_denominator = negated_determinant - alternate_root * negated_thru_s22;
         ensure_nonzero(beta_denominator, "TRL reflect beta/alpha is singular")?;
-        let beta_over_alpha = (e - b) / beta_denominator;
+        let beta_over_alpha = (thru_s11 - alternate_root) / beta_denominator;
         let w1 = reflect_measured.s[(point, 0, 0)];
         let w2 = reflect_measured.s[(point, 1, 1)];
         let alpha_denominator =
-            (w2 + gamma) * (Complex64::new(1.0, 0.0) - w1 / x) * gamma_denominator;
+            (w2 + gamma) * (Complex64::new(1.0, 0.0) - w1 / selected_root) * gamma_denominator;
         ensure_nonzero(alpha_denominator, "TRL reflect alpha is singular")?;
-        let alpha =
-            (((w1 - b) * (Complex64::new(1.0, 0.0) + w2 * beta_over_alpha) * beta_denominator)
-                / alpha_denominator)
-                .sqrt();
-        let output_denominator = alpha * (Complex64::new(1.0, 0.0) - w1 / x);
+        let alpha = (((w1 - alternate_root)
+            * (Complex64::new(1.0, 0.0) + w2 * beta_over_alpha)
+            * beta_denominator)
+            / alpha_denominator)
+            .sqrt();
+        let output_denominator = alpha * (Complex64::new(1.0, 0.0) - w1 / selected_root);
         ensure_nonzero(output_denominator, "TRL reflect solution is singular")?;
         let candidates = [
-            (w1 - b) / output_denominator,
-            -(w1 - b) / output_denominator,
+            (w1 - alternate_root) / output_denominator,
+            -(w1 - alternate_root) / output_denominator,
         ];
-        let approximation = reflect_approximation
-            .map(|network| network.s[(point, 0, 0)])
-            .unwrap_or(Complex64::new(-1.0, 0.0));
+        let approximation = reflect_approximation.map_or(Complex64::new(-1.0, 0.0), |network| {
+            network.s[(point, 0, 0)]
+        });
         reflection[point] =
             if (candidates[0] - approximation).norm() <= (candidates[1] - approximation).norm() {
                 candidates[0]
@@ -1977,7 +2460,7 @@ fn solve_complex_least_squares(
     design: &[Vec<Complex64>],
     right: &[Complex64],
 ) -> Result<Vec<Complex64>> {
-    let columns = design.first().map(Vec::len).unwrap_or(0);
+    let columns = design.first().map_or(0, Vec::len);
     if columns == 0 || design.len() != right.len() || design.iter().any(|row| row.len() != columns)
     {
         return Err(Error::IncompatibleShape(
@@ -2052,184 +2535,19 @@ fn solve_lrrm(
 ) -> Result<LrrmSolution> {
     validate_named_standard_count(measured, ideals, 4, "LRRM")?;
     let points = measured[0].frequency_points();
-    let line_transfer = ideals[0].scattering_transfer()?;
-    let mut relations = Vec::with_capacity(points);
-    let mut initial = Vec::with_capacity(points);
-    for point in 0..points {
-        let line_measured = &measured[0];
-        let reflect1_measured = &measured[1];
-        let reflect2_measured = &measured[2];
-        let match_measured = &measured[3];
-        let r11 = reflect1_measured.s[(point, 0, 0)];
-        let r12 = reflect1_measured.s[(point, 1, 1)];
-        let r21 = reflect2_measured.s[(point, 0, 0)];
-        let r22 = reflect2_measured.s[(point, 1, 1)];
-        let wlr1 = [[Complex64::new(1.0, 0.0); 2], [r11, r21]];
-        let wll1 = [
-            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-            [
-                line_measured.s[(point, 0, 0)],
-                line_measured.s[(point, 0, 1)],
-            ],
-        ];
-        let wll2 = [
-            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
-            [
-                line_measured.s[(point, 1, 0)],
-                line_measured.s[(point, 1, 1)],
-            ],
-        ];
-        let wlr2 = [[Complex64::new(1.0, 0.0); 2], [r12, r22]];
-        let wl = matrix_multiply(
-            matrix_multiply(
-                matrix_multiply(matrix_inverse(wlr1)?, wll1),
-                matrix_inverse(wll2)?,
-            ),
-            wlr2,
-        );
-        let tl = matrix_from_array(&line_transfer, point);
-        let xyz2 = -matrix_determinant(tl) / matrix_determinant(wl);
-        let roots = quadratic_roots(wl[0][0], -tl[1][0] - tl[0][1], wl[1][1] * xyz2)?;
-        let match_vector = matrix_vector_multiply(
-            matrix_inverse(wlr1)?,
-            [Complex64::new(1.0, 0.0), match_measured.s[(point, 0, 0)]],
-        );
-        let relation = LrrmPointRelation {
-            wl,
-            tl,
-            xyz2,
-            roots: [roots.0, roots.1],
-            match_vector,
-            measured_reflections: [r11, r12, r21, r22],
-        };
-        let result = solve_lrrm_point(
-            &relation,
-            ideals[3].s[(point, 0, 0)],
-            ideals[1].s[(point, 0, 0)],
-            ideals[2].s[(point, 0, 0)],
-        )?;
-        relations.push(relation);
-        initial.push(result);
-    }
-    let angular = Array1::from_iter(
-        measured[0]
-            .frequency
-            .values_hz()
-            .iter()
-            .map(|frequency| 2.0 * std::f64::consts::PI * frequency),
-    );
-    let resistance = Array1::from_iter((0..points).map(|point| {
-        let gamma = ideals[3].s[(point, 0, 0)];
-        (reference_impedance * (Complex64::new(1.0, 0.0) + gamma)
-            / (Complex64::new(1.0, 0.0) - gamma))
-            .re
-    }));
-    let mut inductance = Array1::zeros(points);
-    for point in 0..points {
-        let reflect2 = initial[point].reflect2;
-        let line_transmission = ideals[0].s[(point, 1, 0)];
-        ensure_nonzero(line_transmission, "LRRM ideal line transmission is zero")?;
-        let adjusted = reflect2 / line_transmission.powu(2);
-        let a = 2.0 * reflect2.re + reflect2.norm_sqr() - 2.0 * adjusted.re - adjusted.norm_sqr();
-        let b = 4.0 * resistance[point] * (reflect2.im + adjusted.im);
-        let c = 4.0 * resistance[point].powi(2) * (reflect2.norm_sqr() - 1.0);
-        if a.abs() <= f64::EPSILON || angular[point].abs() <= f64::EPSILON {
-            return Err(Error::Unsupported(
-                "LRRM match inductance equation is singular".to_owned(),
-            ));
-        }
-        let discriminant = (b * b - 4.0 * a * c).max(0.0).sqrt();
-        let reactances = [
-            (-b + discriminant) / (2.0 * a),
-            (-b - discriminant) / (2.0 * a),
-        ];
-        let ideal_match = ideals[3].s[(point, 0, 0)];
-        let match_candidates = reactances.map(|reactance| {
-            let impedance = Complex64::new(resistance[point], reactance);
-            (impedance - reference_impedance) / (impedance + reference_impedance)
-        });
-        let selected = if (match_candidates[0] - ideal_match).norm()
-            <= (match_candidates[1] - ideal_match).norm()
-        {
-            reactances[0]
-        } else {
-            reactances[1]
-        };
-        inductance[point] = selected / angular[point];
-    }
-    let mut capacitance = Array1::zeros(points);
-    let objective_l = |candidate: f64| {
-        lrrm_inductance_objective(
-            candidate,
-            &initial,
-            ideals,
-            &angular,
-            &resistance,
-            reference_impedance,
-        )
-    };
-    if match_fit == LrrmMatchFit::Inductance {
-        let weight = angular.sum();
-        let weighted = angular
-            .iter()
-            .zip(inductance.iter())
-            .map(|(angular, value)| angular * value)
-            .sum::<f64>()
-            / weight;
-        let maximum = 10.0 / angular[points - 1].abs();
-        let (grid_best, grid_error) = (0..10)
-            .map(|index| -maximum + 2.0 * maximum * index as f64 / 9.0)
-            .map(|candidate| (candidate, objective_l(candidate)))
-            .min_by(|left, right| left.1.total_cmp(&right.1))
-            .ok_or_else(|| Error::Unsupported("LRRM fit grid is empty".to_owned()))?;
-        let initial = if grid_error < objective_l(weighted) {
-            grid_best
-        } else {
-            weighted
-        };
-        let fitted = if objective_l(initial) <= f64::EPSILON {
-            initial
-        } else {
-            let span = 2.0 * maximum / 9.0;
-            minimize_scalar(objective_l, initial - span, initial + span)
-        };
-        inductance.fill(fitted);
-    } else if match_fit == LrrmMatchFit::InductanceCapacitance {
-        let maximum_l = 20.0 / angular[points - 1].abs();
-        let worst_match = 0.4_f64;
-        let maximum_c = 2.0 * worst_match
-            / ((1.0 - worst_match.powi(2)).sqrt()
-                * angular[points - 1].abs()
-                * reference_impedance);
-        let objective = |candidate: [f64; 2]| {
-            lrrm_inductance_capacitance_objective(
-                candidate,
-                &initial,
-                &angular,
-                &resistance,
-                reference_impedance,
-            )
-        };
-        let (initial_guess, _) = (0..10)
-            .flat_map(|l_index| {
-                (0..10).map(move |c_index| {
-                    [
-                        maximum_l * l_index as f64 / 9.0,
-                        maximum_c * c_index as f64 / 9.0,
-                    ]
-                })
-            })
-            .map(|candidate| (candidate, objective(candidate)))
-            .min_by(|left, right| left.1.total_cmp(&right.1))
-            .ok_or_else(|| Error::Unsupported("LRRM fit grid is empty".to_owned()))?;
-        let fitted = minimize_two_variables(
-            objective,
-            initial_guess,
-            [maximum_l / 20.0, maximum_c / 20.0],
-        );
-        inductance.fill(fitted[0]);
-        capacitance.fill(fitted[1]);
-    }
+    let (relations, initial) = lrrm_initial_relations(measured, ideals, points)?;
+    let (angular, resistance) = lrrm_frequency_data(measured, ideals, reference_impedance, points);
+    let inductance =
+        lrrm_initial_inductance(&initial, ideals, &angular, &resistance, reference_impedance)?;
+    let (inductance, capacitance) = fit_lrrm_match(
+        match_fit,
+        &initial,
+        ideals,
+        &angular,
+        &resistance,
+        reference_impedance,
+        inductance,
+    )?;
     let matched_values = Array1::from_iter((0..points).map(|point| {
         lrrm_match_reflection(
             reference_impedance,
@@ -2249,6 +2567,258 @@ fn solve_lrrm(
             )
         })
         .collect::<Result<Vec<_>>>()?;
+    let coefficients = lrrm_coefficients(&relations, &final_solutions, points)?;
+    let one_port = |values: &Array1<Complex64>| {
+        Network::new(
+            measured[0].frequency.clone(),
+            Array3::from_shape_fn((points, 1, 1), |(point, _, _)| values[point]),
+            Array2::from_shape_fn((points, 1), |(point, _)| measured[0].z0[(point, 0)]),
+        )
+    };
+    Ok(LrrmSolution {
+        coefficients,
+        matched: one_port(&matched_values)?,
+        reflect1: one_port(&Array1::from_iter(
+            final_solutions.iter().map(|solution| solution.reflect1),
+        ))?,
+        reflect2: one_port(&Array1::from_iter(
+            final_solutions.iter().map(|solution| solution.reflect2),
+        ))?,
+        inductance,
+        capacitance,
+    })
+}
+
+fn lrrm_initial_relations(
+    measured: &[Network],
+    ideals: &[Network],
+    points: usize,
+) -> Result<(Vec<LrrmPointRelation>, Vec<LrrmPointSolution>)> {
+    let line_transfer = ideals[0].scattering_transfer()?;
+    let mut relations = Vec::with_capacity(points);
+    let mut initial = Vec::with_capacity(points);
+    for point in 0..points {
+        let line_measured = &measured[0];
+        let reflect1_measured = &measured[1];
+        let reflect2_measured = &measured[2];
+        let match_measured = &measured[3];
+        let r11 = reflect1_measured.s[(point, 0, 0)];
+        let r12 = reflect1_measured.s[(point, 1, 1)];
+        let r21 = reflect2_measured.s[(point, 0, 0)];
+        let r22 = reflect2_measured.s[(point, 1, 1)];
+        // Upstream scikit-rf variable: `wlr1`.
+        let reflect_input_matrix = [[Complex64::new(1.0, 0.0); 2], [r11, r21]];
+        // Upstream scikit-rf variable: `wll1`.
+        let line_input_matrix = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [
+                line_measured.s[(point, 0, 0)],
+                line_measured.s[(point, 0, 1)],
+            ],
+        ];
+        // Upstream scikit-rf variable: `wll2`.
+        let line_output_matrix = [
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+            [
+                line_measured.s[(point, 1, 0)],
+                line_measured.s[(point, 1, 1)],
+            ],
+        ];
+        // Upstream scikit-rf variable: `wlr2`.
+        let reflect_output_matrix = [[Complex64::new(1.0, 0.0); 2], [r12, r22]];
+        let wl = matrix_multiply(
+            matrix_multiply(
+                matrix_multiply(matrix_inverse(reflect_input_matrix)?, line_input_matrix),
+                matrix_inverse(line_output_matrix)?,
+            ),
+            reflect_output_matrix,
+        );
+        let tl = matrix_from_array(&line_transfer, point);
+        let xyz2 = -matrix_determinant(tl) / matrix_determinant(wl);
+        let roots = quadratic_roots(wl[0][0], -tl[1][0] - tl[0][1], wl[1][1] * xyz2)?;
+        let match_vector = matrix_vector_multiply(
+            matrix_inverse(reflect_input_matrix)?,
+            [Complex64::new(1.0, 0.0), match_measured.s[(point, 0, 0)]],
+        );
+        let relation = LrrmPointRelation {
+            wl,
+            tl,
+            xyz2,
+            roots: roots.into(),
+            match_vector,
+            measured_reflections: [r11, r12, r21, r22],
+        };
+        let result = solve_lrrm_point(
+            &relation,
+            ideals[3].s[(point, 0, 0)],
+            ideals[1].s[(point, 0, 0)],
+            ideals[2].s[(point, 0, 0)],
+        )?;
+        relations.push(relation);
+        initial.push(result);
+    }
+    Ok((relations, initial))
+}
+
+fn lrrm_frequency_data(
+    measured: &[Network],
+    ideals: &[Network],
+    reference_impedance: f64,
+    points: usize,
+) -> (Array1<f64>, Array1<f64>) {
+    let angular = Array1::from_iter(
+        measured[0]
+            .frequency
+            .values_hz()
+            .iter()
+            .map(|frequency| 2.0 * std::f64::consts::PI * frequency),
+    );
+    let resistance = Array1::from_iter((0..points).map(|point| {
+        let gamma = ideals[3].s[(point, 0, 0)];
+        (reference_impedance * (Complex64::new(1.0, 0.0) + gamma)
+            / (Complex64::new(1.0, 0.0) - gamma))
+            .re
+    }));
+    (angular, resistance)
+}
+
+fn lrrm_initial_inductance(
+    initial: &[LrrmPointSolution],
+    ideals: &[Network],
+    angular: &Array1<f64>,
+    resistance: &Array1<f64>,
+    reference_impedance: f64,
+) -> Result<Array1<f64>> {
+    let mut inductance = Array1::zeros(initial.len());
+    for (point, solution) in initial.iter().enumerate() {
+        let reflect2 = solution.reflect2;
+        let line_transmission = ideals[0].s[(point, 1, 0)];
+        ensure_nonzero(line_transmission, "LRRM ideal line transmission is zero")?;
+        let adjusted = reflect2 / line_transmission.powu(2);
+        let a = 2.0f64.mul_add(
+            -adjusted.re,
+            2.0f64.mul_add(reflect2.re, reflect2.norm_sqr()),
+        ) - adjusted.norm_sqr();
+        let b = 4.0 * resistance[point] * (reflect2.im + adjusted.im);
+        let c = 4.0 * resistance[point].powi(2) * (reflect2.norm_sqr() - 1.0);
+        if a.abs() <= f64::EPSILON || angular[point].abs() <= f64::EPSILON {
+            return Err(Error::Unsupported(
+                "LRRM match inductance equation is singular".to_owned(),
+            ));
+        }
+        let discriminant = (4.0 * a).mul_add(-c, b * b).max(0.0).sqrt();
+        let reactances = [
+            (-b + discriminant) / (2.0 * a),
+            (-b - discriminant) / (2.0 * a),
+        ];
+        let ideal_match = ideals[3].s[(point, 0, 0)];
+        let match_candidates = reactances.map(|reactance| {
+            let impedance = Complex64::new(resistance[point], reactance);
+            (impedance - reference_impedance) / (impedance + reference_impedance)
+        });
+        let selected = if (match_candidates[0] - ideal_match).norm()
+            <= (match_candidates[1] - ideal_match).norm()
+        {
+            reactances[0]
+        } else {
+            reactances[1]
+        };
+        inductance[point] = selected / angular[point];
+    }
+    Ok(inductance)
+}
+
+fn fit_lrrm_match(
+    match_fit: LrrmMatchFit,
+    initial: &[LrrmPointSolution],
+    ideals: &[Network],
+    angular: &Array1<f64>,
+    resistance: &Array1<f64>,
+    reference_impedance: f64,
+    mut inductance: Array1<f64>,
+) -> Result<(Array1<f64>, Array1<f64>)> {
+    let points = angular.len();
+    let mut capacitance = Array1::zeros(points);
+    let objective_l = |candidate: f64| {
+        lrrm_inductance_objective(
+            candidate,
+            initial,
+            ideals,
+            angular,
+            resistance,
+            reference_impedance,
+        )
+    };
+    if match_fit == LrrmMatchFit::Inductance {
+        let weight = angular.sum();
+        let weighted = angular
+            .iter()
+            .zip(inductance.iter())
+            .map(|(angular, value)| angular * value)
+            .sum::<f64>()
+            / weight;
+        let maximum = 10.0 / angular[points - 1].abs();
+        let (grid_best, grid_error) = (0..10)
+            .map(|index| -maximum + 2.0 * maximum * f64::from(index) / 9.0)
+            .map(|candidate| (candidate, objective_l(candidate)))
+            .min_by(|left, right| left.1.total_cmp(&right.1))
+            .ok_or_else(|| Error::Unsupported("LRRM fit grid is empty".to_owned()))?;
+        let initial = if grid_error < objective_l(weighted) {
+            grid_best
+        } else {
+            weighted
+        };
+        let fitted = if objective_l(initial) <= f64::EPSILON {
+            initial
+        } else {
+            let span = 2.0 * maximum / 9.0;
+            minimize_scalar(objective_l, initial - span, initial + span)
+        };
+        inductance.fill(fitted);
+    } else if match_fit == LrrmMatchFit::InductanceCapacitance {
+        let maximum_l = 20.0 / angular[points - 1].abs();
+        let worst_match = 0.4_f64;
+        let maximum_c = 2.0 * worst_match
+            / (worst_match.mul_add(-worst_match, 1.0).sqrt()
+                * angular[points - 1].abs()
+                * reference_impedance);
+        let objective = |candidate: [f64; 2]| {
+            lrrm_inductance_capacitance_objective(
+                candidate,
+                initial,
+                angular,
+                resistance,
+                reference_impedance,
+            )
+        };
+        let (initial_guess, _) = (0..10)
+            .flat_map(|l_index| {
+                (0..10).map(move |c_index| {
+                    [
+                        maximum_l * f64::from(l_index) / 9.0,
+                        maximum_c * f64::from(c_index) / 9.0,
+                    ]
+                })
+            })
+            .map(|candidate| (candidate, objective(candidate)))
+            .min_by(|left, right| left.1.total_cmp(&right.1))
+            .ok_or_else(|| Error::Unsupported("LRRM fit grid is empty".to_owned()))?;
+        let fitted = minimize_two_variables(
+            objective,
+            initial_guess,
+            [maximum_l / 20.0, maximum_c / 20.0],
+        );
+        inductance.fill(fitted[0]);
+        capacitance.fill(fitted[1]);
+    }
+    Ok((inductance, capacitance))
+}
+
+fn lrrm_coefficients(
+    relations: &[LrrmPointRelation],
+    final_solutions: &[LrrmPointSolution],
+    points: usize,
+) -> Result<BTreeMap<String, Array1<Complex64>>> {
     let names = [
         "forward directivity",
         "forward source match",
@@ -2258,11 +2828,10 @@ fn solve_lrrm(
         "reverse reflection tracking",
         "k",
     ];
-    let mut coefficients = BTreeMap::from_iter(
-        names
-            .iter()
-            .map(|name| ((*name).to_owned(), Array1::zeros(points))),
-    );
+    let mut coefficients = names
+        .iter()
+        .map(|name| ((*name).to_owned(), Array1::zeros(points)))
+        .collect::<BTreeMap<_, _>>();
     for (point, solved) in final_solutions.iter().enumerate() {
         let relation = &relations[point];
         let [r11, r12, r21, r22] = relation.measured_reflections;
@@ -2305,25 +2874,7 @@ fn solve_lrrm(
     coefficients.insert("reverse isolation".to_owned(), Array1::zeros(points));
     coefficients.insert("forward switch term".to_owned(), Array1::zeros(points));
     coefficients.insert("reverse switch term".to_owned(), Array1::zeros(points));
-    let one_port = |values: &Array1<Complex64>| {
-        Network::new(
-            measured[0].frequency.clone(),
-            Array3::from_shape_fn((points, 1, 1), |(point, _, _)| values[point]),
-            Array2::from_shape_fn((points, 1), |(point, _)| measured[0].z0[(point, 0)]),
-        )
-    };
-    Ok(LrrmSolution {
-        coefficients,
-        matched: one_port(&matched_values)?,
-        reflect1: one_port(&Array1::from_iter(
-            final_solutions.iter().map(|solution| solution.reflect1),
-        ))?,
-        reflect2: one_port(&Array1::from_iter(
-            final_solutions.iter().map(|solution| solution.reflect2),
-        ))?,
-        inductance,
-        capacitance,
-    })
+    Ok(coefficients)
 }
 
 struct LrrmPointRelation {
@@ -2451,7 +3002,7 @@ fn lrrm_inductance_objective(
             error * error
         })
         .sum::<f64>()
-        / solutions.len() as f64
+        / solutions.len().to_f64().unwrap_or(f64::INFINITY)
 }
 
 fn lrrm_inductance_capacitance_objective(
@@ -2485,7 +3036,7 @@ fn lrrm_inductance_capacitance_objective(
                 .re
         })
         .sum::<f64>()
-        / reflects.len() as f64;
+        / reflects.len().to_f64().unwrap_or(f64::INFINITY);
     reflects
         .iter()
         .enumerate()
@@ -2495,7 +3046,7 @@ fn lrrm_inductance_capacitance_objective(
             (ideal - reflection).norm_sqr()
         })
         .sum::<f64>()
-        / reflects.len() as f64
+        / reflects.len().to_f64().unwrap_or(f64::INFINITY)
 }
 
 fn minimize_scalar(objective: impl Fn(f64) -> f64, mut left: f64, mut right: f64) -> f64 {
@@ -2519,7 +3070,7 @@ fn minimize_scalar(objective: impl Fn(f64) -> f64, mut left: f64, mut right: f64
             second_value = objective(second);
         }
     }
-    (left + right) / 2.0
+    f64::midpoint(left, right)
 }
 
 fn minimize_two_variables(
@@ -2535,17 +3086,17 @@ fn minimize_two_variables(
     for _ in 0..160 {
         simplex.sort_by(|left, right| objective(*left).total_cmp(&objective(*right)));
         let centroid = [
-            (simplex[0][0] + simplex[1][0]) / 2.0,
-            (simplex[0][1] + simplex[1][1]) / 2.0,
+            f64::midpoint(simplex[0][0], simplex[1][0]),
+            f64::midpoint(simplex[0][1], simplex[1][1]),
         ];
         let reflected = [
-            (2.0 * centroid[0] - simplex[2][0]).max(0.0),
-            (2.0 * centroid[1] - simplex[2][1]).max(0.0),
+            2.0f64.mul_add(centroid[0], -simplex[2][0]).max(0.0),
+            2.0f64.mul_add(centroid[1], -simplex[2][1]).max(0.0),
         ];
         if objective(reflected) < objective(simplex[0]) {
             let expanded = [
-                (3.0 * centroid[0] - 2.0 * simplex[2][0]).max(0.0),
-                (3.0 * centroid[1] - 2.0 * simplex[2][1]).max(0.0),
+                2.0f64.mul_add(-simplex[2][0], 3.0 * centroid[0]).max(0.0),
+                2.0f64.mul_add(-simplex[2][1], 3.0 * centroid[1]).max(0.0),
             ];
             simplex[2] = if objective(expanded) < objective(reflected) {
                 expanded
@@ -2556,19 +3107,19 @@ fn minimize_two_variables(
             simplex[2] = reflected;
         } else {
             let contracted = [
-                ((centroid[0] + simplex[2][0]) / 2.0).max(0.0),
-                ((centroid[1] + simplex[2][1]) / 2.0).max(0.0),
+                f64::midpoint(centroid[0], simplex[2][0]).max(0.0),
+                f64::midpoint(centroid[1], simplex[2][1]).max(0.0),
             ];
             if objective(contracted) < objective(simplex[2]) {
                 simplex[2] = contracted;
             } else {
                 simplex[1] = [
-                    (simplex[0][0] + simplex[1][0]) / 2.0,
-                    (simplex[0][1] + simplex[1][1]) / 2.0,
+                    f64::midpoint(simplex[0][0], simplex[1][0]),
+                    f64::midpoint(simplex[0][1], simplex[1][1]),
                 ];
                 simplex[2] = [
-                    (simplex[0][0] + simplex[2][0]) / 2.0,
-                    (simplex[0][1] + simplex[2][1]) / 2.0,
+                    f64::midpoint(simplex[0][0], simplex[2][0]),
+                    f64::midpoint(simplex[0][1], simplex[2][1]),
                 ];
             }
         }
@@ -2594,11 +3145,10 @@ fn solve_lmr16(
     let mut through_s = Array3::zeros((points, 2, 2));
     let mut reflect_s = Array3::zeros((points, 1, 1));
     let names = sixteen_term_coefficient_names();
-    let mut coefficients = BTreeMap::from_iter(
-        names
-            .iter()
-            .map(|name| ((*name).to_owned(), Array1::zeros(points))),
-    );
+    let mut coefficients = names
+        .iter()
+        .map(|name| ((*name).to_owned(), Array1::zeros(points)))
+        .collect::<BTreeMap<_, _>>();
     for point in 0..points {
         let matrix = |index: usize| matrix_from_array(&measured[index].s, point);
         let ma = matrix(0);
@@ -2688,6 +3238,16 @@ fn solve_lmr16(
     }
     coefficients.insert("forward switch term".to_owned(), Array1::zeros(points));
     coefficients.insert("reverse switch term".to_owned(), Array1::zeros(points));
+    let (through, reflect) = lmr16_networks(measured, through_s, reflect_s)?;
+    Ok((coefficients, through, reflect))
+}
+
+fn lmr16_networks(
+    measured: &[Network],
+    through_s: Array3<Complex64>,
+    reflect_s: Array3<Complex64>,
+) -> Result<(Network, Network)> {
+    let points = measured[0].frequency_points();
     let through = Network::new(
         measured[0].frequency.clone(),
         through_s,
@@ -2698,10 +3258,10 @@ fn solve_lmr16(
         reflect_s,
         Array2::from_shape_fn((points, 1), |(point, _)| measured[0].z0[(point, 0)]),
     )?;
-    Ok((coefficients, through, reflect))
+    Ok((through, reflect))
 }
 
-fn sixteen_term_coefficient_names() -> [&'static str; 15] {
+const fn sixteen_term_coefficient_names() -> [&'static str; 15] {
     [
         "forward directivity",
         "reverse directivity",
@@ -2774,59 +3334,38 @@ fn solve_lrm(
         "reverse reflection tracking",
         "k",
     ];
-    let mut coefficients = BTreeMap::from_iter(
-        names
-            .iter()
-            .map(|name| ((*name).to_owned(), Array1::zeros(points))),
-    );
+    let mut coefficients = names
+        .iter()
+        .map(|name| ((*name).to_owned(), Array1::zeros(points)))
+        .collect::<BTreeMap<_, _>>();
     for point in 0..points {
         let gm = ideals[2].s[(point, 0, 0)];
         let r1 = reflect_measured.s[(point, 0, 0)];
         let r2 = reflect_measured.s[(point, 1, 1)];
         let m1 = match_measured.s[(point, 0, 0)];
         let m2 = match_measured.s[(point, 1, 1)];
-        let wlr1 = [[Complex64::new(1.0, 0.0); 2], [r1, m1]];
-        let wll1 = [
-            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
-            [
-                line_measured.s[(point, 0, 0)],
-                line_measured.s[(point, 0, 1)],
-            ],
-        ];
-        let wll2 = [
-            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
-            [
-                line_measured.s[(point, 1, 0)],
-                line_measured.s[(point, 1, 1)],
-            ],
-        ];
-        let wlr2 = [[Complex64::new(1.0, 0.0); 2], [r2, m2]];
-        let wl = matrix_multiply(
-            matrix_multiply(
-                matrix_multiply(matrix_inverse(wlr1)?, wll1),
-                matrix_inverse(wll2)?,
-            ),
-            wlr2,
-        );
+        let wl = lrm_measured_line_relation(line_measured, point, r1, m1, r2, m2)?;
         let tl = matrix_from_array(&line_transfer, point);
         let wl_determinant = matrix_determinant(wl);
         ensure_nonzero(wl_determinant, "LRM measured line relation is singular")?;
         let xyz2 = -matrix_determinant(tl) / wl_determinant;
         let (z0, z1) = quadratic_roots(wl[0][0], -tl[1][0] - tl[0][1], wl[1][1] * xyz2)?;
-        let candidates = [z0, z1].map(|z| -> Result<(f64, Complex64, Complex64, Complex64)> {
-            ensure_nonzero(z, "LRM root is zero")?;
-            let xyz = xyz2 / z;
-            let w11 = wl[0][0] * z;
-            let w21 = wl[1][0] * z;
-            let w12 = wl[0][1] * xyz;
-            let w22 = wl[1][1] * xyz;
-            let denominator = tl[1][0] + tl[1][1] * gm - w22;
-            ensure_nonzero(denominator, "LRM reflect solution is singular")?;
-            ensure_nonzero(tl[1][1], "LRM ideal line transfer is singular")?;
-            let x = w12 / denominator;
-            let reflect = (w11 - tl[1][0] + w21 * x) / tl[1][1];
-            Ok(((reflect - ideals[1].s[(point, 0, 0)]).norm(), reflect, x, z))
-        });
+        let candidates = <[Complex64; 2]>::from((z0, z1)).map(
+            |z| -> Result<(f64, Complex64, Complex64, Complex64)> {
+                ensure_nonzero(z, "LRM root is zero")?;
+                let xyz = xyz2 / z;
+                let w11 = wl[0][0] * z;
+                let w21 = wl[1][0] * z;
+                let w12 = wl[0][1] * xyz;
+                let w22 = wl[1][1] * xyz;
+                let denominator = tl[1][0] + tl[1][1] * gm - w22;
+                ensure_nonzero(denominator, "LRM reflect solution is singular")?;
+                ensure_nonzero(tl[1][1], "LRM ideal line transfer is singular")?;
+                let x = w12 / denominator;
+                let reflect = (w11 - tl[1][0] + w21 * x) / tl[1][1];
+                Ok(((reflect - ideals[1].s[(point, 0, 0)]).norm(), reflect, x, z))
+            },
+        );
         let [first, second] = candidates;
         let first = first?;
         let second = second?;
@@ -2874,6 +3413,43 @@ fn solve_lrm(
         Array2::from_shape_fn((points, 1), |(point, _)| measured[0].z0[(point, 0)]),
     )?;
     Ok((coefficients, solved))
+}
+
+fn lrm_measured_line_relation(
+    line_measured: &Network,
+    point: usize,
+    r1: Complex64,
+    m1: Complex64,
+    r2: Complex64,
+    m2: Complex64,
+) -> Result<[[Complex64; 2]; 2]> {
+    // Upstream scikit-rf variable: `wlr1`.
+    let reflect_input_matrix = [[Complex64::new(1.0, 0.0); 2], [r1, m1]];
+    // Upstream scikit-rf variable: `wll1`.
+    let line_input_matrix = [
+        [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        [
+            line_measured.s[(point, 0, 0)],
+            line_measured.s[(point, 0, 1)],
+        ],
+    ];
+    // Upstream scikit-rf variable: `wll2`.
+    let line_output_matrix = [
+        [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        [
+            line_measured.s[(point, 1, 0)],
+            line_measured.s[(point, 1, 1)],
+        ],
+    ];
+    // Upstream scikit-rf variable: `wlr2`.
+    let reflect_output_matrix = [[Complex64::new(1.0, 0.0); 2], [r2, m2]];
+    Ok(matrix_multiply(
+        matrix_multiply(
+            matrix_multiply(matrix_inverse(reflect_input_matrix)?, line_input_matrix),
+            matrix_inverse(line_output_matrix)?,
+        ),
+        reflect_output_matrix,
+    ))
 }
 
 fn solve_unknown_thru(
@@ -3016,88 +3592,7 @@ fn solve_sixteen_term(
     let points = measured[0].frequency_points();
     let mut solved = vec![[Complex64::new(0.0, 0.0); 15]; points];
     for (point, solved_point) in solved.iter_mut().enumerate() {
-        let mut design = Vec::with_capacity(4 * measured.len());
-        let mut right = Vec::with_capacity(4 * measured.len());
-        for (measured, ideal) in measured.iter().zip(ideals) {
-            let m = |row, column| measured.s[(point, row, column)];
-            let i = |row, column| ideal.s[(point, row, column)];
-            design.extend([
-                vec![
-                    i(0, 0),
-                    i(1, 0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(1.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    -m(0, 0) * i(0, 0),
-                    -m(0, 0) * i(1, 0),
-                    -m(0, 1) * i(0, 0),
-                    -m(0, 1) * i(1, 0),
-                    -m(0, 0),
-                    Complex64::new(0.0, 0.0),
-                    -m(0, 1),
-                ],
-                vec![
-                    i(0, 1),
-                    i(1, 1),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(1.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    -m(0, 0) * i(0, 1),
-                    -m(0, 0) * i(1, 1),
-                    -m(0, 1) * i(0, 1),
-                    -m(0, 1) * i(1, 1),
-                    Complex64::new(0.0, 0.0),
-                    -m(0, 0),
-                    Complex64::new(0.0, 0.0),
-                ],
-                vec![
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    i(0, 0),
-                    i(1, 0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(1.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    -m(1, 0) * i(0, 0),
-                    -m(1, 0) * i(1, 0),
-                    -m(1, 1) * i(0, 0),
-                    -m(1, 1) * i(1, 0),
-                    -m(1, 0),
-                    Complex64::new(0.0, 0.0),
-                    -m(1, 1),
-                ],
-                vec![
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    i(0, 1),
-                    i(1, 1),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(0.0, 0.0),
-                    Complex64::new(1.0, 0.0),
-                    -m(1, 0) * i(0, 1),
-                    -m(1, 0) * i(1, 1),
-                    -m(1, 1) * i(0, 1),
-                    -m(1, 1) * i(1, 1),
-                    Complex64::new(0.0, 0.0),
-                    -m(1, 0),
-                    Complex64::new(0.0, 0.0),
-                ],
-            ]);
-            right.extend([
-                Complex64::new(0.0, 0.0),
-                m(0, 1),
-                Complex64::new(0.0, 0.0),
-                m(1, 1),
-            ]);
-        }
+        let (design, right) = sixteen_term_design(measured, ideals, point);
         let mut error = solve_complex_least_squares(&design, &right)?;
         let normalization_denominator = error[12] - error[13] * error[14];
         ensure_nonzero(
@@ -3172,6 +3667,96 @@ fn solve_sixteen_term(
     coefficients.insert("forward switch term".to_owned(), Array1::zeros(points));
     coefficients.insert("reverse switch term".to_owned(), Array1::zeros(points));
     Ok(coefficients)
+}
+
+fn sixteen_term_design(
+    measured: &[Network],
+    ideals: &[Network],
+    point: usize,
+) -> (Vec<Vec<Complex64>>, Vec<Complex64>) {
+    let mut design = Vec::with_capacity(4 * measured.len());
+    let mut right = Vec::with_capacity(4 * measured.len());
+    for (measured, ideal) in measured.iter().zip(ideals) {
+        let m = |row, column| measured.s[(point, row, column)];
+        let i = |row, column| ideal.s[(point, row, column)];
+        design.extend([
+            vec![
+                i(0, 0),
+                i(1, 0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                -m(0, 0) * i(0, 0),
+                -m(0, 0) * i(1, 0),
+                -m(0, 1) * i(0, 0),
+                -m(0, 1) * i(1, 0),
+                -m(0, 0),
+                Complex64::new(0.0, 0.0),
+                -m(0, 1),
+            ],
+            vec![
+                i(0, 1),
+                i(1, 1),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                -m(0, 0) * i(0, 1),
+                -m(0, 0) * i(1, 1),
+                -m(0, 1) * i(0, 1),
+                -m(0, 1) * i(1, 1),
+                Complex64::new(0.0, 0.0),
+                -m(0, 0),
+                Complex64::new(0.0, 0.0),
+            ],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                i(0, 0),
+                i(1, 0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                -m(1, 0) * i(0, 0),
+                -m(1, 0) * i(1, 0),
+                -m(1, 1) * i(0, 0),
+                -m(1, 1) * i(1, 0),
+                -m(1, 0),
+                Complex64::new(0.0, 0.0),
+                -m(1, 1),
+            ],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                i(0, 1),
+                i(1, 1),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                -m(1, 0) * i(0, 1),
+                -m(1, 0) * i(1, 1),
+                -m(1, 1) * i(0, 1),
+                -m(1, 1) * i(1, 1),
+                Complex64::new(0.0, 0.0),
+                -m(1, 0),
+                Complex64::new(0.0, 0.0),
+            ],
+        ]);
+        right.extend([
+            Complex64::new(0.0, 0.0),
+            m(0, 1),
+            Complex64::new(0.0, 0.0),
+            m(1, 1),
+        ]);
+    }
+    (design, right)
 }
 
 fn transform_sixteen_term(
@@ -3505,6 +4090,12 @@ fn apply_twelve_term(
 }
 
 impl MultiportCal {
+    /// Creates a multi-port calibration from pairwise two-port calibrations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pair topology is invalid, measurements and ideals are missing or
+    /// incompatible, or the optional isolation network does not match the calibrated network.
     pub fn new(pairs: Vec<MultiportPairCalibration>, isolation: Option<Network>) -> Result<Self> {
         if pairs.len() < 2 {
             return Err(Error::IncompatibleShape(
@@ -3515,19 +4106,18 @@ impl MultiportCal {
             .iter()
             .flat_map(|pair| pair.ports)
             .max()
-            .map(|port| port + 1)
-            .unwrap_or(0);
+            .map_or(0, |port| port + 1);
         if nports < 3 {
             return Err(Error::IncompatibleShape(
                 "multiport calibration requires at least three ports".to_owned(),
             ));
         }
-        let common = pairs[0]
+        let common_port_count = pairs[0]
             .ports
             .into_iter()
             .filter(|port| pairs.iter().all(|pair| pair.ports.contains(port)))
-            .collect::<Vec<_>>();
-        if common.len() != 1 {
+            .count();
+        if common_port_count != 1 {
             return Err(Error::Unsupported(
                 "multiport calibration pairs must share exactly one common port".to_owned(),
             ));
@@ -3585,6 +4175,12 @@ impl MultiportCal {
         })
     }
 
+    /// Solves each pairwise calibration and assembles the multi-port coefficients.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a pair subnetwork cannot be extracted, a pairwise calibration cannot
+    /// be solved, or the resulting coefficients do not cover every calibrated port.
     pub fn run(&mut self) -> Result<()> {
         let mut counts = vec![0_usize; self.nports];
         for pair in &self.pairs {
@@ -3640,23 +4236,22 @@ impl MultiportCal {
             };
             for (name, values) in &coefficients {
                 if let Some(name) = name.strip_prefix("forward ") {
-                    if name != "switch term" {
-                        self.port_coefficients[ports[0]].insert(name.to_owned(), values.clone());
-                    } else {
+                    if name == "switch term" {
                         self.port_coefficients[ports[1]].insert(name.to_owned(), values.clone());
+                    } else {
+                        self.port_coefficients[ports[0]].insert(name.to_owned(), values.clone());
                     }
                 } else if let Some(name) = name.strip_prefix("reverse ") {
-                    if name != "switch term" {
-                        self.port_coefficients[ports[1]].insert(name.to_owned(), values.clone());
-                    } else {
+                    if name == "switch term" {
                         self.port_coefficients[ports[0]].insert(name.to_owned(), values.clone());
+                    } else {
+                        self.port_coefficients[ports[1]].insert(name.to_owned(), values.clone());
                     }
                 }
             }
             let k_side = usize::from(counts[ports[0]] > counts[ports[1]]);
             self.port_coefficients[ports[k_side]].insert("k".to_owned(), coefficients["k"].clone());
-            self.pair_coefficients
-                .insert((ports[0], ports[1]), coefficients);
+            self.pair_coefficients.insert(ports.into(), coefficients);
         }
         for coefficients in &self.port_coefficients {
             for name in ["directivity", "source match", "reflection tracking", "k"] {
@@ -3670,10 +4265,22 @@ impl MultiportCal {
         Ok(())
     }
 
+    /// Applies the assembled calibration to an uncalibrated multi-port network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is incompatible, the calibration has not been run, or a
+    /// pairwise error transformation is singular.
     pub fn apply(&self, network: &Network) -> Result<Network> {
         self.transform(network, false)
     }
 
+    /// Embeds a calibrated multi-port response in the assembled error model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is incompatible, the calibration has not been run, or a
+    /// pairwise error transformation is singular.
     pub fn embed(&self, network: &Network) -> Result<Network> {
         self.transform(network, true)
     }
@@ -3722,6 +4329,12 @@ impl MultiportCal {
 }
 
 impl MultiportSolt {
+    /// Creates a multi-port SOLT calibration from measured and ideal standards.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the standards or thru-port definitions are incompatible, a required
+    /// two-port subnetwork cannot be extracted, or the resulting pair topology is invalid.
     pub fn new(
         measured: Vec<Network>,
         ideals: Vec<Network>,
@@ -3779,14 +4392,32 @@ impl MultiportSolt {
         })
     }
 
+    /// Solves the underlying pairwise multi-port calibration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a pair subnetwork or calibration cannot be solved, or the assembled
+    /// coefficients do not cover every calibrated port.
     pub fn run(&mut self) -> Result<()> {
         self.inner.run()
     }
 
+    /// Applies the solved SOLT calibration to a multi-port network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is incompatible, the calibration has not been run, or a
+    /// pairwise error transformation is singular.
     pub fn apply(&self, network: &Network) -> Result<Network> {
         self.inner.apply(network)
     }
 
+    /// Embeds a calibrated multi-port response in the SOLT error model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is incompatible, the calibration has not been run, or a
+    /// pairwise error transformation is singular.
     pub fn embed(&self, network: &Network) -> Result<Network> {
         self.inner.embed(network)
     }
@@ -3968,6 +4599,12 @@ fn embed_twelve_term(
 }
 
 impl Normalization {
+    /// Creates a normalization calibration from measured standards.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no standards are supplied or their frequencies, port counts, or
+    /// scattering shapes are incompatible.
     pub fn new(measured: Vec<Network>) -> Result<Self> {
         validate_normalization_networks(&measured)?;
         Ok(Self {
@@ -3983,7 +4620,10 @@ impl Normalization {
         for network in &self.measured {
             average += &network.s;
         }
-        average.mapv_inplace(|value| value / self.measured.len() as f64);
+        let measured_count = self.measured.len().to_f64().ok_or_else(|| {
+            Error::Unsupported("normalization standard count cannot be represented".to_owned())
+        })?;
+        average.mapv_inplace(|value| value / measured_count);
         Ok(average)
     }
 }
@@ -3997,12 +4637,12 @@ impl Calibration for Normalization {
         &self.ideals
     }
 
-    /// Port of `skrf.calibration.calibration.Normalization.run`.
+    /// Computes the average measured response used as the normalization divisor.
     fn run(&mut self) -> Result<()> {
         validate_normalization_networks(&self.measured)
     }
 
-    /// Port of `skrf.calibration.calibration.Normalization.apply_cal`.
+    /// Divides a measured response by the average normalization standard.
     fn apply(&self, network: &Network) -> Result<Network> {
         validate_normalization_target(&self.measured, network)?;
         let average = self.average()?;
@@ -4273,6 +4913,27 @@ fn solve_three_by_three(
     Some(solution)
 }
 
+/// Removes forward and reverse switch-term loading from a raw two-port measurement.
+///
+/// The switch terms are
+///
+/// $$
+/// \Gamma_{f} = \frac{a_{2}}{b_{2}}, \qquad \Gamma_{r} = \frac{a_{1}}{b_{1}}.
+/// $$
+///
+/// Four-sampler VNAs can measure these ratios directly. Otherwise they can be
+/// obtained from a two-tier calibration or estimated with [`compute_switch_terms`].
+///
+/// # Errors
+///
+/// Returns an error when the network is not a two-port, the switch-term arrays do not match its
+/// frequency points, or a switch-term correction matrix is singular.
+///
+/// ## Reference
+///
+/// Roger B. Marks, *Formulations of the Basic Vector Network Analyzer Error Model
+/// including Switch Terms*.
+///
 /// Origin: `skrf/calibration/calibration.py::unterminate`.
 pub fn unterminate(
     network: &Network,
@@ -4297,6 +4958,19 @@ pub fn unterminate(
 }
 
 /// Applies forward and reverse VNA switch-term loading to a two-port network.
+///
+/// This is the inverse of [`unterminate`]. The supplied arrays contain one value
+/// of $\Gamma_{f}$ and $\Gamma_{r}$ per frequency point.
+///
+/// # Errors
+///
+/// Returns an error when the network is not a two-port, the switch-term arrays do not match its
+/// frequency points, or a switch-term loading matrix is singular.
+///
+/// ## Reference
+///
+/// Roger B. Marks, *Formulations of the Basic Vector Network Analyzer Error Model
+/// including Switch Terms*.
 ///
 /// Origin: `skrf/calibration/calibration.py::terminate`.
 pub fn terminate(
@@ -4388,6 +5062,7 @@ fn terminate_switch_matrix(
 /// Returns the ideal twelve-term calibration coefficients for a frequency axis.
 ///
 /// Origin: `skrf/calibration/calibration.py::ideal_coefs_12term`.
+#[must_use]
 pub fn ideal_coefs_12term(frequency: &Frequency) -> BTreeMap<String, Array1<Complex64>> {
     let zeros = Array1::zeros(frequency.points());
     let ones = Array1::from_elem(frequency.points(), Complex64::new(1.0, 0.0));
@@ -4417,9 +5092,19 @@ pub fn ideal_coefs_12term(frequency: &Frequency) -> BTreeMap<String, Array1<Comp
 
 /// Applies switch-term loading to every sourced column of an N-port network.
 ///
-/// `gammas[port]` is `a[port] / b[port]` while any other port is sourced.
+/// `gammas[port]` is $a_{p} / b_{p}$ while any other port is sourced.
 /// For two ports the order is therefore reverse then forward, matching
 /// `skrf.calibration.terminate_nport`.
+///
+/// # Errors
+///
+/// Returns an error when the number or shape of the switch-term networks is incompatible with the
+/// target, or an N-port loading system is singular.
+///
+/// ## Reference
+///
+/// Roger B. Marks, *Formulations of the Basic Vector Network Analyzer Error Model
+/// including Switch Terms*.
 ///
 /// Origin: `skrf/calibration/calibration.py::terminate_nport`.
 pub fn terminate_nport(network: &Network, gammas: &[Network]) -> Result<Network> {
@@ -4484,7 +5169,20 @@ pub fn terminate_nport(network: &Network, gammas: &[Network]) -> Result<Network>
 /// Indirectly estimates forward and reverse switch terms from at least three
 /// measured reciprocal two-port devices.
 ///
-/// The return order is `(Gamma21, Gamma12)`, or forward then reverse.
+/// The return order is $(\Gamma_{21}, \Gamma_{12})$, or forward then reverse.
+/// Accuracy depends on the reciprocal devices being sufficiently distinct; using
+/// more than three devices produces an overdetermined estimate.
+///
+/// # Errors
+///
+/// Returns an error when fewer than three aligned two-port measurements are supplied, a device has
+/// zero forward transmission, or the switch-term null-space solution is singular.
+///
+/// ## References
+///
+/// - Z. Hatab, M. E. Gadringer, and W. Bösch, *Indirect Measurement of Switch Terms of a Vector Network Analyzer with Reciprocal Devices*, [arXiv:2306.07066](https://arxiv.org/abs/2306.07066).
+/// - [VNA switch-term notes](https://ziadhatab.github.io/posts/vna-switch-terms/).
+///
 /// Origin: `skrf/calibration/calibration.py::compute_switch_terms`.
 pub fn compute_switch_terms(networks: &[Network]) -> Result<(Network, Network)> {
     if networks.len() < 3 {
@@ -4547,12 +5245,25 @@ pub fn compute_switch_terms(networks: &[Network]) -> Result<(Network, Network)> 
     }
 
     Ok((
-        switch_term_network(reference, forward, "Gamma21")?,
-        switch_term_network(reference, reverse, "Gamma12")?,
+        switch_term_network(reference, &forward, "Gamma21")?,
+        switch_term_network(reference, &reverse, "Gamma12")?,
     ))
 }
 
 /// Converts twelve-term coefficients to the equivalent eight-term model.
+///
+/// When `redundant_k` is true, the independently derived $k$ estimates are also
+/// returned as `k first` and `k second`.
+///
+/// # Errors
+///
+/// Returns an error when required coefficients are missing or have inconsistent lengths, or when
+/// the twelve-to-eight-term conversion is singular.
+///
+/// ## Reference
+///
+/// Roger B. Marks, *Formulations of the Basic Vector Network Analyzer Error Model
+/// including Switch-Terms*, ARFTG Conference Digest, 1997.
 ///
 /// Origin: `skrf/calibration/calibration.py::convert_12term_2_8term`.
 pub fn convert_12term_2_8term(
@@ -4621,6 +5332,14 @@ pub fn convert_12term_2_8term(
 }
 
 /// Converts eight-term coefficients to the equivalent twelve-term model.
+///
+/// The conversion uses the switch terms and $k$ coefficient and preserves the
+/// directional isolation terms.
+///
+/// # Errors
+///
+/// Returns an error when required coefficients are missing or have inconsistent lengths, or when
+/// the eight-to-twelve-term conversion is singular.
 ///
 /// Origin: `skrf/calibration/calibration.py::convert_8term_2_12term`.
 pub fn convert_8term_2_12term(
@@ -4714,7 +5433,7 @@ fn coefficient_points(coefficients: &BTreeMap<String, Array1<Complex64>>) -> Res
     coefficients
         .values()
         .next()
-        .map(|values| values.len())
+        .map(Array1::len)
         .filter(|points| *points > 0)
         .ok_or_else(|| Error::IncompatibleShape("coefficient dictionary is empty".to_owned()))
 }
@@ -4738,7 +5457,7 @@ fn required_coefficient<'a>(
 
 fn coefficient_network(
     frequency: Frequency,
-    values: Array1<Complex64>,
+    values: &Array1<Complex64>,
     name: &str,
 ) -> Result<Network> {
     let points = frequency.points();
@@ -4792,7 +5511,7 @@ fn group_networks_by_ideal_name(
 
 fn switch_term_network(
     reference: &Network,
-    values: Array1<Complex64>,
+    values: &Array1<Complex64>,
     name: &str,
 ) -> Result<Network> {
     let points = reference.frequency_points();
@@ -4804,6 +5523,11 @@ fn switch_term_network(
 }
 
 /// Converts Keysight PNA coefficient names to scikit-rf coefficient names.
+///
+/// # Errors
+///
+/// Returns an error when a PNA coefficient name or term is invalid, or the coefficients describe
+/// an unsupported number of ports.
 ///
 /// Origin: `skrf/calibration/calibration.py::convert_pnacoefs_2_skrf`.
 pub fn convert_pnacoefs_2_skrf(
@@ -4856,6 +5580,12 @@ pub fn convert_pnacoefs_2_skrf(
 /// Converts scikit-rf coefficient names to Keysight PNA coefficient names.
 ///
 /// `ports` is `(forward, reverse)` and defaults to `(1, 2)` in upstream.
+///
+/// # Errors
+///
+/// Returns an error when the port indices are invalid or a coefficient name, direction, or term
+/// cannot be converted to the PNA convention.
+///
 /// Origin: `skrf/calibration/calibration.py::convert_skrfcoefs_2_pna`.
 pub fn convert_skrfcoefs_2_pna(
     coefficients: &BTreeMap<String, Array1<Complex64>>,
@@ -4904,6 +5634,7 @@ pub fn convert_skrfcoefs_2_pna(
 /// measured network name.
 ///
 /// Origin: `skrf/calibration/calibration.py::align_measured_ideals`.
+#[must_use]
 pub fn align_measured_ideals(
     measured: &[Network],
     ideals: &[Network],
@@ -4934,6 +5665,11 @@ pub fn align_measured_ideals(
 }
 
 /// Converts the compact two-port error vector to four T-matrix arrays.
+///
+/// # Errors
+///
+/// Returns an error when the coefficient map is empty or a required coefficient is missing or has
+/// a different length from the other coefficients.
 ///
 /// Origin: `skrf/calibration/calibration.py::two_port_error_vector_2_Ts`.
 pub fn two_port_error_vector_2_ts(
@@ -4980,14 +5716,23 @@ pub fn two_port_error_vector_2_ts(
 /// on whether three-term or directional coefficients were supplied.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ErrorNetworkResult {
+    /// A single reciprocal two-port error network for a three-term calibration.
     One(Box<Network>),
+    /// Directional forward and reverse error networks.
     Pair {
+        /// Error network for forward excitation.
         forward: Box<Network>,
+        /// Error network for reverse excitation.
         reverse: Box<Network>,
     },
 }
 
 /// Creates one or two error networks from standard calibration coefficients.
+///
+/// # Errors
+///
+/// Returns an error when required coefficients are missing or do not match the frequency length,
+/// or an error network cannot be constructed from the supplied data.
 ///
 /// Origin: `skrf/calibration/calibration.py::error_dict_2_network`.
 pub fn error_dict_2_network(

@@ -1,9 +1,16 @@
+//! Sets of aligned networks, set-wise statistics, parameter interpolation, and uncertainty.
+//!
+//! A [`NetworkSet`] applies calculations such as mean and standard deviation
+//! across multiple N-port networks and returns results as ordinary [`Network`]
+//! values so they can be plotted or serialized normally.
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use chrono::NaiveDateTime;
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 
@@ -16,59 +23,95 @@ use crate::{Error, Frequency, Network, Result};
 /// `skrf.networkSet.NetworkSet.uncertainty_ntwk_triplet`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NetworkSetAttribute {
+    /// Complex scattering parameters.
     Scattering,
+    /// Scattering magnitude.
     Magnitude,
+    /// Scattering phase in degrees.
     PhaseDegrees,
+    /// Scattering magnitude in $20\log_{10}$ decibels.
     Decibel,
+    /// Scattering magnitude in $10\log_{10}$ decibels.
     Decibel10,
+    /// Real scattering component.
     Real,
+    /// Imaginary scattering component.
     Imaginary,
+    /// Voltage standing-wave ratio.
     Vswr,
 }
 
-/// Scalar network view used by the legacy attribute DataFrame adapter.
+/// Scalar network view used by the legacy attribute `DataFrame` adapter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NetworkScalarAttribute {
+    /// Scattering magnitude.
     Magnitude,
+    /// $20\log_{10}$ magnitude.
     Decibel,
+    /// $10\log_{10}$ magnitude.
     Decibel10,
+    /// Phase in degrees.
     PhaseDegrees,
+    /// Real component.
     Real,
+    /// Imaginary component.
     Imaginary,
+    /// Voltage standing-wave ratio.
     Vswr,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Network parameter representation used for set-wise statistics.
 pub enum NetworkParameter {
+    /// Scattering parameters.
     #[default]
     Scattering,
+    /// Impedance parameters.
     Impedance,
+    /// Admittance parameters.
     Admittance,
+    /// Two-port ABCD parameters.
     Abcd,
+    /// Inverse-hybrid $G$ parameters.
     InverseHybrid,
+    /// Hybrid $H$ parameters.
     Hybrid,
+    /// Scattering-transfer $T$ parameters.
     ScatteringTransfer,
 }
 
 /// Named result of [`tuner_constellation`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct TunerConstellation {
+    /// Networks corresponding to the tuner points.
     pub networks: NetworkSet,
+    /// Real parts of the reflection coefficients.
     pub real: Array1<f64>,
+    /// Imaginary parts of the reflection coefficients.
     pub imaginary: Array1<f64>,
+    /// Complex reflection coefficients.
     pub reflection: Array1<Complex64>,
 }
 
-/// Origin: `skrf/networkSet.py::NetworkSet`.
+/// An unordered collection of aligned N-port networks.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct NetworkSet {
+    /// Networks in the set.
     pub networks: Vec<Network>,
+    /// Optional set name.
     pub name: Option<String>,
+    /// Numeric parameter values aligned with the networks.
     pub parameters: BTreeMap<String, Vec<f64>>,
+    /// Text parameter values aligned with the networks.
     pub text_parameters: BTreeMap<String, Vec<String>>,
 }
 
 impl NetworkSet {
+    /// Creates a set whose members share frequency axis and port count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the networks do not share the same port count and frequency axis.
     pub fn new(networks: Vec<Network>, name: Option<String>) -> Result<Self> {
         if let Some(first) = networks.first() {
             for network in networks.iter().skip(1) {
@@ -95,6 +138,10 @@ impl NetworkSet {
     /// Constructs a set from every Touchstone member of a ZIP archive.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.from_zip`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the archive cannot be read or its networks are incompatible.
     pub fn from_zip(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let networks = crate::io::read_zipped_touchstones(path)?
@@ -109,6 +156,10 @@ impl NetworkSet {
     /// Creates a set from supported network files in one directory.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.from_dir`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be read or its networks are incompatible.
     pub fn from_directory(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let networks = crate::io::read_all_networks(path, None, false)?
@@ -124,12 +175,18 @@ impl NetworkSet {
     /// Creates named networks from scattering matrices and a shared frequency axis.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.from_s_dict`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a matrix is non-square, its point count differs from the frequency
+    /// axis, or the constructed networks are incompatible.
     pub fn from_s_map(
         values: BTreeMap<String, Array3<Complex64>>,
-        frequency: Frequency,
+        frequency: impl std::borrow::Borrow<Frequency>,
         reference_impedance: Complex64,
         name: Option<String>,
     ) -> Result<Self> {
+        let frequency = frequency.borrow();
         let mut networks = Vec::with_capacity(values.len());
         for (network_name, scattering) in values {
             let (points, rows, columns) = scattering.dim();
@@ -155,6 +212,10 @@ impl NetworkSet {
     /// Reads a Generalized MDIF file into a parameterized set.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.from_mdif`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, parsed, or converted to a network set.
     pub fn from_mdif(path: impl AsRef<Path>) -> Result<Self> {
         Mdif::from_path(path)?.to_network_set()
     }
@@ -162,14 +223,22 @@ impl NetworkSet {
     /// Reads a CITI file into a parameterized set.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.from_citi`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, parsed, or converted to a network set.
     pub fn from_citi(path: impl AsRef<Path>) -> Result<Self> {
         Citi::from_path(path)?.to_network_set()
     }
 
+    /// Returns the number of networks.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.networks.len()
     }
 
+    /// Returns whether the set contains no networks.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.networks.is_empty()
     }
@@ -177,6 +246,10 @@ impl NetworkSet {
     /// Returns cloned networks keyed by their names.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.to_dict`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network is unnamed.
     pub fn to_network_map(&self) -> Result<BTreeMap<String, Network>> {
         self.networks
             .iter()
@@ -197,6 +270,10 @@ impl NetworkSet {
     /// Returns cloned scattering arrays keyed by network name.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.to_s_dict`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network is unnamed.
     pub fn to_s_map(&self) -> Result<BTreeMap<String, Array3<Complex64>>> {
         self.to_network_map().map(|networks| {
             networks
@@ -216,12 +293,18 @@ impl NetworkSet {
     }
 
     /// Port of `NetworkSet.has_params` for the typed parameter stores.
+    #[must_use]
     pub fn has_parameters(&self) -> bool {
         (!self.parameters.is_empty() || !self.text_parameters.is_empty())
             && self.validate_parameters().is_ok()
     }
 
     /// Validate and assign one parameter coordinate to every network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value count differs from the network count or a value is not
+    /// finite.
     pub fn set_parameter(&mut self, name: impl Into<String>, values: Vec<f64>) -> Result<()> {
         if values.len() != self.networks.len() {
             return Err(Error::IncompatibleShape(format!(
@@ -240,6 +323,10 @@ impl NetworkSet {
     }
 
     /// Assign a string-valued coordinate to every network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value count differs from the network count.
     pub fn set_text_parameter(
         &mut self,
         name: impl Into<String>,
@@ -257,6 +344,10 @@ impl NetworkSet {
     }
 
     /// Port of `skrf.networkSet.NetworkSet.sel` for numeric parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if stored parameter coordinates are inconsistent with the network count.
     pub fn select(&self, indexers: &BTreeMap<String, Vec<f64>>) -> Result<Self> {
         self.validate_parameters()?;
         if indexers.is_empty() {
@@ -280,6 +371,11 @@ impl NetworkSet {
 
     /// Port of `skrf.networkSet.NetworkSet.interpolate_from_params` for a
     /// numeric interpolation axis and optional exact numeric filters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the parameter is absent, coordinates are invalid, or interpolation
+    /// cannot be performed at the target.
     pub fn interpolate_from_parameter(
         &self,
         parameter: &str,
@@ -300,6 +396,10 @@ impl NetworkSet {
     }
 
     /// Port of `skrf.networkSet.NetworkSet.interpolate_frequency`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any member cannot be interpolated to the requested frequency axis.
     pub fn interpolate_frequency(&self, frequency: &crate::Frequency) -> Result<Self> {
         let networks = self
             .networks
@@ -315,6 +415,10 @@ impl NetworkSet {
     }
 
     /// Port of `skrf.networkSet.NetworkSet.inv`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any member network cannot be inverted.
     pub fn inverse(&self) -> Result<Self> {
         let networks = self
             .networks
@@ -330,6 +434,10 @@ impl NetworkSet {
     }
 
     /// Port of `skrf.networkSet.NetworkSet.filter`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected parameter coordinates are inconsistent.
     pub fn filter_names(&self, needle: &str) -> Result<Self> {
         let indices = self
             .networks
@@ -368,6 +476,7 @@ impl NetworkSet {
     }
 
     /// Returns a name-sorted clone while retaining all parameter coordinates.
+    #[must_use]
     pub fn sorted_by_name(&self) -> Self {
         let mut sorted = self.clone();
         sorted.sort_by_name();
@@ -377,6 +486,10 @@ impl NetworkSet {
     /// Returns `count` random samples with replacement using a caller-owned RNG.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.rand`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty.
     pub fn random_networks_with_rng<R: Rng + ?Sized>(
         &self,
         count: usize,
@@ -395,6 +508,10 @@ impl NetworkSet {
     /// Applies one typed network operation to every member and preserves coordinates.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.element_wise_method`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails or produces mutually incompatible networks.
     pub fn map_networks(
         &self,
         mut operation: impl FnMut(&Network) -> Result<Network>,
@@ -411,6 +528,11 @@ impl NetworkSet {
     }
 
     /// Applies a typed pairwise operation to two compatible sets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sets differ in length, the operation fails, or its results are
+    /// mutually incompatible.
     pub fn zip_networks(
         &self,
         other: &Self,
@@ -435,64 +557,134 @@ impl NetworkSet {
         Ok(mapped)
     }
 
+    /// Adds paired networks element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sets differ in length or paired networks are incompatible.
     pub fn add_set(&self, other: &Self) -> Result<Self> {
         self.zip_networks(other, Network::add_elementwise)
     }
 
+    /// Subtracts paired networks element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sets differ in length or paired networks are incompatible.
     pub fn subtract_set(&self, other: &Self) -> Result<Self> {
         self.zip_networks(other, Network::subtract_elementwise)
     }
 
+    /// Multiplies paired networks element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sets differ in length or paired networks are incompatible.
     pub fn multiply_set(&self, other: &Self) -> Result<Self> {
         self.zip_networks(other, Network::multiply_elementwise)
     }
 
+    /// Divides paired networks element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sets differ in length or paired networks are incompatible.
     pub fn divide_set(&self, other: &Self) -> Result<Self> {
         self.zip_networks(other, Network::divide_elementwise)
     }
 
+    /// Cascades paired networks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sets differ in length or paired networks cannot be cascaded.
     pub fn cascade_set(&self, other: &Self) -> Result<Self> {
         self.zip_networks(other, Network::cascade)
     }
 
+    /// De-embeds each network using its paired fixture.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if set lengths differ or a network cannot be de-embedded by its fixture.
     pub fn deembed_set(&self, fixtures: &Self) -> Result<Self> {
         self.zip_networks(fixtures, |network, fixture| network.deembed(fixture, None))
     }
 
+    /// Adds one network elementwise to every member.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the supplied network is incompatible with any member.
     pub fn add_network(&self, other: &Network) -> Result<Self> {
         self.map_networks(|network| network.add_elementwise(other))
     }
 
+    /// Subtracts one network elementwise from every member.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the supplied network is incompatible with any member.
     pub fn subtract_network(&self, other: &Network) -> Result<Self> {
         self.map_networks(|network| network.subtract_elementwise(other))
     }
 
+    /// Multiplies every member elementwise by one network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the supplied network is incompatible with any member.
     pub fn multiply_network(&self, other: &Network) -> Result<Self> {
         self.map_networks(|network| network.multiply_elementwise(other))
     }
 
+    /// Divides every member elementwise by one network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the supplied network is incompatible with any member.
     pub fn divide_network(&self, other: &Network) -> Result<Self> {
         self.map_networks(|network| network.divide_elementwise(other))
     }
 
+    /// Cascades every member with one network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the supplied network cannot be cascaded with any member.
     pub fn cascade_network(&self, other: &Network) -> Result<Self> {
         self.map_networks(|network| network.cascade(other))
     }
 
+    /// De-embeds the same fixture from every member.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the fixture cannot de-embed any member.
     pub fn deembed_network(&self, fixture: &Network) -> Result<Self> {
         self.map_networks(|network| network.deembed(fixture, None))
     }
 
+    /// Returns the complex mean scattering matrix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty or the derived network cannot be constructed.
     pub fn mean_s(&self) -> Result<Network> {
         let first = self.first()?;
         let mut s = Array3::zeros(first.s.dim());
         for network in &self.networks {
             s += &network.s;
         }
-        s.mapv_inplace(|value| value / self.networks.len() as f64);
+        s.mapv_inplace(|value| value / self.networks.len().to_f64().unwrap_or(f64::INFINITY));
         self.derived_network(s, "mean")
     }
 
+    /// Returns scattering sample standard deviation stored in a network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty or the derived network cannot be constructed.
     pub fn std_s(&self) -> Result<Network> {
         let mean = self.mean_s()?;
         let mut variances = Array3::<f64>::zeros(mean.s.dim());
@@ -504,22 +696,34 @@ impl NetworkSet {
                 *variance += (*value - *mean_value).norm_sqr();
             }
         }
-        let count = self.networks.len() as f64;
+        let count = self.networks.len().to_f64().unwrap_or(f64::INFINITY);
         let standard_deviation =
             variances.mapv(|variance| Complex64::new((variance / count).sqrt(), 0.0));
         self.derived_network(standard_deviation, "std")
     }
 
+    /// Returns the complex mean of a selected network-parameter representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, parameter conversion fails, or the result cannot be
+    /// represented as a network.
     pub fn mean_parameter(&self, parameter: NetworkParameter) -> Result<Network> {
         let first = self.first()?;
         let mut mean = Array3::zeros(first.s.dim());
         for network in &self.networks {
             mean += &parameter_values(network, parameter)?;
         }
-        mean.mapv_inplace(|value| value / self.networks.len() as f64);
+        mean.mapv_inplace(|value| value / self.networks.len().to_f64().unwrap_or(f64::INFINITY));
         self.derived_network(mean, &format!("mean-{parameter:?}"))
     }
 
+    /// Returns sample standard deviation of a selected parameter representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, parameter conversion fails, or the result cannot be
+    /// represented as a network.
     pub fn std_parameter(&self, parameter: NetworkParameter) -> Result<Network> {
         let mean = self.mean_parameter(parameter)?;
         let mut variance = Array3::<f64>::zeros(mean.s.dim());
@@ -531,13 +735,19 @@ impl NetworkSet {
                 *variance += (*value - *mean_value).norm_sqr();
             }
         }
-        let count = self.networks.len() as f64;
+        let count = self.networks.len().to_f64().unwrap_or(f64::INFINITY);
         self.derived_network(
             variance.mapv(|value| Complex64::new((value / count).sqrt(), 0.0)),
             &format!("std-{parameter:?}"),
         )
     }
 
+    /// Returns the mean of a real-valued component of a parameter representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, parameter conversion fails, or the result cannot be
+    /// represented as a network.
     pub fn mean_parameter_component(
         &self,
         parameter: NetworkParameter,
@@ -546,6 +756,12 @@ impl NetworkSet {
         self.scalar_parameter_statistic(parameter, component, false)
     }
 
+    /// Returns standard deviation of a real-valued parameter component.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, parameter conversion fails, or the result cannot be
+    /// represented as a network.
     pub fn std_parameter_component(
         &self,
         parameter: NetworkParameter,
@@ -555,17 +771,25 @@ impl NetworkSet {
     }
 
     /// Mean scattering magnitude, stored as the real component of `Network.s`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty or the derived network cannot be constructed.
     pub fn mean_s_magnitude(&self) -> Result<Network> {
         let first = self.first()?;
         let mut mean = Array3::<f64>::zeros(first.s.dim());
         for network in &self.networks {
-            mean += &network.s.mapv(|value| value.norm());
+            mean += &network.s.mapv(Complex64::norm);
         }
-        mean.mapv_inplace(|value| value / self.networks.len() as f64);
+        mean.mapv_inplace(|value| value / self.networks.len().to_f64().unwrap_or(f64::INFINITY));
         self.derived_network(mean.mapv(|value| Complex64::new(value, 0.0)), "mean-s-mag")
     }
 
     /// Population standard deviation of scattering magnitude.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty or the derived network cannot be constructed.
     pub fn std_s_magnitude(&self) -> Result<Network> {
         let mean = self.mean_s_magnitude()?;
         let mut variance = Array3::<f64>::zeros(mean.s.dim());
@@ -576,7 +800,7 @@ impl NetworkSet {
                 *variance += (value.norm() - mean_value.re).powi(2);
             }
         }
-        let count = self.networks.len() as f64;
+        let count = self.networks.len().to_f64().unwrap_or(f64::INFINITY);
         self.derived_network(
             variance.mapv(|value| Complex64::new((value / count).sqrt(), 0.0)),
             "std-s-mag",
@@ -584,17 +808,25 @@ impl NetworkSet {
     }
 
     /// Mean scattering phase in degrees, stored in the real component.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty or the derived network cannot be constructed.
     pub fn mean_s_phase_degrees(&self) -> Result<Network> {
         let first = self.first()?;
         let mut mean = Array3::<f64>::zeros(first.s.dim());
         for network in &self.networks {
             mean += &network.s.mapv(|value| value.arg().to_degrees());
         }
-        mean.mapv_inplace(|value| value / self.networks.len() as f64);
+        mean.mapv_inplace(|value| value / self.networks.len().to_f64().unwrap_or(f64::INFINITY));
         self.derived_network(mean.mapv(|value| Complex64::new(value, 0.0)), "mean-s-deg")
     }
 
     /// Population standard deviation of scattering phase in degrees.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty or the derived network cannot be constructed.
     pub fn std_s_phase_degrees(&self) -> Result<Network> {
         let mean = self.mean_s_phase_degrees()?;
         let mut variance = Array3::<f64>::zeros(mean.s.dim());
@@ -605,7 +837,7 @@ impl NetworkSet {
                 *variance += (value.arg().to_degrees() - mean_value.re).powi(2);
             }
         }
-        let count = self.networks.len() as f64;
+        let count = self.networks.len().to_f64().unwrap_or(f64::INFINITY);
         self.derived_network(
             variance.mapv(|value| Complex64::new((value / count).sqrt(), 0.0)),
             "std-s-deg",
@@ -613,6 +845,10 @@ impl NetworkSet {
     }
 
     /// Mean magnitude converted to decibels after aggregation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the magnitude mean cannot be computed.
     pub fn mean_s_db(&self) -> Result<Network> {
         let mut network = self.mean_s_magnitude()?;
         network.s.mapv_inplace(|value| {
@@ -622,6 +858,10 @@ impl NetworkSet {
     }
 
     /// Magnitude standard deviation converted to decibels after aggregation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the magnitude standard deviation cannot be computed.
     pub fn std_s_db(&self) -> Result<Network> {
         let mut network = self.std_s_magnitude()?;
         network.s.mapv_inplace(|value| {
@@ -633,6 +873,11 @@ impl NetworkSet {
     /// Returns the mean, lower bound, and upper bound for a selected attribute.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.uncertainty_ntwk_triplet`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `deviations` is not finite or the selected statistic cannot be
+    /// computed.
     pub fn uncertainty_network_triplet(
         &self,
         attribute: NetworkSetAttribute,
@@ -713,6 +958,10 @@ impl NetworkSet {
     /// Adds independent Gaussian magnitude and phase noise characterized by this set.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.add_polar_noise`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, the target shape differs, or noise generation fails.
     pub fn add_polar_noise(&self, network: &Network) -> Result<Network> {
         let first = self.first()?;
         if network.frequency != first.frequency || network.s.dim() != first.s.dim() {
@@ -741,6 +990,10 @@ impl NetworkSet {
     /// Parses every network name as a sortable scikit-rf timestamp.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.datetime_index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any network is unnamed or its name is not a supported timestamp.
     pub fn datetime_index(&self) -> Result<Vec<NaiveDateTime>> {
         self.networks
             .iter()
@@ -758,11 +1011,20 @@ impl NetworkSet {
     /// Writes this set using the safe Rust object format.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.write`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the destination exists without overwrite permission, serialization
+    /// fails, or the file cannot be written.
     pub fn write_to_path(&self, path: impl AsRef<Path>, overwrite: bool) -> Result<PathBuf> {
         crate::io::write_object(path, &StoredObject::NetworkSet(self.clone()), overwrite)
     }
 
     /// Writes this set using its name as the file path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is unnamed or writing the object fails.
     pub fn write_named(&self, overwrite: bool) -> Result<PathBuf> {
         let name = self.name.as_deref().ok_or_else(|| {
             Error::Unsupported("an unnamed NetworkSet needs an explicit output path".to_owned())
@@ -773,6 +1035,10 @@ impl NetworkSet {
     /// Writes a Generalized MDIF representation.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.write_mdif`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set cannot be represented as MDIF or the file cannot be written.
     pub fn write_mdif(&self, path: impl AsRef<Path>, comments: &[String]) -> Result<()> {
         Mdif::write_to_path(self, path, comments)
     }
@@ -780,6 +1046,10 @@ impl NetworkSet {
     /// Writes one worksheet per network.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.write_spreadsheet`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if network data cannot be converted or the workbook cannot be written.
     #[cfg(feature = "xlsx")]
     pub fn write_spreadsheet(
         &self,
@@ -793,6 +1063,10 @@ impl NetworkSet {
     ///
     /// Axes are frequency, observation, and column-major port/re-imaginary
     /// component index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty.
     pub fn scalar_s_matrix(&self) -> Result<Array3<f64>> {
         let first = self.first()?;
         let components = 2 * first.ports() * first.ports();
@@ -813,7 +1087,11 @@ impl NetworkSet {
         Ok(scalar)
     }
 
-    /// Port of `NetworkSet.cov` using NumPy's sample-covariance convention.
+    /// Port of `NetworkSet.cov` using `NumPy`'s sample-covariance convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fewer than two networks are available or scalar projection fails.
     pub fn covariance_s(&self) -> Result<Array3<f64>> {
         if self.networks.len() < 2 {
             return Err(Error::IncompatibleShape(
@@ -829,7 +1107,7 @@ impl NetworkSet {
                     (0..observations)
                         .map(|observation| scalar[(point, observation, component)])
                         .sum::<f64>()
-                        / observations as f64
+                        / observations.to_f64().unwrap_or(f64::INFINITY)
                 })
                 .collect::<Vec<_>>();
             for row in 0..components {
@@ -840,13 +1118,18 @@ impl NetworkSet {
                                 * (scalar[(point, observation, column)] - means[column])
                         })
                         .sum::<f64>()
-                        / (observations - 1) as f64;
+                        / (observations - 1).to_f64().unwrap_or(f64::INFINITY);
                 }
             }
         }
         Ok(covariance)
     }
 
+    /// Interpolates a network using the first numeric set parameter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one parameter axis exists or interpolation fails.
     pub fn interpolate_from_network(&self, parameter: f64) -> Result<Network> {
         if self.parameters.len() != 1 {
             return Err(Error::Unsupported(
@@ -863,6 +1146,11 @@ impl NetworkSet {
 
     /// Port of `skrf.networkSet.NetworkSet.interpolate_from_network` with the
     /// upstream `ntw_param` argument represented explicitly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty set, mismatched or non-finite values, duplicate coordinates,
+    /// an out-of-range target, or a network construction failure.
     pub fn interpolate_from_values(&self, values: &[f64], target: f64) -> Result<Network> {
         self.first()?;
         if values.len() != self.networks.len() || values.len() < 2 {
@@ -884,7 +1172,10 @@ impl NetworkSet {
             .map(|(index, value)| (value, index))
             .collect::<Vec<_>>();
         ordered.sort_by(|left, right| left.0.total_cmp(&right.0));
-        if ordered.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        if ordered.windows(2).any(|pair| {
+            (pair[0].0 - pair[1].0).abs()
+                <= f64::EPSILON * pair[0].0.abs().max(pair[1].0.abs()).max(1.0)
+        }) {
             return Err(Error::Unsupported(
                 "network interpolation parameter values must be unique".to_owned(),
             ));
@@ -894,7 +1185,9 @@ impl NetworkSet {
                 "network interpolation target lies outside the parameter range".to_owned(),
             ));
         }
-        if let Some((_, index)) = ordered.iter().find(|(value, _)| *value == target) {
+        if let Some((_, index)) = ordered.iter().find(|(value, _)| {
+            (*value - target).abs() <= f64::EPSILON * value.abs().max(target.abs()).max(1.0)
+        }) {
             return Ok(self.networks[*index].clone());
         }
         let upper = ordered
@@ -914,6 +1207,12 @@ impl NetworkSet {
         self.derived_network(s, "interpolated")
     }
 
+    /// Converts the parameterized set into a row-oriented `DataFrame`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, has no parameters, parameter lengths differ from the
+    /// network count, or `DataFrame` construction fails.
     #[cfg(feature = "dataframe")]
     pub fn to_dataframe(&self) -> Result<polars::frame::DataFrame> {
         use polars::prelude::Column;
@@ -993,6 +1292,11 @@ impl NetworkSet {
     /// Exports one scalar port component per named network.
     ///
     /// Origin: `skrf.networkSet.NetworkSet.ntwk_attr_2_df`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the set is empty, either port is invalid, or `DataFrame` construction
+    /// fails.
     #[cfg(feature = "dataframe")]
     pub fn network_attribute_dataframe(
         &self,
@@ -1049,7 +1353,7 @@ impl NetworkSet {
         for values in &projected {
             mean += values;
         }
-        mean.mapv_inplace(|value| value / projected.len() as f64);
+        mean.mapv_inplace(|value| value / projected.len().to_f64().unwrap_or(f64::INFINITY));
         let values = if standard_deviation {
             let mut variance = Array3::<f64>::zeros(first.s.dim());
             for values in &projected {
@@ -1059,7 +1363,8 @@ impl NetworkSet {
                     *variance += (*value - *mean).powi(2);
                 }
             }
-            variance.mapv(|value| (value / projected.len() as f64).sqrt())
+            variance
+                .mapv(|value| (value / projected.len().to_f64().unwrap_or(f64::INFINITY)).sqrt())
         } else {
             mean
         };
@@ -1133,8 +1438,8 @@ impl NetworkSet {
         let first = self.first()?;
         let mut network = Network::new(first.frequency.clone(), s, first.z0.clone())?;
         network.name = self.name.as_ref().map(|name| format!("{name}-{operation}"));
-        network.comments = first.comments.clone();
-        network.port_names = first.port_names.clone();
+        network.comments.clone_from(&first.comments);
+        network.port_names.clone_from(&first.port_names);
         network.variables = first.variables.clone();
         network.s_definition = first.s_definition;
         Ok(network)
@@ -1168,6 +1473,11 @@ fn scalar_component(value: Complex64, component: NetworkScalarAttribute) -> f64 
 /// Applies a typed aggregate to the scattering matrices of compatible networks.
 ///
 /// Origin: `skrf.networkSet.func_on_networks` (`fon`).
+///
+/// # Errors
+///
+/// Returns an error if the input is empty or incompatible, the aggregate fails, or its output
+/// shape differs from the input shape.
 pub fn function_on_networks(
     networks: &[Network],
     name: Option<String>,
@@ -1198,6 +1508,10 @@ pub fn function_on_networks(
 /// Selects dictionary entries whose key contains a substring.
 ///
 /// Origin: `skrf.networkSet.getset`.
+///
+/// # Errors
+///
+/// Returns an error if the selected networks do not share a port count and frequency axis.
 pub fn get_set(
     networks: &BTreeMap<String, Network>,
     needle: &str,
@@ -1219,6 +1533,11 @@ pub fn get_set(
 ///
 /// The tuple contains the network set, real coordinates, imaginary coordinates,
 /// and complex reflection coefficients. Origin: `skrf.networkSet.tuner_constellation`.
+///
+/// # Errors
+///
+/// Returns an error for zero grid dimensions, invalid frequency or impedance, or a failure to
+/// construct the frequency axis or networks.
 pub fn tuner_constellation(
     name: &str,
     frequency_hz: f64,
@@ -1240,16 +1559,25 @@ pub fn tuner_constellation(
             "tuner frequency and reference impedance must be positive and finite".to_owned(),
         ));
     }
-    let radial_denominator = radial_points.saturating_sub(1).max(1) as f64;
-    let angular_denominator = angular_points.saturating_sub(1).max(1) as f64;
+    let radial_denominator = radial_points
+        .saturating_sub(1)
+        .max(1)
+        .to_f64()
+        .unwrap_or(f64::INFINITY);
+    let angular_denominator = angular_points
+        .saturating_sub(1)
+        .max(1)
+        .to_f64()
+        .unwrap_or(f64::INFINITY);
     let mut gamma = Vec::with_capacity(radial_points * angular_points);
     for angle_index in 0..angular_points {
-        let angle = std::f64::consts::TAU * angle_index as f64 / angular_denominator;
+        let angle = std::f64::consts::TAU * angle_index.to_f64().unwrap_or(f64::INFINITY)
+            / angular_denominator;
         for radial_index in 0..radial_points {
             let radius = if radial_points == 1 {
                 0.1
             } else {
-                0.1 + 0.8 * radial_index as f64 / radial_denominator
+                0.1 + 0.8 * radial_index.to_f64().unwrap_or(f64::INFINITY) / radial_denominator
             };
             gamma.push(Complex64::from_polar(radius, angle));
         }

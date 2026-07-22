@@ -6,28 +6,52 @@ use rust_rf::constants::{
 
 #[test]
 fn exposes_upstream_physical_constants() {
-    assert_eq!(SPEED_OF_LIGHT, 299_792_458.0);
-    assert_eq!(INCH, 0.0254);
-    assert_eq!(MIL, 25.4e-6);
-    assert_eq!(BOLTZMANN_CONSTANT, 1.380_648_52e-23);
-    assert_eq!(REFERENCE_TEMPERATURE, 290.0);
+    assert_relative_eq!(
+        SPEED_OF_LIGHT,
+        299_792_458.0,
+        epsilon = 0.0,
+        max_relative = 1.0e-12
+    );
+    assert_relative_eq!(INCH, 0.0254, epsilon = 0.0, max_relative = 1.0e-12);
+    assert_relative_eq!(MIL, 25.4e-6, epsilon = 0.0, max_relative = 1.0e-12);
+    assert_relative_eq!(
+        BOLTZMANN_CONSTANT,
+        1.380_648_52e-23,
+        epsilon = 0.0,
+        max_relative = 1.0e-12
+    );
+    assert_relative_eq!(
+        REFERENCE_TEMPERATURE,
+        290.0,
+        epsilon = 0.0,
+        max_relative = 1.0e-12
+    );
 }
 
 #[test]
 fn converts_length_and_time_units_to_meters() {
-    assert_eq!(
+    assert_relative_eq!(
         to_meters(2.0, DistanceUnit::Centimeter, None).unwrap(),
-        0.02
+        0.02,
+        epsilon = 0.0,
+        max_relative = 1.0e-12
     );
-    assert_eq!(to_meters(1.0, DistanceUnit::Inch, None).unwrap(), INCH);
+    assert_relative_eq!(
+        to_meters(1.0, DistanceUnit::Inch, None).unwrap(),
+        INCH,
+        epsilon = 0.0,
+        max_relative = 1.0e-12
+    );
     assert_relative_eq!(
         to_meters(1.0, DistanceUnit::Nanosecond, None).unwrap(),
         0.299_792_458,
         epsilon = 1.0e-15
     );
-    assert_eq!(
+    assert_relative_eq!(
         to_meters(2.0, DistanceUnit::Microsecond, Some(2.0e8)).unwrap(),
-        400.0
+        400.0,
+        epsilon = 0.0,
+        max_relative = 1.0e-12
     );
     assert_eq!(
         distances_to_meters(&[1.0, 2.0], DistanceUnit::Millimeter, None).unwrap(),

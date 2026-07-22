@@ -1,8 +1,15 @@
+//! Backend-neutral plotting data for networks and network sets.
+//!
+//! Functions return simple plot, heatmap, violin, and band structures. Optional
+//! renderers can consume these structures without coupling RF calculations to
+//! a particular plotting library.
+
 #[cfg(feature = "plot")]
 use std::path::Path;
 
 use ndarray::Array3;
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 
 use crate::math::inverse_fft_centered;
 use crate::network::{passivity, reciprocity, s_to_y, s_to_z};
@@ -11,60 +18,93 @@ use crate::{Error, Network, NetworkSet, Result};
 /// Network parameter selected for plotting.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Parameter {
+    /// Scattering parameters.
     #[default]
     Scattering,
+    /// Impedance parameters.
     Impedance,
+    /// Admittance parameters.
     Admittance,
 }
 
 /// Scalar projection of a complex network parameter.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Component {
+    /// Magnitude as $20\log_{10}|x|$.
     #[default]
     Decibels,
+    /// Magnitude as $10\log_{10}|x|$.
     Decibels10,
+    /// Linear magnitude $|x|$.
     Magnitude,
+    /// Phase in degrees.
     PhaseDegrees,
+    /// Real component.
     Real,
+    /// Imaginary component.
     Imaginary,
+    /// Voltage standing-wave ratio.
     Vswr,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// One labeled XY trace.
 pub struct PlotSeries {
+    /// Legend label.
     pub label: String,
+    /// Horizontal coordinates.
     pub x: Vec<f64>,
+    /// Vertical coordinates.
     pub y: Vec<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Backend-neutral collection of XY traces and axis labels.
 pub struct Plot {
+    /// Plot title.
     pub title: String,
+    /// Horizontal-axis label.
     pub x_label: String,
+    /// Vertical-axis label.
     pub y_label: String,
+    /// Traces to render.
     pub series: Vec<PlotSeries>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Rectangular scalar field for contour or image rendering.
 pub struct Heatmap {
+    /// Heatmap title.
     pub title: String,
+    /// Horizontal coordinates.
     pub x: Vec<f64>,
+    /// Vertical coordinates.
     pub y: Vec<f64>,
+    /// Values indexed by vertical then horizontal coordinate.
     pub values: Vec<Vec<f64>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Samples forming one slice of a violin plot.
 pub struct ViolinSlice {
+    /// Position of the slice.
     pub x: f64,
+    /// Sample values at that position.
     pub samples: Vec<f64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Colored rectangular band spanning an X interval and Y range.
 pub struct ShadedBand {
+    /// Start of the horizontal interval.
     pub x_start: f64,
+    /// End of the horizontal interval.
     pub x_stop: f64,
+    /// Lower vertical bound.
     pub y_minimum: f64,
+    /// Upper vertical bound.
     pub y_maximum: f64,
+    /// Normalized position used to select the band color.
     pub color_fraction: f64,
 }
 
@@ -72,6 +112,7 @@ pub struct ShadedBand {
 ///
 /// This is the Rust equivalent of `skrf.setup_plotting` without process-global
 /// plotting side effects.
+#[must_use]
 pub fn configured_style() -> Option<&'static str> {
     std::env::var("SKRF_PLOT_ENV")
         .ok()
@@ -83,6 +124,10 @@ pub fn configured_style() -> Option<&'static str> {
 ///
 /// Origin: `skrf.plotting.plot_rectangular`, `subplot_params`, and generated
 /// `Network.plot_*` methods.
+///
+/// # Errors
+///
+/// Returns an error if parameter conversion or port selection fails.
 pub fn network_plot(
     network: &Network,
     parameter: Parameter,
@@ -112,6 +157,10 @@ pub fn network_plot(
 /// Builds complex-plane data. With `polar`, x is phase in radians and y is magnitude.
 ///
 /// Origin: `plot_complex_rectangular`, `plot_complex_polar`, and `plot_polar`.
+///
+/// # Errors
+///
+/// Returns an error if parameter conversion or port selection fails.
 pub fn complex_plot(
     network: &Network,
     parameter: Parameter,
@@ -145,14 +194,23 @@ pub fn complex_plot(
 }
 
 /// Smith-chart data uses normalized complex scattering values.
+///
+/// # Errors
+///
+/// Returns an error if complex scattering plot construction fails.
 pub fn smith_plot(network: &Network, ports: Option<(usize, usize)>) -> Result<Plot> {
     let mut plot = complex_plot(network, Parameter::Scattering, ports, false)?;
     plot.title = format!("{} - Smith chart", plot.title);
-    plot.x_label = "Normalized resistance".to_owned();
-    plot.y_label = "Normalized reactance".to_owned();
+    "Normalized resistance".clone_into(&mut plot.x_label);
+    "Normalized reactance".clone_into(&mut plot.y_label);
     Ok(plot)
 }
 
+/// Builds diagonal passivity-metric traces for one or every port.
+///
+/// # Errors
+///
+/// Returns an error if passivity calculation fails or `port` is invalid.
 pub fn passivity_plot(network: &Network, port: Option<usize>) -> Result<Plot> {
     let values = passivity(&network.s)?;
     let ports = match port {
@@ -182,6 +240,11 @@ pub fn passivity_plot(network: &Network, port: Option<usize>) -> Result<Plot> {
     })
 }
 
+/// Builds traces of reciprocity error $|S_{ij}-S_{ji}|$.
+///
+/// # Errors
+///
+/// Returns an error if reciprocity calculation fails.
 pub fn reciprocity_plot(network: &Network, decibels: bool) -> Result<Plot> {
     let values = reciprocity(&network.s)?;
     let mut series = Vec::new();
@@ -217,6 +280,10 @@ pub fn reciprocity_plot(network: &Network, decibels: bool) -> Result<Plot> {
 }
 
 /// Distance of `Sij / Sji` from unity (upstream reciprocity metric #2).
+///
+/// # Errors
+///
+/// Returns an error if a reciprocal ratio cannot be represented.
 pub fn reciprocity2_plot(network: &Network, decibels: bool) -> Result<Plot> {
     let mut series = Vec::new();
     for output in 0..network.ports() {
@@ -257,6 +324,10 @@ pub fn reciprocity2_plot(network: &Network, decibels: bool) -> Result<Plot> {
 }
 
 /// Centered inverse-FFT S-parameter plot data.
+///
+/// # Errors
+///
+/// Returns an error if port selection or inverse-FFT calculation fails.
 pub fn time_domain_plot(
     network: &Network,
     component: Component,
@@ -289,7 +360,11 @@ pub fn time_domain_plot(
     })
 }
 
-/// Mean with one-standard-deviation bounds for a NetworkSet component.
+/// Mean with one-standard-deviation bounds for a `NetworkSet` component.
+///
+/// # Errors
+///
+/// Returns an error if the set is empty or the selected ports are invalid.
 pub fn uncertainty_plot(
     set: &NetworkSet,
     component: Component,
@@ -310,10 +385,11 @@ pub fn uncertainty_plot(
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
+    let sample_count = projected.len().to_f64().ok_or_else(|| {
+        Error::Unsupported("sample count cannot be represented as f64".to_owned())
+    })?;
     let mean = (0..points)
-        .map(|point| {
-            projected.iter().map(|values| values[point]).sum::<f64>() / projected.len() as f64
-        })
+        .map(|point| projected.iter().map(|values| values[point]).sum::<f64>() / sample_count)
         .collect::<Vec<_>>();
     let deviation = (0..points)
         .map(|point| {
@@ -321,7 +397,7 @@ pub fn uncertainty_plot(
                 .iter()
                 .map(|values| (values[point] - mean[point]).powi(2))
                 .sum::<f64>()
-                / projected.len() as f64)
+                / sample_count)
                 .sqrt()
         })
         .collect::<Vec<_>>();
@@ -361,6 +437,11 @@ pub fn uncertainty_plot(
     })
 }
 
+/// Builds mean traces with symmetric standard-deviation bounds.
+///
+/// # Errors
+///
+/// Returns an error if `deviations` is invalid or uncertainty calculation fails.
 pub fn uncertainty_bounds_plot(
     set: &NetworkSet,
     component: Component,
@@ -377,12 +458,17 @@ pub fn uncertainty_bounds_plot(
     let mean = plot.series[0].y.clone();
     for series in &mut plot.series[1..] {
         for (point, value) in series.y.iter_mut().enumerate() {
-            *value = mean[point] + deviations * (*value - mean[point]);
+            *value = deviations.mul_add(*value - mean[point], mean[point]);
         }
     }
     Ok(plot)
 }
 
+/// Builds mean traces bounded by the minimum and maximum set members.
+///
+/// # Errors
+///
+/// Returns an error if set projection or port selection fails.
 pub fn minmax_bounds_plot(
     set: &NetworkSet,
     component: Component,
@@ -421,6 +507,11 @@ pub fn minmax_bounds_plot(
     })
 }
 
+/// Builds total, within-group, and between-group uncertainty traces.
+///
+/// # Errors
+///
+/// Returns an error if uncertainty or port-selection calculation fails.
 pub fn uncertainty_decomposition_plot(
     set: &NetworkSet,
     output: usize,
@@ -457,10 +548,15 @@ pub fn uncertainty_decomposition_plot(
     })
 }
 
+/// Builds $\log_{10}(\sigma)$ versus mean magnitude for a selected S-parameter.
+///
+/// # Errors
+///
+/// Returns an error if uncertainty calculation or port selection fails.
 pub fn log_sigma_plot(set: &NetworkSet, output: usize, input: usize) -> Result<Plot> {
     let mut plot = uncertainty_plot(set, Component::Magnitude, output, input)?;
-    plot.title = "Log sigma".to_owned();
-    plot.y_label = "log10(sigma)".to_owned();
+    "Log sigma".clone_into(&mut plot.title);
+    "log10(sigma)".clone_into(&mut plot.y_label);
     plot.series = vec![PlotSeries {
         label: "log sigma".to_owned(),
         x: plot.series[0].x.clone(),
@@ -474,6 +570,11 @@ pub fn log_sigma_plot(set: &NetworkSet, output: usize, input: usize) -> Result<P
     Ok(plot)
 }
 
+/// Builds a network-set signature heatmap over member and frequency indices.
+///
+/// # Errors
+///
+/// Returns an error if set projection or port selection fails.
 pub fn signature(
     set: &NetworkSet,
     component: Component,
@@ -481,14 +582,26 @@ pub fn signature(
     input: usize,
 ) -> Result<Heatmap> {
     let (first, projected) = projected_set(set, component, output, input)?;
+    let member_indices = (0..projected.len())
+        .map(|index| {
+            index.to_f64().ok_or_else(|| {
+                Error::Unsupported("network index cannot be represented as f64".to_owned())
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     Ok(Heatmap {
         title: "NetworkSet signature".to_owned(),
         x: first.frequency.values_hz().to_vec(),
-        y: (0..projected.len()).map(|index| index as f64).collect(),
+        y: member_indices,
         values: projected,
     })
 }
 
+/// Returns per-frequency sample slices for a violin plot.
+///
+/// # Errors
+///
+/// Returns an error if set projection or port selection fails.
 pub fn violin_data(
     set: &NetworkSet,
     component: Component,
@@ -504,6 +617,11 @@ pub fn violin_data(
         .collect())
 }
 
+/// Builds one plot frame per network-set member.
+///
+/// # Errors
+///
+/// Returns an error if any member plot cannot be constructed.
 pub fn animation_frames(
     set: &NetworkSet,
     component: Component,
@@ -515,6 +633,11 @@ pub fn animation_frames(
         .collect()
 }
 
+/// Validates and packages gridded values as a [`Heatmap`].
+///
+/// # Errors
+///
+/// Returns an error if the value grid dimensions do not match the axes.
 pub fn contour_data(
     x: &[f64],
     y: &[f64],
@@ -534,6 +657,11 @@ pub fn contour_data(
     })
 }
 
+/// Creates alternating normalized-color bands between consecutive X edges.
+///
+/// # Errors
+///
+/// Returns an error if edges are not increasing or the Y range is invalid.
 pub fn shaded_bands(edges: &[f64], y_range: (f64, f64)) -> Result<Vec<ShadedBand>> {
     if edges.len() < 2
         || edges.windows(2).any(|pair| pair[0] >= pair[1])
@@ -545,19 +673,30 @@ pub fn shaded_bands(edges: &[f64], y_range: (f64, f64)) -> Result<Vec<ShadedBand
             "shaded bands require increasing edges and a finite y range".to_owned(),
         ));
     }
-    Ok(edges
+    let color_steps = edges
+        .len()
+        .to_f64()
+        .ok_or_else(|| Error::Unsupported("edge count cannot be represented as f64".to_owned()))?;
+    edges
         .windows(2)
         .enumerate()
-        .map(|(index, pair)| ShadedBand {
-            x_start: pair[0],
-            x_stop: pair[1],
-            y_minimum: y_range.0,
-            y_maximum: y_range.1,
-            color_fraction: index as f64 / edges.len() as f64,
+        .map(|(index, pair)| {
+            let color_index = index.to_f64().ok_or_else(|| {
+                Error::Unsupported("band index cannot be represented as f64".to_owned())
+            })?;
+            Ok(ShadedBand {
+                x_start: pair[0],
+                x_stop: pair[1],
+                y_minimum: y_range.0,
+                y_maximum: y_range.1,
+                color_fraction: color_index / color_steps,
+            })
         })
-        .collect())
+        .collect()
 }
 
+/// Builds a two-point complex vector trace beginning at `offset`.
+#[must_use]
 pub fn vector_plot(value: Complex64, offset: Complex64) -> Plot {
     Plot {
         title: "Complex vector".to_owned(),
@@ -572,6 +711,11 @@ pub fn vector_plot(value: Complex64, offset: Complex64) -> Plot {
 }
 
 #[cfg(feature = "plot")]
+/// Renders a plot to an SVG file.
+///
+/// # Errors
+///
+/// Returns an error if bounds calculation, file creation, or rendering fails.
 pub fn render_svg(plot: &Plot, path: impl AsRef<Path>, size: (u32, u32)) -> Result<()> {
     use plotters::prelude::*;
 
@@ -687,7 +831,7 @@ fn project(value: Complex64, component: Component) -> f64 {
     }
 }
 
-fn parameter_symbol(parameter: Parameter) -> &'static str {
+const fn parameter_symbol(parameter: Parameter) -> &'static str {
     match parameter {
         Parameter::Scattering => "S",
         Parameter::Impedance => "Z",
@@ -695,7 +839,7 @@ fn parameter_symbol(parameter: Parameter) -> &'static str {
     }
 }
 
-fn component_label(component: Component) -> &'static str {
+const fn component_label(component: Component) -> &'static str {
     match component {
         Component::Decibels => "Magnitude (dB)",
         Component::Decibels10 => "Magnitude (dB10)",
@@ -717,7 +861,8 @@ fn bounds(values: impl Iterator<Item = f64>) -> Result<(f64, f64)> {
     }
     let mut minimum = finite.iter().copied().fold(f64::INFINITY, f64::min);
     let mut maximum = finite.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    if minimum == maximum {
+    let scale = minimum.abs().max(maximum.abs()).max(1.0);
+    if (minimum - maximum).abs() <= f64::EPSILON * scale {
         minimum -= 1.0;
         maximum += 1.0;
     }

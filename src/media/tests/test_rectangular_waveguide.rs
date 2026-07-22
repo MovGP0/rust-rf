@@ -1,5 +1,7 @@
 ﻿#![allow(unused_imports)]
 
+//! Rectangular-waveguide cutoff, impedance, and wall-loss regressions.
+
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
@@ -16,6 +18,7 @@ use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
 
 const TOLERANCE: f64 = 1.0e-10;
 
+/// Checks cutoff and propagation below and above the dominant-mode cutoff frequency.
 #[test]
 fn calculates_rectangular_waveguide_cutoff_and_propagation() {
     let width = 100.0 * 0.000_025_4;
@@ -42,6 +45,7 @@ fn calculates_rectangular_waveguide_cutoff_and_propagation() {
     assert!(impedance[1].re > 0.0);
 }
 
+/// Checks derivation of broad-wall width from a target TE impedance.
 #[test]
 fn derives_rectangular_waveguide_width_from_impedance() {
     let frequency = Frequency::new(90.0, 90.0, 1, FrequencyUnit::GHz, SweepType::Linear)
@@ -56,6 +60,7 @@ fn derives_rectangular_waveguide_width_from_impedance() {
     assert_relative_eq!(impedance[0].im, 0.0, epsilon = TOLERANCE);
 }
 
+/// Checks conductor attenuation and the additional loss caused by wall roughness.
 #[test]
 fn applies_rectangular_waveguide_conductor_and_roughness_loss() {
     let frequency = Frequency::new(75.0, 110.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -111,6 +116,10 @@ fn applies_rectangular_waveguide_conductor_and_roughness_loss() {
     );
 }
 
+/// Compares transmission magnitude with smooth and rough SWG fixtures.
+///
+/// Only magnitude is compared because the loss approximation omits the
+/// reactive field contribution at the sidewalls.
 #[test]
 fn matches_rectangular_waveguide_conductor_loss_fixtures() {
     for (fixture_name, roughness) in [

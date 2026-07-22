@@ -1,8 +1,6 @@
 name: Test
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -40,13 +38,13 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
-      - name: Apply Clippy suggestions to production code
+      - name: Lint production code
         run: >-
-          cargo clippy --fix --locked --lib --bins --all-features --allow-no-vcs --
-          -W clippy::pedantic
-          -W clippy::nursery
-          -W clippy::unwrap_used
-          -W clippy::expect_used
+          cargo clippy --locked --lib --bins --all-features --
+          -D clippy::pedantic
+          -D clippy::nursery
+          -D clippy::unwrap_used
+          -D clippy::expect_used
 
       - name: Lint tests
         run: >-

@@ -1,3 +1,10 @@
+//! Read and write file formats defined by METAS.
+//!
+//! See the [METAS VNA Tools] project for the associated measurement tools and
+//! file formats.
+//!
+//! [METAS VNA Tools]: https://www.metas.ch/vnatools
+
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -7,12 +14,28 @@ use crate::{Error, NetworkSet, Result};
 /// Write a METAS `sdatcv` file containing the complex mean and sample
 /// covariance of a compatible network set.
 ///
-/// Origin: `skrf/io/metas.py::ns_2_sdatcv`.
+/// The file contains frequency in hertz, reference impedances, the rectangular
+/// components of the mean scattering matrix, and the sample covariance matrix.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be created or written, or if the network
+/// set is empty or contains incompatible networks.
 pub fn write_sdatcv_to_path(network_set: &NetworkSet, path: impl AsRef<Path>) -> Result<()> {
     let writer = BufWriter::new(fs::File::create(path)?);
     write_sdatcv(network_set, writer)
 }
 
+/// Write a METAS `sdatcv` document to an arbitrary writer.
+///
+/// All networks must be compatible. The scattering mean is calculated in
+/// rectangular form, and the covariance is flattened in the order required by
+/// the SDATCV column headings.
+///
+/// # Errors
+///
+/// Returns an error if the network set is empty or incompatible, or if writing
+/// the generated SDATCV document fails.
 pub fn write_sdatcv(network_set: &NetworkSet, mut writer: impl Write) -> Result<()> {
     let first = network_set.networks.first().ok_or_else(|| {
         Error::IncompatibleShape("cannot write an empty NetworkSet as SDATCV".to_owned())

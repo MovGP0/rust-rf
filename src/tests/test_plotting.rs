@@ -1,3 +1,5 @@
+//! Backend-neutral plotting and optional SVG-rendering tests.
+
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -23,6 +25,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Checks rectangular, complex-plane, polar, and Smith plot series.
 #[test]
 fn builds_rectangular_complex_polar_and_smith_series() {
     let network = DATA.ntwk1().expect("network should load");
@@ -62,6 +65,7 @@ fn builds_rectangular_complex_polar_and_smith_series() {
     );
 }
 
+/// Checks passivity, reciprocity, and network-set uncertainty traces.
 #[test]
 fn builds_network_metrics_and_uncertainty_series() {
     let network = DATA.ntwk1().expect("network should load");
@@ -86,6 +90,7 @@ fn builds_network_metrics_and_uncertainty_series() {
     assert_eq!(uncertainty.series.len(), 3);
 }
 
+/// Checks notebook colors, generated method names, and Bokeh-compatible plot data.
 #[test]
 fn exposes_notebook_color_cycle_and_backend_neutral_plot() {
     let colors = trace_color_cycle(1).take(5).collect::<Vec<_>>();
@@ -131,6 +136,8 @@ fn exposes_notebook_color_cycle_and_backend_neutral_plot() {
     assert_eq!(use_bokeh(), BOKEH_NETWORK_METHODS);
 }
 
+/// Checks time-domain and advanced uncertainty, heatmap, violin, animation,
+/// contour, band, and vector plot data.
 #[test]
 fn builds_advanced_backend_neutral_plot_data() {
     let network = DATA.ntwk1().expect("network should load");
@@ -212,6 +219,7 @@ fn builds_advanced_backend_neutral_plot_data() {
 }
 
 #[cfg(feature = "plot")]
+/// Checks SVG rendering and the `plot-touchstone` command-line utility.
 #[test]
 fn renders_svg_and_runs_the_touchstone_plotter() {
     use std::process::Command;

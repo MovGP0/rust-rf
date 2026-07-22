@@ -1,9 +1,17 @@
+//! N-port microwave networks and network-parameter conversions.
+//!
+//! [`Network`] stores frequency-dependent scattering matrices, reference
+//! impedances, metadata, and optional noise parameters. This module also
+//! provides connection, cascading, interpolation, mixed-mode, and conversion
+//! operations used throughout the crate.
+
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::ZERO;
@@ -12,20 +20,33 @@ use crate::math::{
 };
 use crate::{Error, Frequency, Result};
 
-/// Origin: `skrf/network.py::Network`.
+const NOISE_PARAMETER_EQUALITY_TOLERANCE: f64 = 1.0e-12;
+
+/// A frequency-dependent N-port microwave network.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Network {
+    /// Network frequency axis.
     pub frequency: Frequency,
+    /// Scattering matrices with shape `(frequency, output port, input port)`.
     pub s: Array3<Complex64>,
+    /// Per-frequency, per-port reference impedances.
     pub z0: Array2<Complex64>,
+    /// Optional human-readable network name.
     pub name: Option<String>,
+    /// Free-form comments carried with the network.
     pub comments: String,
+    /// Optional names for individual ports.
     pub port_names: Vec<String>,
+    /// Additional string-valued variables or metadata.
     pub variables: BTreeMap<String, String>,
+    /// Scattering-wave definition used by `s`.
     pub s_definition: SParameterDefinition,
+    /// Optional two-port noise parameters.
     pub noise: Option<NoiseParameters>,
+    /// Single-ended, differential, or common designation for each port.
     #[serde(default)]
     pub port_modes: Vec<PortMode>,
+    /// Optional propagation constants associated with the ports.
     #[serde(default)]
     pub propagation_constants: Option<Array2<Complex64>>,
 }
@@ -33,24 +54,40 @@ pub struct Network {
 /// Touchstone single-ended, differential, or common-mode port designation.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PortMode {
+    /// Ordinary single-ended port.
     #[default]
     SingleEnded,
+    /// Differential-mode port.
     Differential,
+    /// Common-mode port.
     Common,
 }
 
 /// Four-parameter representation of two-port noise data.
 ///
+/// Equality uses scale-aware floating-point comparisons so equivalent values
+/// remain equal after conversion between Cartesian and polar representations.
+///
 /// Origin: `skrf.network.Network.set_noise_a`, `nfmin_db`, `g_opt`, and `rn`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NoiseParameters {
+    /// Frequencies at which the noise parameters are defined.
     pub frequency: Frequency,
+    /// Minimum noise figure in decibels.
     pub minimum_noise_figure_db: Array1<f64>,
+    /// Optimum source reflection coefficient $\Gamma_\mathrm{opt}$.
     pub optimal_reflection: Array1<Complex64>,
+    /// Equivalent noise resistance in ohms.
     pub equivalent_noise_resistance: Array1<f64>,
 }
 
 impl NoiseParameters {
+    /// Creates validated two-port noise parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parameter arrays do not match the frequency
+    /// axis or contain invalid values.
     pub fn new(
         frequency: Frequency,
         minimum_noise_figure_db: Array1<f64>,
@@ -92,26 +129,78 @@ impl NoiseParameters {
     }
 }
 
+impl PartialEq for NoiseParameters {
+    fn eq(&self, other: &Self) -> bool {
+        self.frequency == other.frequency
+            && real_arrays_equal(
+                &self.minimum_noise_figure_db,
+                &other.minimum_noise_figure_db,
+            )
+            && complex_arrays_equal(&self.optimal_reflection, &other.optimal_reflection)
+            && real_arrays_equal(
+                &self.equivalent_noise_resistance,
+                &other.equivalent_noise_resistance,
+            )
+    }
+}
+
+fn real_arrays_equal(left: &Array1<f64>, right: &Array1<f64>) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| scalars_equal(*left, *right))
+}
+
+fn complex_arrays_equal(left: &Array1<Complex64>, right: &Array1<Complex64>) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            scalars_equal(left.re, right.re) && scalars_equal(left.im, right.im)
+        })
+}
+
+fn scalars_equal(left: f64, right: f64) -> bool {
+    let scale = left.abs().max(right.abs()).max(1.0);
+    (left - right).abs() <= NOISE_PARAMETER_EQUALITY_TOLERANCE * scale
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+/// Definition used to normalize scattering waves for complex impedances.
 pub enum SParameterDefinition {
+    /// Kurokawa power waves.
     #[default]
     Power,
+    /// Pseudo waves.
     Pseudo,
+    /// Traveling waves.
     Traveling,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Interpolation method for frequency-dependent network data.
 pub enum InterpolationMode {
+    /// Linear interpolation of real and imaginary parts.
     #[default]
     CartesianLinear,
+    /// Linear interpolation of magnitude and unwrapped phase.
     PolarLinear,
+    /// Cubic interpolation.
     Cubic,
+    /// Rational interpolation with a selected polynomial degree.
     Rational {
+        /// Numerator and denominator degree used by the rational interpolator.
         degree: usize,
     },
 }
 
 impl Network {
+    /// Creates a network from scattering matrices and reference impedances.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the scattering matrices are not non-empty and
+    /// square, or when their dimensions disagree with the frequency axis or
+    /// reference impedances.
     pub fn new(frequency: Frequency, s: Array3<Complex64>, z0: Array2<Complex64>) -> Result<Self> {
         let (frequency_points, output_ports, input_ports) = s.dim();
         if output_ports == 0 || output_ports != input_ports {
@@ -148,6 +237,12 @@ impl Network {
         })
     }
 
+    /// Creates a network from impedance matrices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when conversion to scattering parameters fails or the
+    /// resulting network dimensions are inconsistent.
     pub fn from_impedance(
         frequency: Frequency,
         impedance: &Array3<Complex64>,
@@ -160,6 +255,12 @@ impl Network {
         Ok(network)
     }
 
+    /// Creates a network from admittance matrices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when conversion to scattering parameters fails or the
+    /// resulting network dimensions are inconsistent.
     pub fn from_admittance(
         frequency: Frequency,
         admittance: &Array3<Complex64>,
@@ -172,58 +273,109 @@ impl Network {
         Ok(network)
     }
 
+    /// Returns the number of ports.
+    #[must_use]
     pub fn ports(&self) -> usize {
         self.s.dim().1
     }
 
+    /// Returns the number of frequency points.
+    #[must_use]
     pub fn frequency_points(&self) -> usize {
         self.frequency.points()
     }
 
+    /// Converts scattering parameters to impedance parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parameter dimensions or reference impedances
+    /// are invalid, or when a required linear solve fails.
     pub fn impedance(&self) -> Result<Array3<Complex64>> {
         s_to_z(&self.s, &self.z0, self.s_definition)
     }
 
+    /// Converts scattering parameters to admittance parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parameter dimensions or reference impedances
+    /// are invalid, or when a required linear solve fails.
     pub fn admittance(&self) -> Result<Array3<Complex64>> {
         s_to_y(&self.s, &self.z0, self.s_definition)
     }
 
+    /// Converts scattering parameters to hybrid $H$ parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a valid two-port whose
+    /// scattering parameters can be converted to hybrid parameters.
     pub fn hybrid(&self) -> Result<Array3<Complex64>> {
         s_to_h(&self.s, &self.z0, self.s_definition)
     }
 
+    /// Converts scattering parameters to inverse-hybrid $G$ parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a valid two-port whose
+    /// scattering parameters can be converted to inverse-hybrid parameters.
     pub fn inverse_hybrid(&self) -> Result<Array3<Complex64>> {
         s_to_g(&self.s, &self.z0, self.s_definition)
     }
 
+    /// Converts scattering parameters to scattering-transfer $T$ parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port network.
     pub fn scattering_transfer(&self) -> Result<Array3<Complex64>> {
         s_to_t(&self.s)
     }
 
+    /// Converts a two-port network to ABCD parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network and its reference impedances form a
+    /// valid two-port data set.
     pub fn abcd(&self) -> Result<Array3<Complex64>> {
         s_to_abcd(&self.s, &self.z0)
     }
 
+    /// Returns scattering-parameter magnitudes $|S|$.
+    #[must_use]
     pub fn s_magnitude(&self) -> Array3<f64> {
-        self.s.mapv(|value| value.norm())
+        self.s.mapv(Complex64::norm)
     }
 
+    /// Returns scattering magnitudes in decibels, $20\log_{10}|S|$.
+    #[must_use]
     pub fn s_db(&self) -> Array3<f64> {
         self.s.mapv(|value| 20.0 * value.norm().log10())
     }
 
+    /// Returns power-style scattering values, $10\log_{10}|S|$.
+    #[must_use]
     pub fn s_db10(&self) -> Array3<f64> {
         self.s.mapv(|value| 10.0 * value.norm().log10())
     }
 
+    /// Returns scattering phases in radians.
+    #[must_use]
     pub fn s_phase_radians(&self) -> Array3<f64> {
-        self.s.mapv(|value| value.arg())
+        self.s.mapv(Complex64::arg)
     }
 
+    /// Returns scattering phases in degrees.
+    #[must_use]
     pub fn s_phase_degrees(&self) -> Array3<f64> {
         self.s.mapv(|value| value.arg().to_degrees())
     }
 
+    /// Returns unwrapped scattering phases in radians along frequency.
+    #[must_use]
     pub fn s_phase_unwrapped_radians(&self) -> Array3<f64> {
         let mut phase = self.s_phase_radians();
         for output in 0..self.ports() {
@@ -239,19 +391,31 @@ impl Network {
         phase
     }
 
+    /// Returns the real parts of the scattering parameters.
+    #[must_use]
     pub fn s_real(&self) -> Array3<f64> {
         self.s.mapv(|value| value.re)
     }
 
+    /// Returns the imaginary parts of the scattering parameters.
+    #[must_use]
     pub fn s_imaginary(&self) -> Array3<f64> {
         self.s.mapv(|value| value.im)
     }
 
+    /// Returns voltage standing-wave ratio $(1+|S|)/(1-|S|)$.
+    #[must_use]
     pub fn s_vswr(&self) -> Array3<f64> {
         self.s
             .mapv(|value| (1.0 + value.norm()) / (1.0 - value.norm()))
     }
 
+    /// Returns centered inverse-FFT time-domain scattering data.
+    ///
+    /// # Errors
+    ///
+    /// This implementation currently produces an `Ok` value unconditionally;
+    /// the result type is retained for API compatibility.
     pub fn s_time(&self) -> Result<Array3<Complex64>> {
         let mut time = Array3::zeros(self.s.dim());
         for output in 0..self.ports() {
@@ -267,14 +431,30 @@ impl Network {
         Ok(time)
     }
 
+    /// Returns time-domain scattering magnitudes in decibels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if conversion to time-domain scattering data fails.
     pub fn s_time_db(&self) -> Result<Array3<f64>> {
         Ok(self.s_time()?.mapv(|value| 20.0 * value.norm().log10()))
     }
 
+    /// Applies a frequency-domain window to every scattering trace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the requested window cannot be generated for the
+    /// network's number of frequency points.
     pub fn windowed(&self, window: &crate::time::Window, normalize: bool) -> Result<Self> {
         let samples = crate::time::window_samples(window, self.frequency_points())?;
         let scale = if normalize {
-            self.frequency_points() as f64 / samples.iter().sum::<f64>()
+            let point_count = u32::try_from(self.frequency_points()).map_err(|_| {
+                Error::Unsupported(
+                    "window point count exceeds the supported normalization range".to_owned(),
+                )
+            })?;
+            f64::from(point_count) / samples.iter().sum::<f64>()
         } else {
             1.0
         };
@@ -289,6 +469,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Calculates the impulse response and its time axis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid port indices, an unsupported window, or a
+    /// frequency axis that cannot produce a time axis.
     pub fn impulse_response(
         &self,
         output: usize,
@@ -309,6 +495,12 @@ impl Network {
         ))
     }
 
+    /// Calculates the step response and its time axis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying impulse response cannot be
+    /// calculated.
     pub fn step_response(
         &self,
         output: usize,
@@ -331,6 +523,11 @@ impl Network {
         ))
     }
 
+    /// Tests whether all singular values of $S$ are at most one within tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `tolerance` is negative or non-finite.
     pub fn is_passive(&self, tolerance: f64) -> Result<bool> {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return Err(Error::Unsupported(
@@ -341,6 +538,12 @@ impl Network {
             .all(|point| scattering_spectral_norm(&self.s, point) <= 1.0 + tolerance))
     }
 
+    /// Tests whether $S_{ij}=S_{ji}$ within tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `tolerance` is negative or non-finite, or when the
+    /// scattering matrices are not square.
     pub fn is_reciprocal(&self, tolerance: f64) -> Result<bool> {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return Err(Error::Unsupported(
@@ -352,6 +555,12 @@ impl Network {
             .all(|difference| *difference <= tolerance))
     }
 
+    /// Tests whether all ports have symmetric scattering behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `tolerance` is negative or non-finite, or when the
+    /// network's ports cannot be flipped in pairs.
     pub fn is_symmetric(&self, tolerance: f64) -> Result<bool> {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return Err(Error::Unsupported(
@@ -366,12 +575,28 @@ impl Network {
             .all(|(left, right)| (*left - *right).norm() <= tolerance))
     }
 
+    /// Returns a per-frequency aggregate scattering error against another network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the networks have different frequency axes or
+    /// scattering-matrix dimensions.
     pub fn scattering_error(&self, other: &Self) -> Result<Array1<f64>> {
         if self.frequency != other.frequency || self.s.dim() != other.s.dim() {
             return Err(Error::IncompatibleShape(
                 "scattering error requires matching frequency and port shapes".to_owned(),
             ));
         }
+        let matrix_elements = self
+            .ports()
+            .checked_mul(self.ports())
+            .and_then(|count| u32::try_from(count).ok())
+            .ok_or_else(|| {
+                Error::Unsupported(
+                    "port count exceeds the supported error-normalization range".to_owned(),
+                )
+            })?;
+        let normalization = f64::from(matrix_elements);
         Ok(Array1::from_iter((0..self.frequency_points()).map(
             |point| {
                 ((0..self.ports())
@@ -382,12 +607,17 @@ impl Network {
                         })
                     })
                     .sum::<f64>()
-                    / (self.ports() * self.ports()) as f64)
+                    / normalization)
                     .sqrt()
             },
         )))
     }
 
+    /// Tests whether $S^\dagger S=I$ within tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `tolerance` is negative or non-finite.
     pub fn is_lossless(&self, tolerance: f64) -> Result<bool> {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return Err(Error::Unsupported(
@@ -409,6 +639,11 @@ impl Network {
         }))
     }
 
+    /// Returns group delay $-d\arg(S)/d\omega$ in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network has fewer than two frequency points.
     pub fn group_delay(&self) -> Result<Array3<f64>> {
         if self.frequency_points() < 2 {
             return Err(Error::InvalidFrequency(
@@ -438,6 +673,11 @@ impl Network {
         Ok(delay)
     }
 
+    /// Returns Rollet's two-port stability factor $K$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port network.
     pub fn stability_factor(&self) -> Result<Array1<f64>> {
         if self.ports() != 2 {
             return Err(Error::IncompatibleShape(
@@ -457,6 +697,11 @@ impl Network {
         )))
     }
 
+    /// Returns maximum stable gain for a two-port network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port network.
     pub fn maximum_stable_gain(&self) -> Result<Array1<f64>> {
         if self.ports() != 2 {
             return Err(Error::IncompatibleShape(
@@ -468,6 +713,11 @@ impl Network {
         )))
     }
 
+    /// Returns maximum available or stable gain according to the stability factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port network.
     pub fn maximum_gain(&self) -> Result<Array1<f64>> {
         let stability = self.stability_factor()?;
         let stable_gain = self.maximum_stable_gain()?;
@@ -479,6 +729,11 @@ impl Network {
         )))
     }
 
+    /// Returns Mason's unilateral gain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port network.
     pub fn unilateral_gain(&self) -> Result<Array1<f64>> {
         let stability = self.stability_factor()?;
         let stable_gain = self.maximum_stable_gain()?;
@@ -486,11 +741,17 @@ impl Network {
             |point| {
                 let ratio = self.s[(point, 1, 0)] / self.s[(point, 0, 1)];
                 (ratio - Complex64::new(1.0, 0.0)).norm_sqr()
-                    / (2.0 * stability[point] * stable_gain[point] - 2.0 * ratio.re)
+                    / 2.0f64.mul_add(-ratio.re, 2.0 * stability[point] * stable_gain[point])
             },
         )))
     }
 
+    /// Selects and reorders a subset of ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `ports` is empty or contains an out-of-range port
+    /// index.
     pub fn subnetwork(&self, ports: &[usize]) -> Result<Self> {
         if ports.is_empty() || ports.iter().any(|port| *port >= self.ports()) {
             return Err(Error::InvalidPort {
@@ -519,6 +780,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Crops the network to an inclusive frequency interval in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-finite or reversed bounds, when the interval
+    /// contains no samples, or when the cropped frequency axis is invalid.
     pub fn cropped(&self, start_hz: f64, stop_hz: f64) -> Result<Self> {
         if !start_hz.is_finite() || !stop_hz.is_finite() || start_hz > stop_hz {
             return Err(Error::InvalidFrequency(
@@ -553,6 +820,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Adds a phase delay to one port.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `port` is out of range or `phase_degrees` is not
+    /// finite.
     pub fn delayed_port(&self, port: usize, phase_degrees: f64) -> Result<Self> {
         if port >= self.ports() {
             return Err(Error::InvalidPort {
@@ -574,6 +847,11 @@ impl Network {
         Ok(result)
     }
 
+    /// Rotates every scattering parameter by a common phase.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `phase_degrees` is not finite.
     pub fn rotated(&self, phase_degrees: f64) -> Result<Self> {
         if !phase_degrees.is_finite() {
             return Err(Error::Unsupported(
@@ -586,6 +864,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Adds independent Gaussian magnitude and phase noise to scattering data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either deviation cannot define a normal
+    /// distribution.
     pub fn with_added_polar_noise(
         &self,
         magnitude_deviation: f64,
@@ -617,6 +901,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Multiplies scattering data by Gaussian polar perturbations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either deviation cannot define a normal
+    /// distribution.
     pub fn with_multiplicative_noise(
         &self,
         magnitude_deviation: f64,
@@ -635,6 +925,11 @@ impl Network {
         Ok(result)
     }
 
+    /// Adds a small complex perturbation to avoid exact singularities.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `amount` is not finite.
     pub fn nudged(&self, amount: f64) -> Result<Self> {
         if !amount.is_finite() {
             return Err(Error::Unsupported("nudge amount must be finite".to_owned()));
@@ -660,12 +955,20 @@ impl Network {
         Ok(())
     }
 
-    pub fn is_noisy(&self) -> bool {
+    /// Returns whether noise parameters are attached.
+    #[must_use]
+    pub const fn is_noisy(&self) -> bool {
         self.noise.is_some()
     }
 
     /// Port of `Network.set_noise_a`, retaining the standard four noise
     /// parameters rather than materializing the equivalent correlation matrix.
+    /// Attaches validated two-port noise parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parameter arrays do not match the frequency
+    /// axis or contain invalid values.
     pub fn set_noise_parameters(
         &mut self,
         frequency: Frequency,
@@ -683,6 +986,12 @@ impl Network {
     }
 
     /// Port of `Network.nf` for a constant complex source impedance.
+    /// Returns noise factor for a specified source impedance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when noise parameters are absent, the source impedance
+    /// is zero, or its admittance does not have positive conductance.
     pub fn noise_factor(&self, source_impedance: Complex64) -> Result<Array1<f64>> {
         let noise = self.noise.as_ref().ok_or_else(|| {
             Error::Unsupported("network does not contain noise parameters".to_owned())
@@ -706,13 +1015,17 @@ impl Network {
                     / (Complex64::new(1.0, 0.0) - gamma);
                 let optimal_admittance = Complex64::new(1.0, 0.0) / optimal_impedance;
                 let minimum = 10.0_f64.powf(noise.minimum_noise_figure_db[index] / 10.0);
-                minimum
-                    + noise.equivalent_noise_resistance[index] / source_admittance.re
-                        * (source_admittance - optimal_admittance).norm_sqr()
+                (noise.equivalent_noise_resistance[index] / source_admittance.re)
+                    .mul_add((source_admittance - optimal_admittance).norm_sqr(), minimum)
             },
         )))
     }
 
+    /// Returns minimum noise factor in linear units.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network has no noise parameters.
     pub fn minimum_noise_factor(&self) -> Result<Array1<f64>> {
         let noise = self.noise.as_ref().ok_or_else(|| {
             Error::Unsupported("network does not contain noise parameters".to_owned())
@@ -722,6 +1035,11 @@ impl Network {
             .mapv(|value| 10.0_f64.powf(value / 10.0)))
     }
 
+    /// Returns the optimum source impedance for minimum noise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network has no noise parameters.
     pub fn optimal_noise_impedance(&self) -> Result<Array1<Complex64>> {
         let noise = self.noise.as_ref().ok_or_else(|| {
             Error::Unsupported("network does not contain noise parameters".to_owned())
@@ -732,18 +1050,35 @@ impl Network {
         }))
     }
 
+    /// Returns the optimum source admittance for minimum noise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network has no noise parameters.
     pub fn optimal_noise_admittance(&self) -> Result<Array1<Complex64>> {
         Ok(self
             .optimal_noise_impedance()?
             .mapv(|impedance| Complex64::new(1.0, 0.0) / impedance))
     }
 
+    /// Returns noise figure in decibels for a specified source impedance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when noise parameters are absent or the source
+    /// impedance is invalid for a noise-factor calculation.
     pub fn noise_figure_db(&self, source_impedance: Complex64) -> Result<Array1<f64>> {
         Ok(self
             .noise_factor(source_impedance)?
             .mapv(|factor| 10.0 * factor.log10()))
     }
 
+    /// Returns source or load stability-circle points on the reflection plane.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port, `target_port` is zero
+    /// or one, and at least two circle points are requested.
     pub fn stability_circle(&self, target_port: usize, points: usize) -> Result<Array2<Complex64>> {
         if self.ports() != 2 || target_port >= 2 || points < 2 {
             return Err(Error::IncompatibleShape(
@@ -751,6 +1086,16 @@ impl Network {
                     .to_owned(),
             ));
         }
+        let point_values = (0..points)
+            .map(|point| {
+                u32::try_from(point).map(f64::from).map_err(|_| {
+                    Error::Unsupported(
+                        "stability-circle point count exceeds the supported range".to_owned(),
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let point_intervals = point_values[points - 1];
         Ok(Array2::from_shape_fn(
             (self.frequency_points(), points),
             |(frequency, point)| {
@@ -770,12 +1115,18 @@ impl Network {
                 center
                     + Complex64::from_polar(
                         radius,
-                        std::f64::consts::TAU * point as f64 / (points - 1) as f64,
+                        std::f64::consts::TAU * point_values[point] / point_intervals,
                     )
             },
         ))
     }
 
+    /// Returns constant operating- or available-gain circle points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the network is a two-port, `target_port` is zero
+    /// or one, `gain_db` is finite, and at least two points are requested.
     pub fn gain_circle(
         &self,
         target_port: usize,
@@ -788,25 +1139,41 @@ impl Network {
                     .to_owned(),
             ));
         }
+        let point_values = (0..points)
+            .map(|point| {
+                u32::try_from(point).map(f64::from).map_err(|_| {
+                    Error::Unsupported(
+                        "gain-circle point count exceeds the supported range".to_owned(),
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let point_intervals = point_values[points - 1];
         let requested = 10.0_f64.powf(gain_db / 10.0);
         Ok(Array2::from_shape_fn(
             (self.frequency_points(), points),
             |(frequency, point)| {
                 let reflection = self.s[(frequency, target_port, target_port)];
                 let gain_factor = (requested * (1.0 - reflection.norm_sqr())).min(1.0);
-                let denominator = 1.0 - (1.0 - gain_factor) * reflection.norm_sqr();
+                let denominator = (1.0 - gain_factor).mul_add(-reflection.norm_sqr(), 1.0);
                 let center = gain_factor * reflection.conj() / denominator;
                 let radius =
                     (1.0 - gain_factor).sqrt() * (1.0 - reflection.norm_sqr()) / denominator;
                 center
                     + Complex64::from_polar(
                         radius.abs(),
-                        std::f64::consts::TAU * point as f64 / (points - 1) as f64,
+                        std::f64::consts::TAU * point_values[point] / point_intervals,
                     )
             },
         ))
     }
 
+    /// Returns constant-noise-figure circle points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when noise parameters are absent, `noise_figure_db` is
+    /// not finite, or fewer than two points are requested.
     pub fn noise_figure_circle(
         &self,
         noise_figure_db: f64,
@@ -820,6 +1187,16 @@ impl Network {
                 "noise circles require finite figure and at least two points".to_owned(),
             ));
         }
+        let point_values = (0..points)
+            .map(|point| {
+                u32::try_from(point).map(f64::from).map_err(|_| {
+                    Error::Unsupported(
+                        "noise-circle point count exceeds the supported range".to_owned(),
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let point_intervals = point_values[points - 1];
         let requested = 10.0_f64.powf(noise_figure_db / 10.0);
         let minimum = self.minimum_noise_factor()?;
         Ok(Array2::from_shape_fn(
@@ -839,12 +1216,19 @@ impl Network {
                 center
                     + Complex64::from_polar(
                         radius,
-                        std::f64::consts::TAU * point as f64 / (points - 1) as f64,
+                        std::f64::consts::TAU * point_values[point] / point_intervals,
                     )
             },
         ))
     }
 
+    /// Interpolates the network using Cartesian linear interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either frequency axis is unsuitable for
+    /// interpolation, a target lies outside the source range, or the resulting
+    /// network dimensions are invalid.
     pub fn interpolate(&self, frequency: &Frequency) -> Result<Self> {
         if self.frequency_points() < 2 {
             return Err(Error::InvalidFrequency(
@@ -892,7 +1276,7 @@ impl Network {
                 })?;
             let (lower, upper, fraction) = if upper == 0 {
                 (0, 0, 0.0)
-            } else if self.frequency.values_hz()[upper] == target {
+            } else if self.frequency.values_hz()[upper].total_cmp(&target).is_eq() {
                 (upper, upper, 0.0)
             } else {
                 let lower = upper - 1;
@@ -926,6 +1310,12 @@ impl Network {
     }
 
     /// Interpolates in Cartesian, polar, or Floater-Hormann rational form.
+    /// Interpolates the network using the selected [`InterpolationMode`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the frequency axes are unsuitable for
+    /// interpolation or rational-interpolator construction fails.
     pub fn interpolate_with_mode(
         &self,
         frequency: &Frequency,
@@ -943,8 +1333,8 @@ impl Network {
                 let values = match mode {
                     InterpolationMode::CartesianLinear => unreachable!(),
                     InterpolationMode::PolarLinear => {
-                        let magnitude = source.mapv(|value| value.norm());
-                        let phase = unwrap_radians(&source.mapv(|value| value.arg()));
+                        let magnitude = source.mapv(Complex64::norm);
+                        let phase = unwrap_radians(&source.mapv(Complex64::arg));
                         Array1::from_iter(frequency.values_hz().iter().map(|target| {
                             let magnitude =
                                 linear_sample(self.frequency.values_hz(), &magnitude, *target);
@@ -978,6 +1368,13 @@ impl Network {
     ///
     /// Origin: `skrf.network.Network.extrapolate_to_dc`. Rust uses linear
     /// magnitude/unwrapped-phase interpolation for a deterministic dependency-free API.
+    /// Extrapolates the network to DC, optionally using supplied DC scattering data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for insufficient frequency points, an invalid output
+    /// count or DC matrix shape, or a failure to construct or interpolate the
+    /// extended frequency grid.
     pub fn extrapolate_to_dc(
         &self,
         points: Option<usize>,
@@ -991,11 +1388,29 @@ impl Network {
         if self.frequency.values_hz()[0] == 0.0 {
             return Ok(self.clone());
         }
-        let requested_points = points.unwrap_or_else(|| {
-            let step = self.frequency.values_hz()[1] - self.frequency.values_hz()[0];
-            self.frequency_points()
-                + (self.frequency.values_hz()[0] / step).round().max(1.0) as usize
-        });
+        let requested_points = points.map_or_else(
+            || {
+                let step = self.frequency.values_hz()[1] - self.frequency.values_hz()[0];
+                let extrapolated_points = (self.frequency.values_hz()[0] / step)
+                    .round()
+                    .max(1.0)
+                    .to_usize()
+                    .ok_or_else(|| {
+                        Error::InvalidFrequency(
+                            "DC extrapolation point count is outside the supported range"
+                                .to_owned(),
+                        )
+                    })?;
+                self.frequency_points()
+                    .checked_add(extrapolated_points)
+                    .ok_or_else(|| {
+                        Error::InvalidFrequency(
+                            "DC extrapolation point count overflowed".to_owned(),
+                        )
+                    })
+            },
+            Ok,
+        )?;
         if requested_points < 2 {
             return Err(Error::InvalidFrequency(
                 "DC extrapolation requires at least two output points".to_owned(),
@@ -1017,15 +1432,15 @@ impl Network {
                 let first = self.s[(0, row, column)];
                 let second = self.s[(1, row, column)];
                 let fraction = -first_frequency / (second_frequency - first_frequency);
-                let magnitude = first.norm() + fraction * (second.norm() - first.norm());
+                let magnitude = fraction.mul_add(second.norm() - first.norm(), first.norm());
                 let mut phase_delta = second.arg() - first.arg();
-                while phase_delta > std::f64::consts::PI {
-                    phase_delta -= 2.0 * std::f64::consts::PI;
+                while phase_delta.total_cmp(&std::f64::consts::PI).is_gt() {
+                    phase_delta = 2.0f64.mul_add(-std::f64::consts::PI, phase_delta);
                 }
-                while phase_delta < -std::f64::consts::PI {
-                    phase_delta += 2.0 * std::f64::consts::PI;
+                while phase_delta.total_cmp(&-std::f64::consts::PI).is_lt() {
+                    phase_delta = 2.0f64.mul_add(std::f64::consts::PI, phase_delta);
                 }
-                Complex64::from_polar(magnitude, first.arg() + fraction * phase_delta)
+                Complex64::from_polar(magnitude, fraction.mul_add(phase_delta, first.arg()))
             })
         };
         let mut frequencies = Vec::with_capacity(self.frequency_points() + 1);
@@ -1063,6 +1478,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Cascades this network with another network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless both networks are compatible two-ports, or when
+    /// conversion between scattering and chain matrices fails.
     pub fn cascade(&self, other: &Self) -> Result<Self> {
         validate_two_port_pair(self, other)?;
         let points = self.frequency_points();
@@ -1087,6 +1508,12 @@ impl Network {
     /// Element-wise complex addition of two compatible scattering matrices.
     ///
     /// Origin: `skrf.network.Network.__add__`.
+    /// Adds aligned scattering matrices element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the networks have incompatible frequency axes or
+    /// scattering-matrix dimensions.
     pub fn add_elementwise(&self, other: &Self) -> Result<Self> {
         self.elementwise_binary(other, |left, right| left + right)
     }
@@ -1094,6 +1521,12 @@ impl Network {
     /// Element-wise complex subtraction of two compatible scattering matrices.
     ///
     /// Origin: `skrf.network.Network.__sub__`.
+    /// Subtracts aligned scattering matrices element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the networks have incompatible frequency axes or
+    /// scattering-matrix dimensions.
     pub fn subtract_elementwise(&self, other: &Self) -> Result<Self> {
         self.elementwise_binary(other, |left, right| left - right)
     }
@@ -1101,6 +1534,12 @@ impl Network {
     /// Element-wise complex multiplication of two compatible scattering matrices.
     ///
     /// Origin: `skrf.network.Network.__mul__`.
+    /// Multiplies aligned scattering matrices element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the networks have incompatible frequency axes or
+    /// scattering-matrix dimensions.
     pub fn multiply_elementwise(&self, other: &Self) -> Result<Self> {
         self.elementwise_binary(other, |left, right| left * right)
     }
@@ -1108,6 +1547,12 @@ impl Network {
     /// Element-wise complex division of two compatible scattering matrices.
     ///
     /// Origin: `skrf.network.Network.__truediv__`.
+    /// Divides aligned scattering matrices element by element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the networks have incompatible frequency axes or
+    /// scattering-matrix dimensions.
     pub fn divide_elementwise(&self, other: &Self) -> Result<Self> {
         self.elementwise_binary(other, |left, right| left / right)
     }
@@ -1115,6 +1560,11 @@ impl Network {
     /// Raises every scattering value to a real power.
     ///
     /// Origin: the numeric branch of `skrf.network.Network.__pow__`.
+    /// Raises every scattering value to a real power.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `exponent` is not finite.
     pub fn elementwise_power(&self, exponent: f64) -> Result<Self> {
         if !exponent.is_finite() {
             return Err(Error::Unsupported(
@@ -1129,6 +1579,12 @@ impl Network {
     /// Removes one left fixture and an optional right fixture from a two-port network.
     ///
     /// Origin: `skrf.network.Network.__floordiv__`.
+    /// De-embeds left and optional right fixture networks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a fixture cannot be inverted or the networks are
+    /// not compatible two-ports for cascading.
     pub fn deembed(&self, left_fixture: &Self, right_fixture: Option<&Self>) -> Result<Self> {
         let mut deembedded = left_fixture.inverse()?.cascade(self)?;
         if let Some(right_fixture) = right_fixture {
@@ -1139,6 +1595,13 @@ impl Network {
         Ok(result)
     }
 
+    /// Connects one port of this network to one port of another network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible networks or invalid ports, when no
+    /// external port remains, or when connection construction or its linear
+    /// solve fails.
     pub fn connect(&self, port: usize, other: &Self, other_port: usize) -> Result<Self> {
         validate_connection_networks(self, port, other, other_port)?;
         let left_ports = self.ports();
@@ -1210,6 +1673,13 @@ impl Network {
     }
 
     /// Port of `skrf.network.innerconnect`.
+    /// Connects two ports within the same network and removes them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid or identical ports, when no external port
+    /// would remain, or when connection construction or its linear solve
+    /// fails.
     pub fn inner_connect(&self, first_port: usize, second_port: usize) -> Result<Self> {
         if first_port >= self.ports() {
             return Err(Error::InvalidPort {
@@ -1277,6 +1747,12 @@ impl Network {
         Ok(network)
     }
 
+    /// Renormalizes scattering data to new port impedances and wave definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `z0` has the wrong shape or conversion through
+    /// impedance parameters fails.
     pub fn renormalize(
         &mut self,
         z0: Array2<Complex64>,
@@ -1296,6 +1772,12 @@ impl Network {
         Ok(())
     }
 
+    /// Returns the cascading inverse of a two-port network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless this is a two-port, or when a chain matrix is
+    /// singular or cannot be converted to or from scattering parameters.
     pub fn inverse(&self) -> Result<Self> {
         if self.ports() != 2 {
             return Err(Error::Unsupported(
@@ -1329,6 +1811,11 @@ impl Network {
     }
 
     /// Port of `skrf.network.Network.flipped`.
+    /// Reverses a two-port network's port orientation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network has an odd number of ports.
     pub fn flipped(&self) -> Result<Self> {
         let ports = self.ports();
         let half = ports / 2;
@@ -1350,6 +1837,12 @@ impl Network {
     /// the corresponding old zero-based port index.
     ///
     /// Port of `Network.renumber` used by `skrf.media.device.DualCoupler`.
+    /// Returns a network whose ports follow the supplied permutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `order` has the wrong length or is not a complete
+    /// permutation of the network ports.
     pub fn renumbered(&self, order: &[usize]) -> Result<Self> {
         let ports = self.ports();
         if order.len() != ports {
@@ -1383,10 +1876,22 @@ impl Network {
         Ok(network)
     }
 
+    /// Reads a Touchstone network file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be read or its Touchstone data
+    /// cannot be parsed into a network.
     pub fn read_touchstone(path: impl AsRef<Path>) -> Result<Self> {
         crate::io::Touchstone::from_path(path)?.network()
     }
 
+    /// Writes the network as a Touchstone file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the network cannot be represented as Touchstone
+    /// data or the output file cannot be written.
     pub fn write_touchstone(&self, path: impl AsRef<Path>) -> Result<()> {
         crate::io::write_touchstone(
             self,
@@ -1415,6 +1920,12 @@ impl Network {
     }
 
     /// Converts the first `2 * pairs` single-ended ports into differential and common modes.
+    /// Converts paired single-ended ports to differential and common modes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `pairs` is zero or exceeds the available ports, or
+    /// when a pair's reference impedances are unequal.
     pub fn single_ended_to_mixed_mode(&self, pairs: usize) -> Result<Self> {
         if pairs == 0 || 2 * pairs > self.ports() {
             return Err(Error::IncompatibleShape(format!(
@@ -1463,6 +1974,12 @@ impl Network {
         Ok(result)
     }
 
+    /// Converts differential and common modes back to paired single-ended ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `pairs` is zero or exceeds the available ports, or
+    /// when differential and common reference impedances are incompatible.
     pub fn mixed_mode_to_single_ended(&self, pairs: usize) -> Result<Self> {
         if pairs == 0 || 2 * pairs > self.ports() {
             return Err(Error::IncompatibleShape(format!(
@@ -1544,7 +2061,8 @@ fn similarity_transform(
 
 fn scattering_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f64 {
     let ports = scattering.dim().1;
-    let mut vector = vec![Complex64::new(1.0 / (ports as f64).sqrt(), 0.0); ports];
+    let port_count = ports.to_f64().unwrap_or(f64::INFINITY);
+    let mut vector = vec![Complex64::new(1.0 / port_count.sqrt(), 0.0); ports];
     let mut singular = 0.0;
     for _ in 0..32 {
         let transformed = (0..ports)
@@ -1556,7 +2074,7 @@ fn scattering_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f64
             .collect::<Vec<_>>();
         singular = transformed
             .iter()
-            .map(|value| value.norm_sqr())
+            .map(Complex64::norm_sqr)
             .sum::<f64>()
             .sqrt();
         let adjoint = (0..ports)
@@ -1566,11 +2084,7 @@ fn scattering_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f64
                     .sum::<Complex64>()
             })
             .collect::<Vec<_>>();
-        let norm = adjoint
-            .iter()
-            .map(|value| value.norm_sqr())
-            .sum::<f64>()
-            .sqrt();
+        let norm = adjoint.iter().map(Complex64::norm_sqr).sum::<f64>().sqrt();
         if norm == 0.0 {
             return 0.0;
         }
@@ -1584,6 +2098,12 @@ fn scattering_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f64
 /// Cascades a non-empty sequence from left to right.
 ///
 /// Origin: `skrf.network.cascade_list`.
+/// Cascades a non-empty sequence of networks from left to right.
+///
+/// # Errors
+///
+/// Returns an error when `networks` is empty or adjacent networks cannot be
+/// cascaded as compatible two-ports.
 pub fn cascade_list(networks: &[Network]) -> Result<Network> {
     let (first, remaining) = networks.split_first().ok_or_else(|| {
         Error::IncompatibleShape("cascade requires at least one network".to_owned())
@@ -1596,6 +2116,12 @@ pub fn cascade_list(networks: &[Network]) -> Result<Network> {
 /// Connects one selected port from each network at a common intersection.
 ///
 /// Origin: `skrf.network.parallelconnect`.
+/// Connects selected ports of multiple networks in parallel at one junction.
+///
+/// # Errors
+///
+/// Returns an error for mismatched input lists, incompatible frequencies or
+/// invalid ports, or when the equivalent circuit cannot be constructed.
 pub fn parallel_connect(networks: &[Network], selected_ports: &[usize]) -> Result<Network> {
     if networks.len() < 2 || networks.len() != selected_ports.len() {
         return Err(Error::IncompatibleShape(
@@ -1651,6 +2177,12 @@ pub fn parallel_connect(networks: &[Network], selected_ports: &[usize]) -> Resul
 /// Interpolates two networks onto their common frequency samples.
 ///
 /// Origin: `skrf.network.overlap`.
+/// Crops two networks to their common frequency interval.
+///
+/// # Errors
+///
+/// Returns an error when the frequency axes do not overlap or either network
+/// cannot be interpolated onto the common samples.
 pub fn overlap(first: &Network, second: &Network) -> Result<(Network, Network)> {
     let frequency = first.frequency.overlap(&second.frequency)?;
     Ok((
@@ -1662,6 +2194,12 @@ pub fn overlap(first: &Network, second: &Network) -> Result<(Network, Network)> 
 /// Joins ordered, non-overlapping frequency ranges.
 ///
 /// Origin: `skrf.network.stitch`.
+/// Concatenates two compatible networks along the frequency axis.
+///
+/// # Errors
+///
+/// Returns an error when port counts or wave definitions differ, frequency
+/// ranges overlap or are reversed, or the combined network is invalid.
 pub fn stitch(first: &Network, second: &Network) -> Result<Network> {
     if first.ports() != second.ports() || first.s_definition != second.s_definition {
         return Err(Error::IncompatibleShape(
@@ -1699,7 +2237,7 @@ pub fn stitch(first: &Network, second: &Network) -> Result<Network> {
         }
     });
     let mut result = Network::new(frequency, s, z0)?;
-    result.name = first.name.clone();
+    result.name.clone_from(&first.name);
     result.s_definition = first.s_definition;
     Ok(result)
 }
@@ -1707,6 +2245,12 @@ pub fn stitch(first: &Network, second: &Network) -> Result<Network> {
 /// Builds a block-diagonal N-port from frequency-compatible networks.
 ///
 /// Origin: `skrf.network.concat_ports`.
+/// Combines aligned networks into one block-diagonal multiport network.
+///
+/// # Errors
+///
+/// Returns an error when `networks` is empty, frequency axes differ, or the
+/// combined network dimensions are invalid.
 pub fn concatenate_ports(networks: &[Network]) -> Result<Network> {
     let first = networks.first().ok_or_else(|| {
         Error::IncompatibleShape("port concatenation requires networks".to_owned())
@@ -1740,6 +2284,12 @@ pub fn concatenate_ports(networks: &[Network]) -> Result<Network> {
 /// Element-wise complex average of compatible networks.
 ///
 /// Origin: `skrf.network.average`.
+/// Returns the elementwise complex average of aligned networks.
+///
+/// # Errors
+///
+/// Returns an error when `networks` is empty or their frequency axes, port
+/// counts, or reference impedances differ.
 pub fn average(networks: &[Network]) -> Result<Network> {
     let first = networks.first().ok_or_else(|| {
         Error::IncompatibleShape("average requires at least one network".to_owned())
@@ -1758,21 +2308,33 @@ pub fn average(networks: &[Network]) -> Result<Network> {
     for network in networks {
         result.s += &network.s;
     }
-    result.s.mapv_inplace(|value| value / networks.len() as f64);
+    let network_count = networks.len().to_f64().ok_or_else(|| {
+        Error::Unsupported("network count exceeds the supported averaging range".to_owned())
+    })?;
+    result.s.mapv_inplace(|value| value / network_count);
     Ok(result)
 }
 
 /// Population standard deviation of complex S-parameter distance from the mean.
 ///
 /// Origin: `skrf.network.stdev`.
+/// Returns sample standard deviation of scattering values across aligned networks.
+///
+/// # Errors
+///
+/// Returns an error when `networks` is empty or their frequency axes, port
+/// counts, or reference impedances differ.
 pub fn scattering_standard_deviation(networks: &[Network]) -> Result<Array3<f64>> {
     let mean = average(networks)?;
+    let network_count = networks.len().to_f64().ok_or_else(|| {
+        Error::Unsupported("network count exceeds the supported deviation range".to_owned())
+    })?;
     Ok(Array3::from_shape_fn(mean.s.dim(), |index| {
         (networks
             .iter()
             .map(|network| (network.s[index] - mean.s[index]).norm_sqr())
             .sum::<f64>()
-            / networks.len() as f64)
+            / network_count)
             .sqrt()
     }))
 }
@@ -1780,6 +2342,12 @@ pub fn scattering_standard_deviation(networks: &[Network]) -> Result<Array3<f64>
 /// Places two one-port reflections on the diagonal of a two-port network.
 ///
 /// Origin: `skrf.network.two_port_reflect`.
+/// Builds a two-port reflect standard from one or two one-port networks.
+///
+/// # Errors
+///
+/// Returns an error unless both inputs are frequency-compatible one-ports, or
+/// when the resulting two-port dimensions are invalid.
 pub fn two_port_reflect(first: &Network, second: Option<&Network>) -> Result<Network> {
     let second = second.unwrap_or(first);
     if first.ports() != 1 || second.ports() != 1 || first.frequency != second.frequency {
@@ -1802,6 +2370,12 @@ pub fn two_port_reflect(first: &Network, second: Option<&Network>) -> Result<Net
 /// Embeds a two-port into selected ports of an otherwise zero N-port.
 ///
 /// Origin: `skrf.network.twoport_to_nport`.
+/// Maps two-port measurements into specified entries of an N-port network.
+///
+/// # Errors
+///
+/// Returns an error unless `network` is a two-port and the distinct target
+/// ports fit the requested N-port, or when the output dimensions are invalid.
 pub fn two_port_to_nport(
     network: &Network,
     first_port: usize,
@@ -1836,6 +2410,12 @@ pub fn two_port_to_nport(
 /// Assembles the diagonal of an N-port from one-port networks.
 ///
 /// Origin: `skrf.network.n_oneports_2_nport`.
+/// Places one-port networks on the diagonal of an N-port network.
+///
+/// # Errors
+///
+/// Returns an error when `networks` is empty, an input is not a
+/// frequency-compatible one-port, or the output dimensions are invalid.
 pub fn one_ports_to_nport(networks: &[Network]) -> Result<Network> {
     let first = networks.first().ok_or_else(|| {
         Error::IncompatibleShape("N-port assembly requires one-port networks".to_owned())
@@ -1864,6 +2444,12 @@ pub fn one_ports_to_nport(networks: &[Network]) -> Result<Network> {
 ///
 /// This typed mapping replaces upstream filename parsing in
 /// `skrf.network.n_twoports_2_nport`.
+/// Assembles an N-port network from indexed two-port measurements.
+///
+/// # Errors
+///
+/// Returns an error when measurements are absent or have incompatible port
+/// mappings, frequencies, or shapes, or when the output dimensions are invalid.
 pub fn two_port_measurements_to_nport(
     measurements: &[(usize, usize, Network)],
     ports: usize,
@@ -1901,6 +2487,12 @@ pub fn two_port_measurements_to_nport(
 }
 
 /// Port of `skrf.network.s2z`.
+/// Converts scattering matrices to impedance matrices.
+///
+/// # Errors
+///
+/// Returns an error for incompatible parameter or reference-impedance shapes,
+/// invalid reference impedances, or a failed linear solve.
 pub fn s_to_z(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -1969,6 +2561,12 @@ pub fn s_to_z(
 }
 
 /// Port of `skrf.network.z2s`.
+/// Converts impedance matrices to scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error for incompatible parameter or reference-impedance shapes,
+/// invalid reference impedances, or a failed linear solve.
 pub fn z_to_s(
     impedance: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2030,16 +2628,32 @@ pub fn z_to_s(
 }
 
 /// Port of `skrf.network.z2y`.
+/// Converts impedance matrices to admittance matrices by inversion.
+///
+/// # Errors
+///
+/// Returns an error when an impedance matrix is not square or cannot be inverted.
 pub fn z_to_y(impedance: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     invert_parameter_matrices(impedance)
 }
 
 /// Port of `skrf.network.y2z`.
+/// Converts admittance matrices to impedance matrices by inversion.
+///
+/// # Errors
+///
+/// Returns an error when an admittance matrix is not square or cannot be inverted.
 pub fn y_to_z(admittance: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     invert_parameter_matrices(admittance)
 }
 
 /// Port of `skrf.network.s2y`.
+/// Converts scattering matrices to admittance matrices.
+///
+/// # Errors
+///
+/// Returns an error for incompatible parameter or reference-impedance shapes, invalid reference
+/// impedances, or a failed matrix inversion or linear solve.
 pub fn s_to_y(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2049,6 +2663,12 @@ pub fn s_to_y(
 }
 
 /// Port of `skrf.network.y2s`.
+/// Converts admittance matrices to scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error for incompatible parameter or reference-impedance shapes, invalid reference
+/// impedances, or a failed matrix inversion or linear solve.
 pub fn y_to_s(
     admittance: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2058,6 +2678,11 @@ pub fn y_to_s(
 }
 
 /// Port of `skrf.network.z2h` for two-port hybrid parameters.
+/// Converts two-port impedance matrices to hybrid $H$ parameters.
+///
+/// # Errors
+///
+/// Returns an error unless every impedance matrix is 2-by-2 and has a nonzero `Z22` element.
 pub fn z_to_h(impedance: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     let (frequencies, rows, columns) = impedance.dim();
     if rows != 2 || columns != 2 {
@@ -2084,11 +2709,22 @@ pub fn z_to_h(impedance: &Array3<Complex64>) -> Result<Array3<Complex64>> {
 }
 
 /// Port of `skrf.network.h2z` for two-port hybrid parameters.
+/// Converts two-port hybrid $H$ parameters to impedance matrices.
+///
+/// # Errors
+///
+/// Returns an error unless every hybrid matrix is 2-by-2 and has a nonzero `H22` element.
 pub fn h_to_z(hybrid: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     z_to_h(hybrid)
 }
 
 /// Port of `skrf.network.h2s`.
+/// Converts hybrid $H$ parameters to scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error for invalid two-port hybrid matrices, incompatible reference-impedance
+/// shapes, invalid reference impedances, or a failed linear solve.
 pub fn h_to_s(
     hybrid: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2098,6 +2734,12 @@ pub fn h_to_s(
 }
 
 /// Port of `skrf.network.s2h`.
+/// Converts scattering matrices to hybrid $H$ parameters.
+///
+/// # Errors
+///
+/// Returns an error for invalid scattering or reference-impedance shapes, invalid reference
+/// impedances, a failed linear solve, or a converted impedance matrix with zero `Z22`.
 pub fn s_to_h(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2107,6 +2749,13 @@ pub fn s_to_h(
 }
 
 /// Port of `skrf.network.g2s`.
+/// Converts inverse-hybrid $G$ parameters to scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error for non-square or singular inverse-hybrid matrices, invalid two-port hybrid
+/// matrices, incompatible reference-impedance shapes, invalid reference impedances, or a failed
+/// linear solve.
 pub fn g_to_s(
     inverse_hybrid: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2120,6 +2769,13 @@ pub fn g_to_s(
 }
 
 /// Port of `skrf.network.s2g`.
+/// Converts scattering matrices to inverse-hybrid $G$ parameters.
+///
+/// # Errors
+///
+/// Returns an error for invalid scattering or reference-impedance shapes, invalid reference
+/// impedances, a failed matrix inversion or linear solve, or a converted admittance matrix with
+/// zero `Y22`.
 pub fn s_to_g(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2129,6 +2785,11 @@ pub fn s_to_g(
 }
 
 /// Port of `skrf.network.passivity`.
+/// Returns the passivity metric $\sqrt{S^\dagger S}$ at each frequency.
+///
+/// # Errors
+///
+/// Returns an error unless the scattering data contains square matrices with at least two ports.
 pub fn passivity(scattering: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     let (frequencies, rows, columns) = scattering.dim();
     if rows <= 1 || rows != columns {
@@ -2153,6 +2814,11 @@ pub fn passivity(scattering: &Array3<Complex64>) -> Result<Array3<Complex64>> {
 }
 
 /// Port of `skrf.network.reciprocity`.
+/// Returns elementwise reciprocity error $|S-S^T|$.
+///
+/// # Errors
+///
+/// Returns an error unless the scattering data contains square matrices with at least two ports.
 pub fn reciprocity(scattering: &Array3<Complex64>) -> Result<Array3<f64>> {
     let (frequencies, rows, columns) = scattering.dim();
     if rows <= 1 || rows != columns {
@@ -2169,6 +2835,12 @@ pub fn reciprocity(scattering: &Array3<Complex64>) -> Result<Array3<f64>> {
 }
 
 /// Port of `skrf.network.flip` for batched even-port scattering matrices.
+/// Reverses the port order of scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error unless the scattering data contains nonempty, square matrices with an even
+/// number of ports.
 pub fn flip_ports(scattering: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     let (frequencies, rows, columns) = scattering.dim();
     if rows == 0 || rows != columns || rows % 2 != 0 {
@@ -2184,6 +2856,12 @@ pub fn flip_ports(scattering: &Array3<Complex64>) -> Result<Array3<Complex64>> {
 }
 
 /// Port of `skrf.network.s2s_active`.
+/// Returns active scattering parameters for a specified port-excitation vector.
+///
+/// # Errors
+///
+/// Returns an error unless the scattering data contains nonempty square matrices and the
+/// excitation vector contains one value per port.
 pub fn active_s(
     scattering: &Array3<Complex64>,
     excitation: &Array1<Complex64>,
@@ -2220,6 +2898,12 @@ pub fn active_s(
 }
 
 /// Port of `skrf.network.s2z_active`.
+/// Returns active port impedances for a specified excitation vector.
+///
+/// # Errors
+///
+/// Returns an error when the scattering and reference-impedance shapes are incompatible, or when
+/// the scattering matrices and excitation vector do not describe the same nonzero port count.
 pub fn active_z(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2235,6 +2919,12 @@ pub fn active_z(
 }
 
 /// Port of `skrf.network.s2y_active`.
+/// Returns active port admittances for a specified excitation vector.
+///
+/// # Errors
+///
+/// Returns an error when the scattering and reference-impedance shapes are incompatible, or when
+/// the scattering matrices and excitation vector do not describe the same nonzero port count.
 pub fn active_y(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2250,6 +2940,12 @@ pub fn active_y(
 }
 
 /// Port of `skrf.network.s2vswr_active`.
+/// Returns active VSWR for a specified excitation vector.
+///
+/// # Errors
+///
+/// Returns an error unless the scattering data contains nonempty square matrices and the
+/// excitation vector contains one value per port.
 pub fn active_vswr(
     scattering: &Array3<Complex64>,
     excitation: &Array1<Complex64>,
@@ -2259,6 +2955,12 @@ pub fn active_vswr(
 }
 
 /// Port of `skrf.network.s2t` for two-port scattering transfer parameters.
+/// Converts even-port scattering matrices to scattering-transfer matrices.
+///
+/// # Errors
+///
+/// Returns an error unless every scattering matrix is 2-by-2 and has nonzero forward
+/// transmission.
 pub fn s_to_t(scattering: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     let (points, rows, columns) = scattering.dim();
     if rows != 2 || columns != 2 {
@@ -2279,6 +2981,12 @@ pub fn s_to_t(scattering: &Array3<Complex64>) -> Result<Array3<Complex64>> {
 }
 
 /// Port of `skrf.network.t2s` for two-port scattering transfer parameters.
+/// Converts scattering-transfer matrices to scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error unless every transfer matrix is 2-by-2 and has a nonzero leading chain
+/// element.
 pub fn t_to_s(transfer: &Array3<Complex64>) -> Result<Array3<Complex64>> {
     let (points, rows, columns) = transfer.dim();
     if rows != 2 || columns != 2 {
@@ -2304,6 +3012,12 @@ pub fn t_to_s(transfer: &Array3<Complex64>) -> Result<Array3<Complex64>> {
 }
 
 /// Port of `skrf.network.s2a` for equal, real two-port references.
+/// Converts two-port scattering matrices to ABCD matrices.
+///
+/// # Errors
+///
+/// Returns an error unless the scattering matrices and references describe equal, positive-real
+/// two-port impedances and every matrix has nonzero forward transmission.
 pub fn s_to_abcd(
     scattering: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2333,6 +3047,12 @@ pub fn s_to_abcd(
 }
 
 /// Port of `skrf.network.a2s` for equal, real two-port references.
+/// Converts two-port ABCD matrices to scattering matrices.
+///
+/// # Errors
+///
+/// Returns an error unless the ABCD matrices and references describe equal, positive-real
+/// two-port impedances and the conversion denominator is nonzero at every frequency.
 pub fn abcd_to_s(
     abcd: &Array3<Complex64>,
     reference_impedance: &Array2<Complex64>,
@@ -2436,7 +3156,7 @@ fn linear_sample(x: &Array1<f64>, y: &Array1<f64>, target: f64) -> f64 {
         .iter()
         .position(|source| *source >= target)
         .unwrap_or_else(|| x.len().saturating_sub(1));
-    if upper == 0 || x[upper] == target {
+    if upper == 0 || x[upper].total_cmp(&target).is_eq() {
         return y[upper];
     }
     let lower = upper - 1;

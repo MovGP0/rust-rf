@@ -1,9 +1,15 @@
+//! CITI input/output regressions.
+//!
+//! These tests cover network conversion, parameter parsing, files whose only
+//! variable is frequency, and representative one- and two-port values.
+
 use std::io::Cursor;
 
 use approx::assert_relative_eq;
 use num_complex::Complex64;
 use rust_rf::io::{Citi, CitiFormat};
 
+/// Parses real/imaginary CITI data from a reader and converts it to networks.
 #[test]
 fn parses_scalar_ri_data_from_a_reader() {
     let text = "CITIFILE A.01.00\n\
@@ -27,6 +33,7 @@ BEGIN\n1.0,-2.0\n3.0,4.0\nEND\n";
     assert_eq!(networks[0].s[(1, 0, 0)], Complex64::new(3.0, 4.0));
 }
 
+/// Converts magnitude/angle and dB/angle data and preserves parameter values.
 #[test]
 fn converts_magangle_and_dbangle_and_builds_parameter_coordinates() {
     let text = "CITIFILE A.01.00\n\
@@ -62,6 +69,7 @@ BEGIN\n75,0\n76,0\nEND\n";
     assert_eq!(set.networks[1].z0[(0, 1)], Complex64::new(76.0, 0.0));
 }
 
+/// Converts impedance parameters to scattering parameters.
 #[test]
 fn converts_impedance_parameters_to_scattering_parameters() {
     let text = "CITIFILE A.01.00\n\
@@ -74,6 +82,7 @@ BEGIN\n50,0\nEND\n";
     assert_relative_eq!(network.s[(0, 0, 0)].norm(), 0.0, epsilon = 1.0e-12);
 }
 
+/// Rejects files without frequency data and incomplete parameter matrices.
 #[test]
 fn rejects_missing_frequency_and_incomplete_matrices() {
     let missing_frequency = "VAR bias MAG 1\nDATA S RI\nVAR_LIST_BEGIN\n1\nEND\nBEGIN\n0,0\nEND\n";

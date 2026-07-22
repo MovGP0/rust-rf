@@ -1,9 +1,13 @@
-//! Hewlett-Packard VNA driver implementation.
+//! Hewlett-Packard 8510C vector network analyzer driver.
 //!
-//! Origin: `skrf/vi/vna/hp/hp8510c.py`.
+//! The driver supports compound and segmented sweeps plus fast FORM2 binary
+//! transfer. Requests exceeding native 51-, 101-, 201-, 401-, or 801-point
+//! sweeps are automatically decomposed into shorter sweeps and stitched back
+//! together. Short or irregular frequency lists use segmented sweep modes.
 
 use ndarray::{Array1, Array2, Array3, Axis, concatenate};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 
 use crate::{Error, Frequency, Network, Result};
 
@@ -11,14 +15,25 @@ use super::super::{InstrumentSession, Vna};
 use super::hp8510c_sweep_plan::{Hp8510SweepProgrammer, SweepPlan};
 
 const HP8510_NATIVE_POINTS: [usize; 5] = [51, 101, 201, 401, 801];
+/// Driver for the HP 8510C and compatible variants.
 pub struct Hp8510C<S: InstrumentSession> {
+    /// Shared VNA transport and value-transfer functionality.
     pub vna: Vna<S>,
+    /// Optional lower instrument frequency limit in hertz.
     pub minimum_hz: Option<f64>,
+    /// Optional upper instrument frequency limit in hertz.
     pub maximum_hz: Option<f64>,
+    /// Planned sections for a compound or segmented sweep.
     pub compound_sweep_plan: Option<SweepPlan>,
 }
 
 impl<S: InstrumentSession> Hp8510C<S> {
+    /// Creates, identifies, resets, and configures an HP 8510C session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when communication fails or the identification response
+    /// does not describe an HP 8510 instrument.
     pub fn new(address: impl Into<String>, session: S) -> Result<Self> {
         let mut driver = Self::from_vna(Vna::new(address, session, Some(2_000)));
         let identification = driver.id()?;
@@ -35,7 +50,8 @@ impl<S: InstrumentSession> Hp8510C<S> {
         Ok(driver)
     }
 
-    pub fn from_vna(vna: Vna<S>) -> Self {
+    /// Wraps an existing VNA session without querying or resetting the instrument.
+    pub const fn from_vna(vna: Vna<S>) -> Self {
         Self {
             vna,
             minimum_hz: None,
@@ -44,27 +60,57 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Returns the instrument identification string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the identification query cannot be completed.
     pub fn id(&mut self) -> Result<String> {
         self.vna.query("OUTPIDEN;")
     }
 
+    /// Presets the instrument and waits for it to finish.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the preset command or completion query fails.
     pub fn reset(&mut self) -> Result<()> {
         self.vna.write("FACTPRES;")?;
         self.wait_until_finished()
     }
 
+    /// Clears the instrument session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying session cannot be cleared.
     pub fn clear(&mut self) -> Result<()> {
         self.vna.clear()
     }
 
+    /// Blocks until the instrument accepts a completed identification query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the completion query fails.
     pub fn wait_until_finished(&mut self) -> Result<()> {
         self.vna.query("OUTPIDEN;").map(|_| ())
     }
 
+    /// Returns the instrument error response from `OUTPERRO`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the instrument error query fails.
     pub fn error(&mut self) -> Result<String> {
         self.vna.query("OUTPERRO")
     }
 
+    /// Returns whether the sweep mode is continuous.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for communication failure or an unknown sweep-state response.
     pub fn is_continuous(&mut self) -> Result<bool> {
         match self.vna.query("GROU?")?.as_str() {
             "\"HOLD\"" => Ok(false),
@@ -75,34 +121,84 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Selects continuous or single-sweep operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sweep-mode command cannot be written.
     pub fn set_continuous(&mut self, continuous: bool) -> Result<()> {
         self.vna.write(if continuous { "CONT;" } else { "SING;" })
     }
 
+    /// Enables averaging with the requested averaging factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the averaging command cannot be written.
     pub fn set_averaging(&mut self, factor: usize) -> Result<()> {
         self.vna.write(&format!("AVERON {factor};"))
     }
 
+    /// Returns the native sweep start frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the query fails or its response is not numeric.
     pub fn frequency_start(&mut self) -> Result<f64> {
         parse_float(&self.vna.query("STAR;OUTPACTI;")?)
     }
 
+    /// Sets the native sweep start frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the frequency command cannot be written.
     pub fn set_frequency_start(&mut self, frequency_hz: f64) -> Result<()> {
         self.vna.write(&format!("STEP; STAR {frequency_hz};"))
     }
 
+    /// Returns the native sweep stop frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the query fails or its response is not numeric.
     pub fn frequency_stop(&mut self) -> Result<f64> {
         parse_float(&self.vna.query("STOP;OUTPACTI;")?)
     }
 
+    /// Sets the native sweep stop frequency in hertz.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the frequency command cannot be written.
     pub fn set_frequency_stop(&mut self, frequency_hz: f64) -> Result<()> {
         self.vna.write(&format!("STEP; STOP {frequency_hz};"))
     }
 
+    /// Returns the point count of the currently programmed native sweep.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the query fails or the response cannot be converted
+    /// to a point count.
     pub fn native_points(&mut self) -> Result<usize> {
-        parse_float(&self.vna.query("POIN;OUTPACTI;")?).map(|value| value as usize)
+        let value = parse_float(&self.vna.query("POIN;OUTPACTI;")?)?;
+        if value.fract() != 0.0 {
+            return Err(Error::Parse(format!(
+                "HP point count is not an integer: {value}"
+            )));
+        }
+        value
+            .to_usize()
+            .ok_or_else(|| Error::Parse(format!("HP point count is out of range: {value}")))
     }
 
+    /// Returns the compound plan point count, or the native point count when no
+    /// compound sweep is configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the native point count cannot be queried or converted.
     pub fn points(&mut self) -> Result<usize> {
         match &self.compound_sweep_plan {
             Some(plan) => Ok(plan.frequencies_hz().len()),
@@ -110,12 +206,24 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Reconfigures the current start/stop interval for `points` samples.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when querying the current interval or programming the
+    /// requested sweep fails.
     pub fn set_points(&mut self, points: usize) -> Result<()> {
         let start = self.frequency_start()?;
         let stop = self.frequency_stop()?;
         self.set_frequency_step(start, stop, points)
     }
 
+    /// Returns the frequency axis of the currently programmed native sweep.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when querying or parsing the native sweep settings fails,
+    /// or when the resulting frequency axis is invalid.
     pub fn native_frequency(&mut self) -> Result<Frequency> {
         Frequency::from_hz(Array1::from(linear_space(
             self.frequency_start()?,
@@ -124,6 +232,13 @@ impl<S: InstrumentSession> Hp8510C<S> {
         )))
     }
 
+    /// Returns the complete compound frequency axis, or the native axis when no
+    /// compound plan is configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the planned axis is invalid or the native sweep
+    /// settings cannot be queried and converted.
     pub fn frequency(&mut self) -> Result<Frequency> {
         match &self.compound_sweep_plan {
             Some(plan) => Frequency::from_hz(Array1::from(plan.frequencies_hz())),
@@ -131,6 +246,15 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Plans a list sweep for the supplied frequency axis.
+    ///
+    /// Frequencies outside the optional instrument limits are discarded before
+    /// planning.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained frequencies cannot form a valid HP 8510
+    /// sweep plan.
     pub fn set_frequency(&mut self, frequency: &Frequency) -> Result<()> {
         let values = frequency
             .values_hz()
@@ -145,6 +269,13 @@ impl<S: InstrumentSession> Hp8510C<S> {
         Ok(())
     }
 
+    /// Configures continuous-wave measurement at one frequency using a native
+    /// point count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `points` is not one of the native HP 8510 counts or
+    /// instrument communication fails.
     pub fn set_frequency_single_point(&mut self, frequency_hz: f64, points: usize) -> Result<()> {
         if !HP8510_NATIVE_POINTS.contains(&points) {
             return Err(Error::Unsupported(format!(
@@ -158,6 +289,12 @@ impl<S: InstrumentSession> Hp8510C<S> {
         Ok(())
     }
 
+    /// Configures a synthesized step sweep, using a compound plan when required.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the requested interval cannot form a valid sweep plan
+    /// or the native sweep cannot be programmed.
     pub fn set_frequency_sweep(
         &mut self,
         start_hz: f64,
@@ -167,6 +304,15 @@ impl<S: InstrumentSession> Hp8510C<S> {
         self.set_frequency_step(start_hz, stop_hz, points)
     }
 
+    /// Configures a slow synthesized step sweep.
+    ///
+    /// Native point counts and custom counts up to 792 are programmed directly;
+    /// larger requests are represented by a [`SweepPlan`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the interval cannot form a valid sweep plan or the
+    /// native sweep cannot be programmed.
     pub fn set_frequency_step(&mut self, start_hz: f64, stop_hz: f64, points: usize) -> Result<()> {
         if Self::supports_native_step(points) {
             self.compound_sweep_plan = None;
@@ -179,6 +325,11 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Configures a fast, non-synthesized ramp sweep.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `points` is a native HP 8510 point count.
     pub fn set_frequency_ramp(&mut self, start_hz: f64, stop_hz: f64, points: usize) -> Result<()> {
         if !HP8510_NATIVE_POINTS.contains(&points) {
             return Err(Error::Unsupported(format!(
@@ -191,10 +342,17 @@ impl<S: InstrumentSession> Hp8510C<S> {
         ))
     }
 
+    /// Returns whether the instrument can execute a step sweep directly.
+    #[must_use]
     pub fn supports_native_step(points: usize) -> bool {
         points > 0 && (HP8510_NATIVE_POINTS.contains(&points) || points <= 792)
     }
 
+    /// Programs a direct built-in or segmented linear step sweep.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsupported point count or communication failure.
     pub fn set_instrument_step_state(
         &mut self,
         start_hz: f64,
@@ -226,6 +384,12 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Programs a segmented continuous-wave list sweep.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when more than 30 raw frequencies are supplied or
+    /// instrument communication fails.
     pub fn set_instrument_cw_step_state(&mut self, frequencies_hz: &[f64]) -> Result<()> {
         if frequencies_hz.len() > 30 {
             return Err(Error::Unsupported(
@@ -237,17 +401,27 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
         for frequency in frequencies_hz {
             self.vna.write("SADD;")?;
-            self.vna.write(&format!("CWFREQ {};", *frequency as u64))?;
+            // HP 8510 CWFREQ accepts integer hertz; preserve the original driver's
+            // truncation while rejecting non-finite, negative, or out-of-range values.
+            let frequency_hz = frequency.trunc().to_u64().ok_or_else(|| {
+                Error::InvalidFrequency(format!("invalid HP8510 CW frequency {frequency}"))
+            })?;
+            self.vna.write(&format!("CWFREQ {frequency_hz};"))?;
         }
         self.vna.write("SDON; EDITDONE; LISFREQ;")
     }
 
+    /// Reads the two integer instrument status values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the status response is malformed.
     pub fn wait_for_status(&mut self) -> Result<(i32, i32)> {
         let status = self.vna.query("OUTPSTAT")?;
         let values = status
             .trim()
             .split(',')
-            .map(|value| value.parse::<i32>())
+            .map(str::parse::<i32>)
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|error| Error::Parse(format!("invalid HP8510 status: {error}")))?;
         match values.as_slice() {
@@ -256,6 +430,11 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Reads complex values using the fast HP FORM2 binary transfer format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for communication failure or an invalid binary response.
     pub fn ask_for_complex(&mut self, output_command: &str) -> Result<Vec<Complex64>> {
         self.wait_for_status()?;
         self.vna.write("FORM2;")?;
@@ -263,6 +442,14 @@ impl<S: InstrumentSession> Hp8510C<S> {
         parse_hp_binary(&self.vna.session.read_raw()?)
     }
 
+    /// Performs one native one-port sweep and returns its network data.
+    ///
+    /// `expected_hz` supplies the frequency axis for a sweep-plan section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sweep or binary transfer fails, the frequency
+    /// axis is invalid, or the returned trace length does not match the axis.
     pub fn one_port_native(
         &mut self,
         continuous_wave: bool,
@@ -281,6 +468,12 @@ impl<S: InstrumentSession> Hp8510C<S> {
         one_port_network(frequency, values)
     }
 
+    /// Performs a one-port native or compound sweep and returns stitched data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when sweep programming, acquisition, masking, stitching,
+    /// or restoration of the original sweep interval fails.
     pub fn one_port(&mut self, continuous_wave: bool) -> Result<Network> {
         let Some(plan) = self.compound_sweep_plan.clone() else {
             return self.one_port_native(continuous_wave, None, true);
@@ -303,6 +496,12 @@ impl<S: InstrumentSession> Hp8510C<S> {
         result.ok_or_else(|| Error::InvalidFrequency("HP8510 sweep plan is empty".into()))
     }
 
+    /// Performs the four native parameter sweeps required for a two-port network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a parameter sweep fails or the four traces cannot be
+    /// assembled into a frequency-aligned two-port network.
     pub fn two_port_native(
         &mut self,
         continuous_wave: bool,
@@ -313,9 +512,15 @@ impl<S: InstrumentSession> Hp8510C<S> {
         let s12 = self.parameter_sweep("s12;", continuous_wave, expected_hz, fresh_sweep)?;
         let s22 = self.parameter_sweep("s22;", continuous_wave, expected_hz, fresh_sweep)?;
         let s21 = self.parameter_sweep("s21;", continuous_wave, expected_hz, fresh_sweep)?;
-        assemble_two_port(s11, s12, s21, s22)
+        assemble_two_port(s11, &s12, &s21, &s22)
     }
 
+    /// Performs a two-port native or compound sweep and returns stitched data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when sweep programming, acquisition, masking, stitching,
+    /// or restoration of the original sweep interval fails.
     pub fn two_port(&mut self, continuous_wave: bool) -> Result<Network> {
         let Some(plan) = self.compound_sweep_plan.clone() else {
             return self.two_port_native(continuous_wave, None, true);
@@ -338,6 +543,12 @@ impl<S: InstrumentSession> Hp8510C<S> {
         result.ok_or_else(|| Error::InvalidFrequency("HP8510 sweep plan is empty".into()))
     }
 
+    /// Obtains S-parameter network data for port 1, port 2, or both ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `ports` is `[1]`, `[2]`, `[1, 2]`, or `[2, 1]`,
+    /// or if the measurement fails.
     pub fn get_snp_network(&mut self, ports: &[usize], continuous_wave: bool) -> Result<Network> {
         match ports {
             [1] => {
@@ -355,6 +566,15 @@ impl<S: InstrumentSession> Hp8510C<S> {
         }
     }
 
+    /// Measures the forward and reverse switch terms.
+    ///
+    /// The first network is the forward term `Gamma_f` = `b_2/a_2` while port 1
+    /// drives the source. The second is the reverse term `Gamma_r` = `b_1/a_1`
+    /// while port 2 drives the source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when configuring or acquiring either switch-term sweep fails.
     pub fn switch_terms(&mut self) -> Result<(Network, Network)> {
         self.vna
             .write("USER2;DRIVPORT1;LOCKA1;NUMEB2;DENOA2;CONV1S;")?;
@@ -394,7 +614,7 @@ impl<S: InstrumentSession> Hp8510SweepProgrammer for Hp8510C<S> {
     }
 }
 
-fn assemble_two_port(s11: Network, s12: Network, s21: Network, s22: Network) -> Result<Network> {
+fn assemble_two_port(s11: Network, s12: &Network, s21: &Network, s22: &Network) -> Result<Network> {
     if s11.frequency != s12.frequency
         || s11.frequency != s21.frequency
         || s11.frequency != s22.frequency
@@ -425,9 +645,15 @@ fn linear_space(start: f64, stop: f64, points: usize) -> Vec<f64> {
         0 => Vec::new(),
         1 => vec![start],
         _ => {
-            let step = (stop - start) / (points - 1) as f64;
+            let point_intervals = (points - 1).to_f64().unwrap_or(f64::NAN);
+            let frequency_increment = (stop - start) / point_intervals;
             (0..points)
-                .map(|index| start + index as f64 * step)
+                .map(|index| {
+                    index
+                        .to_f64()
+                        .unwrap_or(f64::NAN)
+                        .mul_add(frequency_increment, start)
+                })
                 .collect()
         }
     }
@@ -478,8 +704,8 @@ fn parse_hp_binary(buffer: &[u8]) -> Result<Vec<Complex64>> {
         .chunks_exact(8)
         .map(|chunk| {
             Complex64::new(
-                f32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as f64,
-                f32::from_be_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]) as f64,
+                f64::from(f32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])),
+                f64::from(f32::from_be_bytes([chunk[4], chunk[5], chunk[6], chunk[7]])),
             )
         })
         .collect())

@@ -1,17 +1,46 @@
-use super::media::*;
-use super::*;
-/// Origin: `skrf/media/distributedCircuit.py::DistributedCircuit`.
+//! Transmission lines defined by distributed impedance and admittance.
+
+use std::fmt;
+use std::path::Path;
+
+use ndarray::Array1;
+use num_complex::Complex64;
+
+use crate::{Error, Frequency, Network, Result};
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+/// Transmission-line medium defined by distributed RLGC values.
+///
+/// | Quantity | Symbol | Field/method |
+/// | --- | --- | --- |
+/// | Resistance | $R'$ | [`Self::resistance_per_meter`] |
+/// | Inductance | $L'$ | [`Self::inductance_per_meter`] |
+/// | Conductance | $G'$ | [`Self::conductance_per_meter`] |
+/// | Capacitance | $C'$ | [`Self::capacitance_per_meter`] |
+/// | Impedance | $Z'=R'+j\omega L'$ | [`Self::distributed_impedance`] |
+/// | Admittance | $Y'=G'+j\omega C'$ | [`Self::distributed_admittance`] |
 #[derive(Clone, Debug)]
 pub struct DistributedCircuit {
+    /// Frequency band.
     pub frequency: Frequency,
+    /// Distributed resistance $R'$ in ohms per meter.
     pub resistance_per_meter: Array1<f64>,
+    /// Distributed conductance $G'$ in siemens per meter.
     pub conductance_per_meter: Array1<f64>,
+    /// Distributed inductance $L'$ in henries per meter.
     pub inductance_per_meter: Array1<f64>,
+    /// Distributed capacitance $C'$ in farads per meter.
     pub capacitance_per_meter: Array1<f64>,
+    /// Optional port impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
 }
 
 impl DistributedCircuit {
+    /// Construct a distributed circuit from frequency-dependent RLGC arrays.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an RLGC or port-impedance array has the wrong length.
     pub fn new(
         frequency: Frequency,
         resistance_per_meter: Array1<f64>,
@@ -51,6 +80,11 @@ impl DistributedCircuit {
         })
     }
 
+    /// Construct a distributed circuit from scalar RLGC values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the generated RLGC arrays are incompatible with the frequency axis.
     pub fn from_scalars(
         frequency: Frequency,
         resistance_per_meter: f64,
@@ -69,6 +103,8 @@ impl DistributedCircuit {
         )
     }
 
+    /// Return distributed impedance $Z'=R'+j\omega L'$ in ohms per meter.
+    #[must_use]
     pub fn distributed_impedance(&self) -> Array1<Complex64> {
         Array1::from_shape_fn(self.frequency.points(), |point| {
             let mut value = Complex64::new(
@@ -82,6 +118,8 @@ impl DistributedCircuit {
         })
     }
 
+    /// Return distributed admittance $Y'=G'+j\omega C'$ in siemens per meter.
+    #[must_use]
     pub fn distributed_admittance(&self) -> Array1<Complex64> {
         Array1::from_shape_fn(self.frequency.points(), |point| {
             let mut value = Complex64::new(
@@ -95,7 +133,13 @@ impl DistributedCircuit {
         })
     }
 
-    /// Port of `skrf.media.DistributedCircuit.from_media`.
+    /// Recover distributed RLGC values from an existing medium.
+    ///
+    /// Uses $Z'=\gamma Z_{0}$ and $Y'=\gamma/Z_{0}$; zero frequency is rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero frequency, zero characteristic impedance, or incompatible arrays.
     pub fn from_media<M: Media>(media: &M) -> Result<Self> {
         let angular = media.frequency().angular();
         if angular.iter().any(|value| *value == 0.0) {
@@ -128,12 +172,23 @@ impl DistributedCircuit {
         )
     }
 
-    /// Port of `skrf.media.DistributedCircuit.from_csv`.
+    /// Read a distributed circuit from a media CSV file.
+    ///
+    /// The expected columns contain frequency, $Z_{0}$, $\gamma$, and optional
+    /// port impedance as real/imaginary pairs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the CSV cannot be read or its medium data is invalid.
     pub fn from_csv(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_media(&DefinedGammaZ0::from_csv(path)?)
     }
 
-    /// Port of `skrf.media.Media.write_csv` for this distributed medium.
+    /// Write frequency, $Z_{0}$, $\gamma$, and port impedance to CSV.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the medium cannot be evaluated or the CSV cannot be written.
     pub fn write_csv(&self, path: impl AsRef<Path>) -> Result<()> {
         self.as_defined()?.write_csv(path)
     }
@@ -153,6 +208,7 @@ impl Media for DistributedCircuit {
         &self.frequency
     }
 
+    /// Return propagation constant $\gamma=\sqrt{Z'Y'}$.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         let impedance = self.distributed_impedance();
         let admittance = self.distributed_admittance();
@@ -161,6 +217,7 @@ impl Media for DistributedCircuit {
         }))
     }
 
+    /// Return characteristic impedance $Z_{0}=\sqrt{Z'/Y'}$.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         let impedance = self.distributed_impedance();
         let admittance = self.distributed_admittance();

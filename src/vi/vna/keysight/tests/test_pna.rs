@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![cfg(feature = "visa")]
+//! Keysight PNA driver tests using a deterministic SCPI session.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::io::{Read, Write};
@@ -9,6 +10,7 @@ use rust_rf::vi::vna::keysight::{FieldFox, Pna, PnaSweepMode, PnaSweepType, Trig
 use rust_rf::vi::vna::{InstrumentSession, ValuesFormat, Vna};
 
 #[derive(Default)]
+/// In-memory SCPI session that records writes and returns queued responses.
 struct ScpiMock {
     responses: BTreeMap<String, VecDeque<Vec<u8>>>,
     writes: Vec<u8>,
@@ -16,6 +18,7 @@ struct ScpiMock {
 }
 
 impl ScpiMock {
+    /// Creates a mock with one text response for each command.
     fn with_text(responses: impl IntoIterator<Item = (&'static str, &'static str)>) -> Self {
         let mut session = Self::default();
         for (command, response) in responses {
@@ -28,6 +31,7 @@ impl ScpiMock {
         session
     }
 
+    /// Queues another response for a command.
     fn push(&mut self, command: &str, response: impl Into<Vec<u8>>) {
         self.responses
             .entry(command.into())
@@ -68,16 +72,19 @@ impl InstrumentSession for ScpiMock {
     }
 }
 
+/// Creates a `FieldFox` backed by the supplied mock session.
 fn field_fox(session: ScpiMock) -> FieldFox<ScpiMock> {
     FieldFox::from_vna(Vna::new("mock", session, None))
 }
 
-fn make_pna(session: ScpiMock, model: &str) -> Pna<ScpiMock> {
-    Pna::from_model(Vna::new("mock", session, None), model).unwrap()
+/// Creates a PNA backed by the supplied mock session and model identifier.
+fn make_pna(session: ScpiMock, model: &str) -> rust_rf::Result<Pna<ScpiMock>> {
+    Pna::from_model(Vna::new("mock", session, None), model)
 }
 
 #[test]
-fn pna_queries_and_sets_channel_parameters() {
+/// Verifies typed queries and writes for PNA channel properties.
+fn pna_queries_and_sets_channel_parameters() -> rust_rf::Result<()> {
     let session = ScpiMock::with_text([
         ("SENS1:FREQ:STAR?", "100"),
         ("SENS1:SWE:POIN?", "11"),
@@ -85,7 +92,7 @@ fn pna_queries_and_sets_channel_parameters() {
         ("SENS1:SWE:MODE?", "SING"),
         ("SYST:MEAS:CAT? 1", "1,2,3"),
     ]);
-    let mut pna = make_pna(session, "N5227B");
+    let mut pna = make_pna(session, "N5227B")?;
     {
         let mut channel = pna.channel(1).unwrap();
         assert_eq!(channel.frequency_start().unwrap(), 100);
@@ -100,17 +107,19 @@ fn pna_queries_and_sets_channel_parameters() {
         String::from_utf8(pna.vna.session.writes).unwrap(),
         "SENS1:FREQ:STAR 1000000SENS1:SWE:TYPE LOG"
     );
+    Ok(())
 }
 
 #[test]
-fn pna_manages_formats_measurements_and_model_capabilities() {
+/// Verifies transfer formats, measurements, triggers, and model capabilities.
+fn pna_manages_formats_measurements_and_model_capabilities() -> rust_rf::Result<()> {
     let session = ScpiMock::with_text([
         ("FORM?", "REAL,+64"),
         ("CALC1:PAR:CAT:EXT?", "CH1_S11_1,S11,CH1_S12_1,S12"),
         ("DISP:WIND:CAT?", "1"),
         ("SYST:CAP:HARD:PORT:COUN?", "4"),
     ]);
-    let mut pna = make_pna(session, "N5227B");
+    let mut pna = make_pna(session, "N5227B")?;
     assert_eq!(pna.query_format().unwrap(), ValuesFormat::Binary64);
     assert_eq!(pna.ports().unwrap(), 4);
     assert_eq!(
@@ -126,12 +135,14 @@ fn pna_manages_formats_measurements_and_model_capabilities() {
     assert!(writes.contains("CALC1:PAR:DEL 'TRACE'"));
     assert!(writes.contains("TRIG:SOUR IMM"));
 
-    let mut legacy = make_pna(ScpiMock::default(), "E8362C");
+    let mut legacy = make_pna(ScpiMock::default(), "E8362C")?;
     assert_eq!(legacy.ports().unwrap(), 2);
+    Ok(())
 }
 
 #[test]
-fn pna_acquires_an_active_trace_network_and_restores_state() {
+/// Verifies active-trace acquisition and restoration of instrument state.
+fn pna_acquires_an_active_trace_network_and_restores_state() -> rust_rf::Result<()> {
     let mut session = ScpiMock::default();
     session.push("SENS1:SWE:MODE?", b"SING".to_vec());
     session.push("SENS1:SWE:TIME?", b"1.0".to_vec());
@@ -146,14 +157,16 @@ fn pna_acquires_an_active_trace_network_and_restores_state() {
         "CALC1:DATA? SDATA",
         binary_f64_block(&(0..11).flat_map(|_| [1.0, -1.0]).collect::<Vec<_>>()),
     );
-    let mut pna = make_pna(session, "E8362C");
+    let mut pna = make_pna(session, "E8362C")?;
     let network = pna.channel(1).unwrap().get_active_trace().unwrap();
     assert_eq!(network.s.dim(), (11, 1, 1));
     assert_eq!(network.s[[0, 0, 0]], rust_rf::Complex64::new(1.0, -1.0));
     assert_eq!(pna.vna.values_format, ValuesFormat::Ascii);
     assert_eq!(pna.vna.session.clears, 2);
+    Ok(())
 }
 
+/// Encodes floating-point values as an IEEE 488.2 binary block.
 fn binary_f64_block(values: &[f64]) -> Vec<u8> {
     let payload = values
         .iter()

@@ -3,15 +3,24 @@
 
 use std::collections::BTreeMap;
 
+/// Stable documentation-build settings translated from `doc/source/conf.py`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DocumentationConfig {
+    /// Project name displayed by generated documentation.
     pub project: String,
+    /// Project author displayed by generated documentation.
     pub author: String,
+    /// HTML page title.
     pub html_title: String,
+    /// Documentation source-file suffix.
     pub source_suffix: String,
+    /// Root document used to build the documentation tree.
     pub master_document: String,
+    /// Enabled documentation extensions.
     pub extensions: Vec<String>,
+    /// Source patterns excluded from documentation builds.
     pub excluded_patterns: Vec<String>,
+    /// External documentation inventories keyed by project name.
     pub intersphinx: BTreeMap<String, String>,
 }
 
@@ -69,7 +78,10 @@ impl DocumentationConfig {
     }
 }
 
-/// Port of `doc/source/conf.py::process_signature` without Sphinx runtime coupling.
+/// Removes the generated `self` and plotting-attribute arguments from generated plot signatures.
+///
+/// Signatures for ordinary functions, or plot functions not listed in `generated_plot_methods`,
+/// are returned unchanged.
 pub fn process_signature(
     qualified_name: &str,
     signature: &str,
@@ -97,24 +109,36 @@ pub fn process_signature(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Named entry in a structured NumPy-style documentation section.
 pub struct DocField {
+    /// Field, parameter, return value, or exception name.
     pub name: String,
+    /// Declared type or value description.
     pub field_type: String,
+    /// Dedented Markdown description lines.
     pub description: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Parsed representation of a NumPy-style docstring.
 pub struct NumpyDocString {
+    /// Optional callable signature from the first line.
     pub signature: Option<String>,
+    /// Initial one-paragraph summary.
     pub summary: Vec<String>,
+    /// Additional prose before the first named section.
     pub extended_summary: Vec<String>,
+    /// Free-form named sections such as Notes or Examples.
     pub sections: BTreeMap<String, Vec<String>>,
+    /// Structured sections such as Parameters, Returns, and Raises.
     pub fields: BTreeMap<String, Vec<DocField>>,
+    /// Parsed entries from the reStructuredText `index` directive.
     pub index: BTreeMap<String, Vec<String>>,
 }
 
 impl NumpyDocString {
-    /// Parses the section and field model used by the bundled NumPy docscrape extension.
+    /// Parses the section and field model used by the bundled `NumPy` docscrape extension.
+    #[must_use]
     pub fn parse(input: &str) -> Self {
         let lines = dedent(input);
         let mut output = Self::default();
@@ -173,12 +197,14 @@ impl NumpyDocString {
         output
     }
 
+    /// Returns the lines in a free-form named section, or an empty slice.
     pub fn section(&self, name: &str) -> &[String] {
-        self.sections.get(name).map(Vec::as_slice).unwrap_or(&[])
+        self.sections.get(name).map_or(&[], Vec::as_slice)
     }
 
+    /// Returns the entries in a structured named section, or an empty slice.
     pub fn field_section(&self, name: &str) -> &[DocField] {
-        self.fields.get(name).map(Vec::as_slice).unwrap_or(&[])
+        self.fields.get(name).map_or(&[], Vec::as_slice)
     }
 }
 
@@ -245,8 +271,9 @@ fn parse_fields(lines: &[String]) -> Vec<DocField> {
         let header = lines[cursor].trim();
         let (name, field_type) = header
             .split_once(':')
-            .map(|(name, field_type)| (name.trim(), field_type.trim()))
-            .unwrap_or((header, ""));
+            .map_or((header, ""), |(name, field_type)| {
+                (name.trim(), field_type.trim())
+            });
         cursor += 1;
         let mut description = Vec::new();
         while cursor < lines.len() {

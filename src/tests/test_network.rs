@@ -1,3 +1,5 @@
+//! N-port network construction, conversion, connection, and analysis regressions.
+
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,7 +19,9 @@ use rust_rf::{
 };
 
 const TOLERANCE: f64 = 1.0e-10;
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+/// Checks scattering and reference-impedance shape validation.
 #[test]
 fn validates_network_shapes() {
     let frequency = Frequency::new(1.0, 2.0, 2, FrequencyUnit::GHz, SweepType::Linear)
@@ -33,14 +37,17 @@ fn validates_network_shapes() {
     assert!(Network::new(frequency, Array3::zeros((2, 2, 1)), Array2::zeros((2, 2))).is_err());
 }
 
+/// Checks frequency interpolation of scattering data and reference impedance.
 #[test]
 fn linearly_interpolates_s_parameters_and_impedance() {
     let frequency = Frequency::from_hz(array![1.0, 3.0]).expect("frequency should be valid");
     let s = Array3::from_shape_fn((2, 1, 1), |(point, _, _)| {
-        Complex64::new(2.0 * point as f64, -2.0 * point as f64)
+        let point = f64::from(u32::try_from(point).expect("fixture index should fit in u32"));
+        Complex64::new(2.0 * point, -2.0 * point)
     });
     let z0 = Array2::from_shape_fn((2, 1), |(point, _)| {
-        Complex64::new(50.0 + 10.0 * point as f64, 0.0)
+        let point = f64::from(u32::try_from(point).expect("fixture index should fit in u32"));
+        Complex64::new(10.0f64.mul_add(point, 50.0), 0.0)
     });
     let network = Network::new(frequency, s, z0).expect("network should be valid");
     let target = Frequency::from_hz(array![1.0, 2.0, 3.0]).expect("target should be valid");
@@ -68,10 +75,11 @@ fn linearly_interpolates_s_parameters_and_impedance() {
     assert_complex_close(cubic.s[(1, 0, 0)], Complex64::new(1.0, -1.0));
 }
 
+/// Checks two-port cascading and cascading inversion.
 #[test]
-fn cascades_and_inverts_two_port_networks() {
-    let first = matched_two_port(Complex64::new(0.8, 0.1));
-    let second = matched_two_port(Complex64::new(0.6, -0.2));
+fn cascades_and_inverts_two_port_networks() -> TestResult {
+    let first = matched_two_port(Complex64::new(0.8, 0.1))?;
+    let second = matched_two_port(Complex64::new(0.6, -0.2))?;
     let cascaded = first.cascade(&second).expect("cascade should succeed");
     assert_complex_close(
         cascaded.s[(0, 1, 0)],
@@ -89,12 +97,14 @@ fn cascades_and_inverts_two_port_networks() {
     assert_complex_close(identity.s[(0, 1, 1)], Complex64::new(0.0, 0.0));
     assert_complex_close(identity.s[(0, 1, 0)], Complex64::new(1.0, 0.0));
     assert_complex_close(identity.s[(0, 0, 1)], Complex64::new(1.0, 0.0));
+    Ok(())
 }
 
+/// Checks elementwise arithmetic, real powers, and fixture de-embedding.
 #[test]
-fn performs_elementwise_arithmetic_power_and_deembedding() {
-    let left = matched_two_port(Complex64::new(0.8, 0.1));
-    let right = matched_two_port(Complex64::new(0.5, -0.2));
+fn performs_elementwise_arithmetic_power_and_deembedding() -> TestResult {
+    let left = matched_two_port(Complex64::new(0.8, 0.1))?;
+    let right = matched_two_port(Complex64::new(0.5, -0.2))?;
 
     assert_complex_close(
         left.add_elementwise(&right)
@@ -125,7 +135,7 @@ fn performs_elementwise_arithmetic_power_and_deembedding() {
         left.s[(0, 1, 0)].powf(2.0),
     );
 
-    let dut = matched_two_port(Complex64::new(0.7, 0.05));
+    let dut = matched_two_port(Complex64::new(0.7, 0.05))?;
     let measured = left
         .cascade(&dut)
         .and_then(|network| network.cascade(&right))
@@ -134,11 +144,13 @@ fn performs_elementwise_arithmetic_power_and_deembedding() {
         .deembed(&left, Some(&right))
         .expect("deembedding should succeed");
     assert_parameter_matrices_close(&restored.s, &dut.s);
+    Ok(())
 }
 
+/// Checks lossless Touchstone write/read round trips.
 #[test]
-fn writes_touchstone_that_can_be_read_back() {
-    let network = matched_two_port(Complex64::new(0.75, -0.25));
+fn writes_touchstone_that_can_be_read_back() -> TestResult {
+    let network = matched_two_port(Complex64::new(0.75, -0.25))?;
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system clock should follow the Unix epoch")
@@ -160,11 +172,13 @@ fn writes_touchstone_that_can_be_read_back() {
     fs::remove_file(path).expect("temporary Touchstone file should be removed");
     fs::remove_dir(temporary_directory).expect("empty temporary directory should be removed");
     let _ = fs::remove_dir(temporary_root);
+    Ok(())
 }
 
+/// Checks S/Z/Y round trips for power, pseudo, and traveling waves.
 #[test]
-fn round_trips_impedance_and_admittance_for_all_wave_definitions() {
-    let scattering = representative_scattering();
+fn round_trips_impedance_and_admittance_for_all_wave_definitions() -> TestResult {
+    let scattering = representative_scattering()?;
     let reference = Array2::from_shape_vec(
         (1, 2),
         vec![Complex64::new(50.0, 5.0), Complex64::new(75.0, -3.0)],
@@ -201,8 +215,10 @@ fn round_trips_impedance_and_admittance_for_all_wave_definitions() {
             &scattering,
         );
     }
+    Ok(())
 }
 
+/// Checks the one-port impedance formula for a real reference impedance.
 #[test]
 fn matches_one_port_impedance_formula_for_real_reference() {
     let scattering = Array3::from_shape_vec((1, 1, 1), vec![Complex64::new(0.2, 0.1)])
@@ -222,13 +238,14 @@ fn matches_one_port_impedance_formula_for_real_reference() {
     }
 }
 
+/// Checks renormalization to a new impedance and restoration of the original network.
 #[test]
-fn renormalizes_and_restores_network_reference_impedance() {
+fn renormalizes_and_restores_network_reference_impedance() -> TestResult {
     let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
     let original_reference = Array2::from_elem((1, 2), Complex64::new(50.0, 0.0));
     let mut network = Network::new(
         frequency,
-        representative_scattering(),
+        representative_scattering()?,
         original_reference.clone(),
     )
     .expect("network should be valid");
@@ -247,11 +264,13 @@ fn renormalizes_and_restores_network_reference_impedance() {
         .expect("reverse renormalization should succeed");
 
     assert_parameter_matrices_close(&network.s, &original_scattering);
+    Ok(())
 }
 
+/// Checks scattering-transfer $S\leftrightarrow T$ round trips.
 #[test]
-fn round_trips_scattering_transfer_parameters() {
-    let scattering = representative_scattering();
+fn round_trips_scattering_transfer_parameters() -> TestResult {
+    let scattering = representative_scattering()?;
     let transfer = s_to_t(&scattering).expect("S to T conversion should succeed");
     let s11 = scattering[(0, 0, 0)];
     let s12 = scattering[(0, 0, 1)];
@@ -264,11 +283,13 @@ fn round_trips_scattering_transfer_parameters() {
     let restored = t_to_s(&transfer).expect("T to S conversion should succeed");
     assert_parameter_matrices_close(&restored, &scattering);
     assert!(s_to_t(&Array3::zeros((1, 1, 1))).is_err());
+    Ok(())
 }
 
+/// Checks two-port $S\leftrightarrow ABCD$ round trips.
 #[test]
-fn round_trips_abcd_parameters() {
-    let scattering = representative_scattering();
+fn round_trips_abcd_parameters() -> TestResult {
+    let scattering = representative_scattering()?;
     let reference = Array2::from_elem((1, 2), Complex64::new(50.0, 0.0));
     let abcd = s_to_abcd(&scattering, &reference).expect("S to ABCD conversion should succeed");
     let restored = abcd_to_s(&abcd, &reference).expect("ABCD to S conversion should succeed");
@@ -280,12 +301,14 @@ fn round_trips_abcd_parameters() {
     )
     .expect("shape should be valid");
     assert!(s_to_abcd(&scattering, &unequal).is_err());
+    Ok(())
 }
 
+/// Checks connection of arbitrary ports on general N-port networks.
 #[test]
-fn connects_arbitrary_n_port_networks() {
-    let splitter = ideal_three_way();
-    let extension = matched_two_port(Complex64::new(1.0, 0.0));
+fn connects_arbitrary_n_port_networks() -> TestResult {
+    let splitter = ideal_three_way()?;
+    let extension = matched_two_port(Complex64::new(1.0, 0.0))?;
     let connected = splitter
         .connect(1, &extension, 0)
         .expect("N-port connection should succeed");
@@ -304,8 +327,8 @@ fn connects_arbitrary_n_port_networks() {
         }
     }
 
-    let left = matched_two_port_with_reference(50.0);
-    let right = matched_two_port_with_reference(75.0);
+    let left = matched_two_port_with_reference(50.0)?;
+    let right = matched_two_port_with_reference(75.0)?;
     let mismatch = left
         .connect(1, &right, 0)
         .expect("unequal-reference connection should succeed");
@@ -316,8 +339,10 @@ fn connects_arbitrary_n_port_networks() {
         1.0,
         epsilon = TOLERANCE
     );
+    Ok(())
 }
 
+/// Checks connecting and eliminating two ports within one network.
 #[test]
 fn inner_connects_ports_of_one_network() {
     let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
@@ -342,9 +367,10 @@ fn inner_connects_ports_of_one_network() {
     assert_complex_close(connected.s[(0, 0, 1)], Complex64::new(1.0, 0.0));
 }
 
+/// Checks hybrid and inverse-hybrid parameter round trips.
 #[test]
-fn round_trips_hybrid_and_inverse_hybrid_parameters() {
-    let scattering = representative_scattering();
+fn round_trips_hybrid_and_inverse_hybrid_parameters() -> TestResult {
+    let scattering = representative_scattering()?;
     let reference = Array2::from_shape_vec(
         (1, 2),
         vec![Complex64::new(50.0, 5.0), Complex64::new(75.0, -3.0)],
@@ -368,8 +394,10 @@ fn round_trips_hybrid_and_inverse_hybrid_parameters() {
     let restored = g_to_s(&inverse_hybrid, &reference, SParameterDefinition::Power)
         .expect("G to S conversion should succeed");
     assert_parameter_matrices_close(&restored, &scattering);
+    Ok(())
 }
 
+/// Checks passivity and reciprocity metrics.
 #[test]
 fn calculates_passivity_and_reciprocity_metrics() {
     let mut scattering = Array3::zeros((1, 2, 2));
@@ -391,10 +419,13 @@ fn calculates_passivity_and_reciprocity_metrics() {
     assert!(reciprocity(&Array3::zeros((1, 1, 1))).is_err());
 }
 
+/// Checks reversal of even-port scattering matrices.
 #[test]
 fn flips_even_port_scattering_matrices() {
     let scattering = Array3::from_shape_fn((1, 4, 4), |(_, row, column)| {
-        Complex64::new((10 * row + column) as f64, 0.0)
+        let matrix_value =
+            f64::from(u32::try_from(10 * row + column).expect("fixture index should fit in u32"));
+        Complex64::new(matrix_value, 0.0)
     });
     let flipped = flip_ports(&scattering).expect("port flipping should succeed");
     assert_complex_close(flipped[(0, 0, 0)], scattering[(0, 2, 2)]);
@@ -402,6 +433,7 @@ fn flips_even_port_scattering_matrices() {
     assert!(flip_ports(&Array3::zeros((1, 3, 3))).is_err());
 }
 
+/// Checks active S, Z, Y, and VSWR for a port-excitation vector.
 #[test]
 fn calculates_active_network_parameters() {
     let scattering = Array3::from_shape_vec(
@@ -441,9 +473,10 @@ fn calculates_active_network_parameters() {
     assert_relative_eq!(vswr[(0, 1)], 1.55 / 0.45, epsilon = TOLERANCE);
 }
 
+/// Checks derived magnitude/phase/time quantities and parameter components.
 #[test]
-fn exposes_derived_parameter_component_and_time_properties() {
-    let network = matched_two_port(Complex64::new(0.8, 0.1));
+fn exposes_derived_parameter_component_and_time_properties() -> TestResult {
+    let network = matched_two_port(Complex64::new(0.8, 0.1))?;
     assert_eq!(network.impedance().expect("impedance").dim(), (1, 2, 2));
     assert_eq!(network.admittance().expect("admittance").dim(), (1, 2, 2));
     assert_eq!(network.hybrid().expect("hybrid").dim(), (1, 2, 2));
@@ -459,17 +492,18 @@ fn exposes_derived_parameter_component_and_time_properties() {
         (1, 2, 2)
     );
     assert_eq!(network.abcd().expect("ABCD").dim(), (1, 2, 2));
-    assert_eq!(
+    assert_relative_eq!(
         network.s_magnitude()[(0, 1, 0)],
-        network.s[(0, 1, 0)].norm()
+        network.s[(0, 1, 0)].norm(),
+        epsilon = TOLERANCE
     );
     assert_relative_eq!(
         network.s_phase_degrees()[(0, 1, 0)],
         network.s[(0, 1, 0)].arg().to_degrees(),
         epsilon = TOLERANCE
     );
-    assert_eq!(network.s_real()[(0, 1, 0)], 0.8);
-    assert_eq!(network.s_imaginary()[(0, 1, 0)], 0.1);
+    assert_relative_eq!(network.s_real()[(0, 1, 0)], 0.8, epsilon = TOLERANCE);
+    assert_relative_eq!(network.s_imaginary()[(0, 1, 0)], 0.1, epsilon = TOLERANCE);
     assert_eq!(network.s_time().expect("time response").dim(), (1, 2, 2));
     assert!(network.is_passive(1.0e-12).expect("passivity"));
     assert!(network.is_reciprocal(1.0).expect("reciprocity"));
@@ -480,17 +514,23 @@ fn exposes_derived_parameter_component_and_time_properties() {
             .expect("scattering error"),
         array![0.0]
     );
+    Ok(())
 }
 
+/// Checks equal-impedance single-ended/mixed-mode round trips.
 #[test]
-fn round_trips_equal_impedance_mixed_mode_conversion() {
-    let first = matched_two_port(Complex64::new(0.8, 0.1));
+fn round_trips_equal_impedance_mixed_mode_conversion() -> TestResult {
+    let first = matched_two_port(Complex64::new(0.8, 0.1))?;
     let mut four_port = first
         .connect(1, &first, 0)
         .expect("networks should connect");
     // The connection above produces a two-port, so construct a deterministic four-port matrix.
     four_port.s = Array3::from_shape_fn((1, 4, 4), |(_, output, input)| {
-        Complex64::new((output * 4 + input) as f64 / 100.0, 0.01 * input as f64)
+        let matrix_index = f64::from(
+            u32::try_from(output * 4 + input).expect("fixture matrix index should fit in u32"),
+        );
+        let input = f64::from(u32::try_from(input).expect("fixture port index should fit in u32"));
+        Complex64::new(matrix_index / 100.0, 0.01 * input)
     });
     four_port.z0 = Array2::from_elem((1, 4), Complex64::new(50.0, 0.0));
     four_port.port_modes = vec![rust_rf::network::PortMode::SingleEnded; 4];
@@ -504,150 +544,99 @@ fn round_trips_equal_impedance_mixed_mode_conversion() {
         .mixed_mode_to_single_ended(2)
         .expect("single-ended conversion should succeed");
     assert_parameter_matrices_close(&restored.s, &four_port.s);
+    Ok(())
 }
 
+/// Checks group delay, stability/gain, subnetworks, cropping, and port delay.
 #[test]
-fn calculates_group_delay_stability_subnetworks_crops_and_port_delay() {
-    let frequency =
-        Frequency::from_hz(array![1.0e9, 2.0e9, 3.0e9]).expect("frequency should be valid");
+fn calculates_group_delay_stability_subnetworks_crops_and_port_delay() -> TestResult {
+    let frequency = Frequency::from_hz(array![1.0e9, 2.0e9, 3.0e9])?;
     let delay = 0.1e-9;
     let s = Array3::from_shape_fn((3, 2, 2), |(point, output, input)| {
-        if output != input {
+        if output == input {
+            Complex64::new(0.1, 0.0)
+        } else {
             Complex64::from_polar(
                 0.5,
                 -std::f64::consts::TAU * frequency.values_hz()[point] * delay,
             )
-        } else {
-            Complex64::new(0.1, 0.0)
         }
     });
     let network = Network::new(
         frequency,
         s,
         Array2::from_elem((3, 2), Complex64::new(50.0, 0.0)),
-    )
-    .expect("network should be valid");
+    )?;
 
-    assert_relative_eq!(
-        network.group_delay().expect("group delay")[(1, 1, 0)],
-        delay,
-        epsilon = 1.0e-12
-    );
-    assert_eq!(network.stability_factor().expect("stability").len(), 3);
-    assert_eq!(
-        network
-            .maximum_stable_gain()
-            .expect("maximum stable gain")
-            .len(),
-        3
-    );
-    assert_eq!(network.maximum_gain().expect("maximum gain").len(), 3);
-    assert_eq!(network.unilateral_gain().expect("unilateral gain").len(), 3);
-    let windowed = network
-        .windowed(&rust_rf::time::Window::Hann, true)
-        .expect("windowed network");
+    assert_frequency_and_time_analysis(&network, delay)?;
+    assert_noise_and_gain_analysis(network)?;
+    Ok(())
+}
+
+fn assert_frequency_and_time_analysis(network: &Network, delay: f64) -> TestResult {
+    assert_relative_eq!(network.group_delay()?[(1, 1, 0)], delay, epsilon = 1.0e-12);
+    assert_eq!(network.stability_factor()?.len(), 3);
+    assert_eq!(network.maximum_stable_gain()?.len(), 3);
+    assert_eq!(network.maximum_gain()?.len(), 3);
+    assert_eq!(network.unilateral_gain()?.len(), 3);
+    let windowed = network.windowed(&rust_rf::time::Window::Hann, true)?;
     assert_eq!(windowed.frequency, network.frequency);
     assert_eq!(
         network
-            .impulse_response(1, 0, Some(&rust_rf::time::Window::Hann))
-            .expect("impulse response")
+            .impulse_response(1, 0, Some(&rust_rf::time::Window::Hann))?
             .1
             .len(),
         3
     );
-    assert_eq!(
-        network
-            .step_response(1, 0, None)
-            .expect("step response")
-            .1
-            .len(),
-        3
-    );
-    assert_eq!(network.subnetwork(&[1]).expect("subnetwork").ports(), 1);
-    assert_eq!(
-        network
-            .cropped(1.5e9, 2.5e9)
-            .expect("cropped network")
-            .frequency_points(),
-        1
-    );
-    let delayed = network.delayed_port(0, 90.0).expect("port delay");
+    assert_eq!(network.step_response(1, 0, None)?.1.len(), 3);
+    assert_eq!(network.subnetwork(&[1])?.ports(), 1);
+    assert_eq!(network.cropped(1.5e9, 2.5e9)?.frequency_points(), 1);
+    let delayed = network.delayed_port(0, 90.0)?;
     assert_complex_close(
         delayed.s[(0, 1, 0)],
         network.s[(0, 1, 0)] * Complex64::new(0.0, -1.0),
     );
     assert_complex_close(
-        network.rotated(90.0).expect("network rotation").s[(0, 1, 0)],
+        network.rotated(90.0)?.s[(0, 1, 0)],
         network.s[(0, 1, 0)] * Complex64::new(0.0, -1.0),
     );
-    assert_parameter_matrices_close(
-        &network
-            .with_added_polar_noise(0.0, 0.0, false)
-            .expect("zero additive noise")
-            .s,
-        &network.s,
-    );
-    assert_parameter_matrices_close(
-        &network
-            .with_multiplicative_noise(0.0, 0.0)
-            .expect("zero multiplicative noise")
-            .s,
-        &network.s,
-    );
-    assert_complex_close(
-        network.nudged(1.0e-12).expect("nudge").s[(0, 0, 0)],
-        network.s[(0, 0, 0)] + 1.0e-12,
-    );
-    assert_eq!(
-        network
-            .stability_circle(0, 181)
-            .expect("stability circle")
-            .dim(),
-        (3, 181)
-    );
-    assert_eq!(
-        network
-            .gain_circle(1, -3.0, 181)
-            .expect("gain circle")
-            .dim(),
-        (3, 181)
-    );
-    let mut noisy = network.clone();
-    noisy
-        .set_noise_parameters(
-            network.frequency.clone(),
-            array![1.0, 1.1, 1.2],
-            array![
-                Complex64::new(0.1, 0.0),
-                Complex64::new(0.1, 0.0),
-                Complex64::new(0.1, 0.0)
-            ],
-            array![5.0, 5.0, 5.0],
-        )
-        .expect("noise parameters");
-    assert_eq!(
-        noisy.minimum_noise_factor().expect("minimum noise").len(),
-        3
-    );
-    assert_eq!(
-        noisy
-            .optimal_noise_impedance()
-            .expect("optimal impedance")
-            .len(),
-        3
-    );
-    assert_eq!(
-        noisy
-            .noise_figure_circle(2.0, 181)
-            .expect("noise circle")
-            .dim(),
-        (3, 181)
-    );
+    Ok(())
 }
 
+fn assert_noise_and_gain_analysis(network: Network) -> TestResult {
+    assert_parameter_matrices_close(
+        &network.with_added_polar_noise(0.0, 0.0, false)?.s,
+        &network.s,
+    );
+    assert_parameter_matrices_close(&network.with_multiplicative_noise(0.0, 0.0)?.s, &network.s);
+    assert_complex_close(
+        network.nudged(1.0e-12)?.s[(0, 0, 0)],
+        network.s[(0, 0, 0)] + 1.0e-12,
+    );
+    assert_eq!(network.stability_circle(0, 181)?.dim(), (3, 181));
+    assert_eq!(network.gain_circle(1, -3.0, 181)?.dim(), (3, 181));
+    let mut noisy = network.clone();
+    noisy.set_noise_parameters(
+        network.frequency,
+        array![1.0, 1.1, 1.2],
+        array![
+            Complex64::new(0.1, 0.0),
+            Complex64::new(0.1, 0.0),
+            Complex64::new(0.1, 0.0)
+        ],
+        array![5.0, 5.0, 5.0],
+    )?;
+    assert_eq!(noisy.minimum_noise_factor()?.len(), 3);
+    assert_eq!(noisy.optimal_noise_impedance()?.len(), 3);
+    assert_eq!(noisy.noise_figure_circle(2.0, 181)?.dim(), (3, 181));
+    Ok(())
+}
+
+/// Checks set-like network helpers: overlap, stitch, average, port concatenation,
+/// standard deviation, and one-/two-port reflection assembly.
 #[test]
-fn combines_overlaps_stitches_averages_and_assembles_reflections() {
-    let line = matched_two_port(Complex64::new(0.8, 0.0));
+fn combines_overlaps_stitches_averages_and_assembles_reflections() -> TestResult {
+    let line = matched_two_port(Complex64::new(0.8, 0.0))?;
     let cascaded = cascade_list(&[line.clone(), line.clone()]).expect("cascade list");
     assert_complex_close(cascaded.s[(0, 1, 0)], Complex64::new(0.64, 0.0));
     assert_eq!(
@@ -718,32 +707,32 @@ fn combines_overlaps_stitches_averages_and_assembles_reflections() {
             .ports(),
         3
     );
+    Ok(())
 }
 
-fn matched_two_port(transmission: Complex64) -> Network {
-    let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
+fn matched_two_port(transmission: Complex64) -> TestResult<Network> {
+    let frequency = Frequency::from_hz(array![1.0e9])?;
     let mut s = Array3::zeros((1, 2, 2));
     s[(0, 1, 0)] = transmission;
     s[(0, 0, 1)] = transmission;
     let z0 = Array2::from_elem((1, 2), Complex64::new(50.0, 0.0));
-    Network::new(frequency, s, z0).expect("network should be valid")
+    Ok(Network::new(frequency, s, z0)?)
 }
 
-fn matched_two_port_with_reference(reference: f64) -> Network {
-    let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
+fn matched_two_port_with_reference(reference: f64) -> TestResult<Network> {
+    let frequency = Frequency::from_hz(array![1.0e9])?;
     let mut s = Array3::zeros((1, 2, 2));
     s[(0, 1, 0)] = Complex64::new(1.0, 0.0);
     s[(0, 0, 1)] = Complex64::new(1.0, 0.0);
-    Network::new(
+    Ok(Network::new(
         frequency,
         s,
         Array2::from_elem((1, 2), Complex64::new(reference, 0.0)),
-    )
-    .expect("network should be valid")
+    )?)
 }
 
-fn ideal_three_way() -> Network {
-    let frequency = Frequency::from_hz(array![1.0e9]).expect("frequency should be valid");
+fn ideal_three_way() -> TestResult<Network> {
+    let frequency = Frequency::from_hz(array![1.0e9])?;
     let s = Array3::from_shape_fn((1, 3, 3), |(_, output, input)| {
         Complex64::new(
             if output == input {
@@ -754,16 +743,15 @@ fn ideal_three_way() -> Network {
             0.0,
         )
     });
-    Network::new(
+    Ok(Network::new(
         frequency,
         s,
         Array2::from_elem((1, 3), Complex64::new(50.0, 0.0)),
-    )
-    .expect("network should be valid")
+    )?)
 }
 
-fn representative_scattering() -> Array3<Complex64> {
-    Array3::from_shape_vec(
+fn representative_scattering() -> TestResult<Array3<Complex64>> {
+    Ok(Array3::from_shape_vec(
         (1, 2, 2),
         vec![
             Complex64::new(0.1, 0.02),
@@ -771,8 +759,7 @@ fn representative_scattering() -> Array3<Complex64> {
             Complex64::new(0.7, 0.05),
             Complex64::new(0.05, -0.01),
         ],
-    )
-    .expect("shape should be valid")
+    )?)
 }
 
 fn assert_parameter_matrices_close(actual: &Array3<Complex64>, expected: &Array3<Complex64>) {

@@ -1,3 +1,5 @@
+//! Regressions based on the official Touchstone specification examples.
+
 use std::path::PathBuf;
 
 use approx::assert_relative_eq;
@@ -12,6 +14,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Parses every official example fixture and verifies its network rank.
 #[test]
 fn parses_every_official_touchstone_example_fixture() {
     let examples = [
@@ -44,12 +47,13 @@ fn parses_every_official_touchstone_example_fixture() {
     }
 }
 
+/// Verifies reference impedances, representative matrix values, and noise data.
 #[test]
 fn reads_reference_impedances_matrix_values_and_noise() {
     let example_3 = Network::read_touchstone(fixture("ex_3.ts")).expect("example 3");
     assert_eq!(example_3.frequency.values_hz().to_vec(), vec![1e9, 2e9]);
-    assert_eq!(example_3.s[(0, 0, 0)].re, 111.0);
-    assert_eq!(example_3.s[(1, 1, 1)].re, 222.0);
+    assert_relative_eq!(example_3.s[(0, 0, 0)].re, 111.0, epsilon = 1e-14);
+    assert_relative_eq!(example_3.s[(1, 1, 1)].re, 222.0, epsilon = 1e-14);
 
     let example_4 = Network::read_touchstone(fixture("ex_4.ts")).expect("example 4");
     let references = example_4.z0.row(0).mapv(|value| value.re).to_vec();
@@ -62,6 +66,7 @@ fn reads_reference_impedances_matrix_values_and_noise() {
     assert_eq!(noise.equivalent_noise_resistance.to_vec(), vec![19.0, 20.0]);
 }
 
+/// Normalizes mixed-mode port ordering and its reference impedances.
 #[test]
 fn normalizes_touchstone_mixed_mode_order() {
     let network = Network::read_touchstone(fixture("ex_16.ts")).expect("example 16");
@@ -83,6 +88,7 @@ fn normalizes_touchstone_mixed_mode_order() {
     }
 }
 
+/// Round-trips every supported network-parameter and numeric-value format.
 #[test]
 fn round_trips_all_touchstone_parameter_and_value_formats() {
     let network = Network::read_touchstone(fixture("ex_12.ts")).expect("example 12");

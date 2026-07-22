@@ -1,21 +1,27 @@
-//! Standard Commands for Programmable Instruments error descriptions.
-//!
-//! Origin: `skrf/vi/scpi_errors.py`.
+//! Standard Commands for Programmable Instruments (SCPI) error descriptions.
 
 use std::fmt::{Display, Formatter};
 
 /// A standard SCPI error returned by an instrument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ScpiError {
+    /// Numeric SCPI error code returned by the instrument.
     pub error_code: i32,
+    /// Standard abbreviated name, or `UNKNOWN_ERR` for an unrecognized code.
     pub abbreviation: &'static str,
+    /// Human-readable description of the error.
     pub description: &'static str,
 }
 
-/// Python-compatible alias for `SCPIError`.
+/// Compatibility alias using the original SCPI capitalization.
 pub type SCPIError = ScpiError;
 
 impl ScpiError {
+    /// Creates an error from its numeric SCPI code.
+    ///
+    /// Unknown codes retain the supplied number and use the `UNKNOWN_ERR`
+    /// abbreviation and a generic description.
+    #[must_use]
     pub fn new(error_code: i32) -> Self {
         let (abbreviation, description) =
             error_details(error_code).unwrap_or(("UNKNOWN_ERR", "An unknown error occurred."));
@@ -39,6 +45,10 @@ impl Display for ScpiError {
 
 impl std::error::Error for ScpiError {}
 
+/// Returns the standard abbreviation and description for a SCPI error code.
+///
+/// Returns `None` when the code is not present in [`SCPI_ERROR_CODES`].
+#[must_use]
 pub fn error_details(error_code: i32) -> Option<(&'static str, &'static str)> {
     SCPI_ERROR_CODES
         .iter()

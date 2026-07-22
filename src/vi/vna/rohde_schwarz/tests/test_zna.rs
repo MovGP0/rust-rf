@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![cfg(feature = "visa")]
+//! Rohde & Schwarz ZNA command tests using a deterministic SCPI session.
 
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -9,6 +10,7 @@ use rust_rf::vi::vna::rohde_schwarz::{RohdeSchwarzVna, RsFamily, SweepMode, Swee
 use rust_rf::vi::vna::{InstrumentSession, ValuesFormat, Vna};
 
 #[derive(Default)]
+/// In-memory SCPI session that records commands and returns canned responses.
 struct ScpiMock {
     responses: BTreeMap<String, Vec<u8>>,
     writes: Vec<u8>,
@@ -43,9 +45,10 @@ impl InstrumentSession for ScpiMock {
     }
 }
 
+/// Creates a ZNA-family driver backed by a mock SCPI session.
 fn driver(
     responses: impl IntoIterator<Item = (&'static str, &'static str)>,
-) -> RohdeSchwarzVna<ScpiMock> {
+) -> Result<RohdeSchwarzVna<ScpiMock>> {
     let session = ScpiMock {
         responses: responses
             .into_iter()
@@ -58,17 +61,17 @@ fn driver(
         RsFamily::Zna,
         "ZNA26-2Port",
     )
-    .unwrap()
 }
 
 #[test]
-fn queries_and_sets_typed_channel_parameters() {
+/// Verifies typed channel property queries and writes.
+fn queries_and_sets_typed_channel_parameters() -> Result<()> {
     let mut driver = driver([
         ("SENS1:FREQ:STAR?", "100"),
         ("SENS1:SWE:POIN?", "11"),
         ("SENS1:SWE:TYPE?", "LIN"),
         ("INIT1:CONT?", "0"),
-    ]);
+    ])?;
     {
         let mut channel = driver.channel(1).unwrap();
         assert_eq!(channel.frequency_start().unwrap(), 100);
@@ -83,11 +86,13 @@ fn queries_and_sets_typed_channel_parameters() {
         String::from_utf8(driver.vna.session.writes).unwrap(),
         "SENS1:FREQ:STAR 100000SENS1:SWE:POIN 101SENS1:SWE:TYPE LOG"
     );
+    Ok(())
 }
 
 #[test]
-fn manages_measurements_and_averaging_commands() {
-    let mut driver = driver([("CALC1:PAR:CAT?", "CH1_S11_1,S11,CH1_S12_1,S12")]);
+/// Verifies measurement creation, deletion, enumeration, and averaging reset.
+fn manages_measurements_and_averaging_commands() -> Result<()> {
+    let mut driver = driver([("CALC1:PAR:CAT?", "CH1_S11_1,S11,CH1_S12_1,S12")])?;
     {
         let mut channel = driver.channel(1).unwrap();
         assert_eq!(
@@ -105,11 +110,13 @@ fn manages_measurements_and_averaging_commands() {
         String::from_utf8(driver.vna.session.writes).unwrap(),
         "SENS1:AVER:CLECALC1:PAR:SDEF 'TRACE','S21'DISP:TRAC:EFE 'TRACE'CALC1:PAR:DEL 'TRACE'"
     );
+    Ok(())
 }
 
 #[test]
-fn queries_and_sets_data_formats() {
-    let mut driver = driver([("FORM?", "REAL,64")]);
+/// Verifies ASCII and binary transfer-format queries and writes.
+fn queries_and_sets_data_formats() -> Result<()> {
+    let mut driver = driver([("FORM?", "REAL,64")])?;
     assert_eq!(driver.query_format().unwrap(), ValuesFormat::Binary64);
     driver.set_query_format(ValuesFormat::Binary32).unwrap();
     assert_eq!(driver.vna.values_format, ValuesFormat::Binary32);
@@ -117,4 +124,5 @@ fn queries_and_sets_data_formats() {
         String::from_utf8(driver.vna.session.writes).unwrap(),
         "FORM:BORD SWAPFORM REAL,32"
     );
+    Ok(())
 }

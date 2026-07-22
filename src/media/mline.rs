@@ -1,49 +1,99 @@
-use super::media::*;
-use super::*;
+//! Microstrip transmission-line models.
+//!
+//! The implementation combines quasi-static geometry models, frequency
+//! dispersion, dielectric loss, conductor skin effect, and surface roughness.
+//! It follows the models documented by [Qucs](http://qucs.sourceforge.net/docs/technical.pdf).
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{
+    Array1, Complex64, Cpw, CpwCompatibilityMode, DielectricDispersionModel, Error,
+    FREE_SPACE_PERMEABILITY, FREE_SPACE_PERMITTIVITY, Frequency, Network, Result, SPEED_OF_LIGHT,
+    fmt,
+};
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Quasi-static model for microstrip impedance and effective permittivity.
 pub enum MicrostripQuasiStaticModel {
+    /// Hammerstad and Jensen model.
     #[default]
     HammerstadJensen,
+    /// Wheeler model.
     Wheeler,
+    /// Schneider model.
     Schneider,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Frequency-dispersion model for microstrip characteristics.
 pub enum MicrostripDispersionModel {
+    /// Hammerstad and Jensen dispersion.
     #[default]
     HammerstadJensen,
+    /// No frequency dispersion.
     None,
+    /// Schneider dispersion.
     Schneider,
+    /// Kirschning and Jansen dispersion.
     KirschningJansen,
+    /// Yamashita dispersion.
     Yamashita,
+    /// Kobayashi dispersion.
     Kobayashi,
 }
 
-/// Microstrip transmission-line medium.
+/// A microstrip transmission line on a dielectric substrate.
 ///
-/// Origin: `skrf/media/mline.py::MLine`.
+/// The line is defined by strip width and thickness, substrate height and
+/// material properties, conductor resistivity, and dielectric loss tangent.
+/// Quasi-static models determine the zero-frequency characteristics; a
+/// selected dispersion model extends them over the frequency band.
+///
+/// When conductor thickness is less than about three skin depths, calculated
+/// conductor loss can be optimistic.
 #[derive(Clone, Debug)]
 pub struct MicrostripLine {
+    /// Frequencies at which the line is evaluated.
     pub frequency: Frequency,
+    /// Conductor width in meters.
     pub width: f64,
+    /// Substrate height between conductor and ground plane in meters.
     pub substrate_height: f64,
+    /// Optional conductor thickness in meters.
     pub thickness: Option<f64>,
+    /// Substrate relative permittivity at the model reference frequency.
     pub relative_permittivity: f64,
+    /// Substrate relative permeability.
     pub relative_permeability: f64,
+    /// Dielectric loss tangent.
     pub loss_tangent: f64,
+    /// Optional conductor resistivity in $\Omega\,\mathrm{m}$.
     pub resistivity: Option<f64>,
+    /// RMS conductor-surface roughness in meters.
     pub roughness: f64,
+    /// Broadband dielectric-dispersion model.
     pub dielectric_model: DielectricDispersionModel,
+    /// Quasi-static impedance and effective-permittivity model.
     pub quasi_static_model: MicrostripQuasiStaticModel,
+    /// Frequency-dispersion model.
     pub dispersion_model: MicrostripDispersionModel,
+    /// Compatibility behavior for Qucs-like calculations.
     pub compatibility_mode: CpwCompatibilityMode,
+    /// Optional port-renormalization impedance.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Optional characteristic-impedance override.
     pub characteristic_impedance_override: Option<Array1<Complex64>>,
 }
 
 type MicrostripCharacteristics = (Array1<Complex64>, Array1<Complex64>, Array1<Complex64>);
 
 impl MicrostripLine {
+    /// Creates a microstrip medium from geometry, material, and model choices.
+    ///
+    /// Geometric dimensions are in meters. Frequency-dependent impedance
+    /// arrays must contain one value per frequency point.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a material value is invalid or an impedance array has the wrong length.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
@@ -123,7 +173,11 @@ impl MicrostripLine {
         })
     }
 
-    /// Resolves conductor resistivity through `skrf.data.materials`.
+    /// Sets conductor resistivity from a named entry in [`crate::data::MATERIALS`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the material is unknown or has no resistivity value.
     pub fn set_resistivity_material(&mut self, material: &str) -> Result<()> {
         let properties = crate::data::MATERIALS
             .get(material.to_ascii_lowercase().as_str())
@@ -189,11 +243,16 @@ impl MicrostripLine {
             self.thickness
                 .filter(|thickness| *thickness > 0.0)
                 .map_or(0.0, |thickness| {
+                    let width_correction =
+                        1.0 / (std::f64::consts::PI * (self.width / thickness + 1.1));
                     thickness / std::f64::consts::PI
-                        * (4.0 * std::f64::consts::E / (thickness / self.substrate_height).abs()
-                            + (1.0 / (std::f64::consts::PI * (self.width / thickness + 1.1)))
-                                .powi(2))
-                        .ln()
+                        * width_correction
+                            .mul_add(
+                                width_correction,
+                                4.0 * std::f64::consts::E
+                                    / (thickness / self.substrate_height).abs(),
+                            )
+                            .ln()
                 });
         let effective_width = dielectric.mapv(|permittivity| {
             self.width
@@ -295,8 +354,9 @@ impl MicrostripLine {
         quasi_effective: Complex64,
     ) -> Complex64 {
         let p1 = 0.27488
-            + (0.6315 + 0.525 / (1.0 + 0.0157 * normalized_frequency).powi(20)) * normalized_width
-            - 0.065683 * (-8.7513 * normalized_width).exp();
+            + (0.6315 + 0.525 / 0.0157_f64.mul_add(normalized_frequency, 1.0).powi(20))
+                * normalized_width
+            - 0.065_683 * (-8.7513 * normalized_width).exp();
         let p2 = 0.33622 * (Complex64::new(1.0, 0.0) - (-0.03442 * relative_permittivity).exp());
         let p3 = 0.0363
             * (-4.6 * normalized_width).exp()
@@ -327,17 +387,18 @@ impl MicrostripLine {
         let r8 = 1.0
             + 1.275
                 * (Complex64::new(1.0, 0.0)
-                    - (-0.004625
+                    - (-0.004_625
                         * r3
                         * relative_permittivity.powf(1.674)
                         * (normalized_frequency / 18.365).powf(2.745))
                     .exp());
-        let r9 = 5.086 * r4 * r5 / (0.3838 + 0.386 * r4) * (-r6).exp() / (1.0 + 1.2992 * r5)
+        let r9 = 5.086 * r4 * r5 / (0.3838 + 0.386 * r4) * (-r6).exp()
+            / 1.2992_f64.mul_add(r5, 1.0)
             * (relative_permittivity - 1.0).powi(6)
             / (1.0 + 10.0 * (relative_permittivity - 1.0).powi(6));
         let r10 = 0.00044 * relative_permittivity.powf(2.136) + 0.0184;
         let normalized_19 = (normalized_frequency / 19.47).powi(6);
-        let r11 = normalized_19 / (1.0 + 0.0962 * normalized_19);
+        let r11 = normalized_19 / 0.0962_f64.mul_add(normalized_19, 1.0);
         let r12 = Complex64::new(1.0, 0.0) / (1.0 + 0.00245 * normalized_width.powi(2));
         let r13 = 0.9408 * effective.powc(r8) - 0.9603;
         let r14 = (0.9408 - r9) * quasi_effective.powc(r8) - 0.9603;
@@ -353,6 +414,14 @@ impl MicrostripLine {
         quasi_impedance * (r13 / r14).powc(r17)
     }
 
+    /// Calculates quasi-static impedance, effective permittivity, and effective width.
+    ///
+    /// The selected [`MicrostripQuasiStaticModel`] accounts for the substrate
+    /// filling factor and finite strip-thickness width correction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if dielectric-property calculation fails.
     pub fn quasi_static_characteristics(&self) -> Result<MicrostripCharacteristics> {
         let (dielectric, _) = self.dielectric_properties()?;
         let input = if self.compatibility_mode == CpwCompatibilityMode::Qucs {
@@ -372,11 +441,9 @@ impl MicrostripLine {
         let normalized_width = self.width / self.substrate_height;
         let normalized_thickness = self.thickness.unwrap_or(0.0) / self.substrate_height;
         let width_correction = if normalized_thickness > 0.0 {
+            let edge_factor = (6.517 * normalized_width).sqrt().tanh().powi(2);
             normalized_thickness / std::f64::consts::PI
-                * (1.0
-                    + 4.0 * std::f64::consts::E / normalized_thickness
-                        * (6.517 * normalized_width).sqrt().tanh().powi(2))
-                .ln()
+                * (4.0 * std::f64::consts::E / normalized_thickness * edge_factor).ln_1p()
         } else {
             0.0
         };
@@ -410,6 +477,14 @@ impl MicrostripLine {
         ))
     }
 
+    /// Applies the selected dispersion model to quasi-static characteristics.
+    ///
+    /// Returns frequency-dependent characteristic impedance, effective
+    /// permittivity, and effective width.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if quasi-static or dielectric-property calculation fails.
     pub fn frequency_dependent_characteristics(
         &self,
     ) -> Result<(Array1<Complex64>, Array1<Complex64>)> {
@@ -505,7 +580,25 @@ impl MicrostripLine {
                 }
             }
         });
-        let impedance = Array1::from_shape_fn(self.frequency.points(), |point| {
+        let impedance = self.dispersive_impedance(
+            &input,
+            &quasi_impedance,
+            &quasi_effective,
+            &effective_width,
+            &effective,
+        );
+        Ok((impedance, effective))
+    }
+
+    fn dispersive_impedance(
+        &self,
+        dielectric: &Array1<Complex64>,
+        quasi_impedance: &Array1<Complex64>,
+        quasi_effective: &Array1<Complex64>,
+        effective_width: &Array1<Complex64>,
+        effective: &Array1<Complex64>,
+    ) -> Array1<Complex64> {
+        Array1::from_shape_fn(self.frequency.points(), |point| {
             match self.dispersion_model {
                 MicrostripDispersionModel::None => quasi_impedance[point],
                 MicrostripDispersionModel::Schneider => {
@@ -524,7 +617,7 @@ impl MicrostripLine {
                         effective_width[point] / self.substrate_height
                     },
                     self.frequency.values_hz()[point] * self.substrate_height * 1.0e-6,
-                    input[point],
+                    dielectric[point],
                     quasi_effective[point],
                     effective[point],
                     quasi_impedance[point],
@@ -538,17 +631,25 @@ impl MicrostripLine {
                     Self::kirschning_impedance(
                         effective_width[point] / self.substrate_height,
                         self.frequency.values_hz()[point] * self.substrate_height * 1.0e-6,
-                        input[point],
+                        dielectric[point],
                         quasi_effective[point],
                         effective[point],
                         quasi_impedance[point],
                     )
                 }
             }
-        });
-        Ok((impedance, effective))
+        })
     }
 
+    /// Calculates conductor and dielectric attenuation in nepers per meter.
+    ///
+    /// Conductor loss uses Wheeler's incremental-inductance rule and includes
+    /// skin effect and RMS surface roughness. Dielectric loss uses the
+    /// frequency-dependent effective permittivity and loss tangent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if dielectric or transmission-line characteristic calculation fails.
     pub fn attenuation(&self) -> Result<(Array1<f64>, Array1<f64>)> {
         let (dielectric, tangent) = self.dielectric_properties()?;
         let (quasi_impedance, quasi_effective, _) = self.quasi_static_characteristics()?;
@@ -575,8 +676,8 @@ impl MicrostripLine {
                 let surface = resistivity / depth;
                 let current_distribution =
                     (-1.2 * (loss_impedance[point].re / free_space_impedance).powf(0.7)).exp();
-                let roughness = 1.0
-                    + 2.0 / std::f64::consts::PI * (1.4 * (self.roughness / depth).powi(2)).atan();
+                let roughness = (2.0 / std::f64::consts::PI)
+                    .mul_add((1.4 * (self.roughness / depth).powi(2)).atan(), 1.0);
                 surface / (loss_impedance[point].re * self.width) * current_distribution * roughness
             })
         } else {
@@ -613,10 +714,12 @@ fn cap_real(value: Complex64, maximum: f64) -> Complex64 {
 }
 
 impl Media for MicrostripLine {
+    /// Returns the line frequency axis.
     fn frequency(&self) -> &Frequency {
         &self.frequency
     }
 
+    /// Returns $`\gamma=\alpha_c+\alpha_d+j\beta`$.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         let (_, effective) = self.frequency_dependent_characteristics()?;
         let (conductor, dielectric) = self.attenuation()?;
@@ -631,6 +734,7 @@ impl Media for MicrostripLine {
         }))
     }
 
+    /// Returns the dispersed characteristic impedance or its configured override.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         if let Some(impedance) = &self.characteristic_impedance_override {
             Ok(impedance.clone())
@@ -639,26 +743,32 @@ impl Media for MicrostripLine {
         }
     }
 
+    /// Returns the optional port-renormalization impedance.
     fn port_impedance(&self) -> Option<&Array1<Complex64>> {
         self.port_z0.as_ref()
     }
 
+    /// Creates a matched microstrip line of the requested length.
     fn line(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.as_defined()?.line(length, unit)
     }
 
+    /// Creates a zero-length through network.
     fn thru(&self) -> Result<Network> {
         self.as_defined()?.thru()
     }
 
+    /// Creates a one-port load with the supplied reflection coefficient.
     fn load(&self, reflection_coefficient: Complex64) -> Result<Network> {
         self.as_defined()?.load(reflection_coefficient)
     }
 
+    /// Creates an ideal open circuit.
     fn open(&self) -> Result<Network> {
         self.as_defined()?.open()
     }
 
+    /// Creates an ideal short circuit.
     fn short(&self) -> Result<Network> {
         self.as_defined()?.short()
     }

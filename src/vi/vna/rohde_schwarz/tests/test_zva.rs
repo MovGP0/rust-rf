@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![cfg(feature = "visa")]
+//! Rohde & Schwarz ZVA model-capability tests using a mock SCPI session.
 
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -9,6 +10,7 @@ use rust_rf::vi::vna::rohde_schwarz::{RohdeSchwarzVna, RsFamily, Zna, Zva};
 use rust_rf::vi::vna::{InstrumentSession, Vna};
 
 #[derive(Default)]
+/// In-memory SCPI session that records commands and returns canned responses.
 struct ScpiMock {
     responses: BTreeMap<String, Vec<u8>>,
     writes: Vec<u8>,
@@ -43,9 +45,10 @@ impl InstrumentSession for ScpiMock {
     }
 }
 
+/// Creates a shared Rohde & Schwarz driver backed by a mock session.
 fn driver(
     responses: impl IntoIterator<Item = (&'static str, &'static str)>,
-) -> RohdeSchwarzVna<ScpiMock> {
+) -> Result<RohdeSchwarzVna<ScpiMock>> {
     let session = ScpiMock {
         responses: responses
             .into_iter()
@@ -58,25 +61,27 @@ fn driver(
         RsFamily::Zna,
         "ZNA26-2Port",
     )
-    .unwrap()
 }
 
 #[test]
+/// Verifies family-specific physical-port discovery for ZNA and ZVA models.
 fn zna_and_zva_apply_model_specific_port_behavior() {
-    let zna_session = ScpiMock {
+    // The upstream ZNA case queries the instrument for its physical port count.
+    let port_count_query_session = ScpiMock {
         responses: BTreeMap::from([
             ("*IDN?".into(), b"Rohde&Schwarz,ZNA26-4Port,123,1".to_vec()),
             ("INST:PORT:COUN?".into(), b"4".to_vec()),
         ]),
         ..ScpiMock::default()
     };
-    let mut zna = Zna::new("mock", zna_session).unwrap();
+    let mut zna = Zna::new("mock", port_count_query_session).unwrap();
     assert_eq!(zna.nports().unwrap(), 4);
 
-    let zva_session = ScpiMock {
+    // The upstream ZVA case derives its physical port count from the model.
+    let model_derived_port_session = ScpiMock {
         responses: BTreeMap::from([("*IDN?".into(), b"Rohde&Schwarz,ZVA40,123,1".to_vec())]),
         ..ScpiMock::default()
     };
-    let mut zva = Zva::new("mock", zva_session).unwrap();
+    let mut zva = Zva::new("mock", model_derived_port_session).unwrap();
     assert_eq!(zva.nports().unwrap(), 2);
 }

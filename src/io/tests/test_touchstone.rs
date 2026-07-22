@@ -1,6 +1,12 @@
+//! Touchstone input/output regressions.
+//!
+//! These tests cover Touchstone 1 and 2 syntax, numeric formats, metadata,
+//! encodings, HFSS extensions, noise data, and parameter conversion.
+
 use std::fs::File;
 use std::path::PathBuf;
 
+use approx::assert_relative_eq;
 use num_complex::Complex64;
 use rust_rf::Network;
 use rust_rf::io::{Touchstone, TouchstoneFormat, TouchstoneParameter};
@@ -14,6 +20,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Reads a simple real/imaginary file and compares it with known values.
 #[test]
 fn reads_real_imaginary_touchstone_data() {
     let touchstone =
@@ -38,6 +45,7 @@ fn reads_real_imaginary_touchstone_data() {
     );
 }
 
+/// Retains the first option line when a file contains more than one.
 #[test]
 fn retains_the_first_of_multiple_option_lines() {
     let touchstone =
@@ -45,6 +53,7 @@ fn retains_the_first_of_multiple_option_lines() {
     assert_complex_close(touchstone.resistance, Complex64::new(10.0, 10.0));
 }
 
+/// Reads Touchstone data from a stream rather than a path.
 #[test]
 fn reads_from_a_stream() {
     let file = File::open(fixture("simple_touchstone.s2p")).expect("fixture should open");
@@ -59,6 +68,7 @@ fn reads_from_a_stream() {
     );
 }
 
+/// Exposes scattering data in real/imaginary and dB/angle forms.
 #[test]
 fn converts_s_parameter_data_formats() {
     let touchstone =
@@ -68,10 +78,16 @@ fn converts_s_parameter_data_formats() {
     assert_eq!(real_imaginary["S21I"].as_slice(), Some(&[4.0, 12.0][..]));
 
     let decibel = touchstone.s_parameter_data(TouchstoneFormat::DecibelAngle);
-    assert!((decibel["S11DB"][0] - 20.0 * 5.0_f64.sqrt().log10()).abs() <= TOLERANCE);
+    assert!(
+        20.0_f64
+            .mul_add(-5.0_f64.sqrt().log10(), decibel["S11DB"][0])
+            .abs()
+            <= TOLERANCE
+    );
     assert!((decibel["S11A"][0] - Complex64::new(1.0, 2.0).arg().to_degrees()).abs() <= TOLERANCE);
 }
 
+/// Parses comments, comment variables, format names, and HFSS gamma/impedance data.
 #[test]
 fn exposes_touchstone_comments_variables_format_names_and_gamma_z0() {
     let text = b"! Created with skrf\n! width = 2.54 mm\n! operator note\n# GHz S RI R 50\n1 0 0\n";
@@ -102,6 +118,7 @@ fn exposes_touchstone_comments_variables_format_names_and_gamma_z0() {
     assert!(z0.is_some());
 }
 
+/// Decodes Touchstone comments that use Windows-1252 characters.
 #[test]
 fn decodes_windows_1252_touchstone_comments() {
     let bytes = b"! 50 \x80 fixture\n# GHz S RI R 50\n1 0 0\n";
@@ -110,12 +127,13 @@ fn decodes_windows_1252_touchstone_comments() {
     assert_eq!(touchstone.comments, vec!["50 € fixture"]);
 }
 
+/// Reads magnitude/angle and decibel/angle parameter data.
 #[test]
 fn reads_magnitude_angle_and_decibel_angle_data() {
     let magnitude_angle = b"# MHz S MA R 50\n1 2 90\n";
     let touchstone = Touchstone::from_reader(&magnitude_angle[..], 1)
         .expect("magnitude-angle data should parse");
-    assert_eq!(touchstone.frequencies_hz()[0], 1.0e6);
+    assert_relative_eq!(touchstone.frequencies_hz()[0], 1.0e6, epsilon = TOLERANCE);
     assert_complex_close(
         touchstone.s_parameters()[(0, 0, 0)],
         Complex64::new(0.0, 2.0),
@@ -130,6 +148,7 @@ fn reads_magnitude_angle_and_decibel_angle_data() {
     );
 }
 
+/// Constructs a complete network from a Touchstone file.
 #[test]
 fn constructs_network_from_touchstone() {
     let network =
@@ -141,6 +160,7 @@ fn constructs_network_from_touchstone() {
     assert_eq!(network.name.as_deref(), Some("simple_touchstone"));
 }
 
+/// Reads Touchstone 2 keywords, port names, and per-port references.
 #[test]
 fn reads_touchstone_two_keywords_ports_and_references() {
     let touchstone =
@@ -169,6 +189,7 @@ fn reads_touchstone_two_keywords_ports_and_references() {
     assert_complex_close(network.z0[(0, 2)], Complex64::new(50.0, 0.0));
 }
 
+/// Expands lower-triangular Touchstone 2 matrix data to a full matrix.
 #[test]
 fn expands_touchstone_two_triangular_matrix_data() {
     let lower = b"[Version] 2.0\n# Hz S RI R 50\n[Number of Ports] 2\n[Number of Frequencies] 1\n[Matrix Format] Lower\n[Network Data]\n1 1 0 2 0 3 0\n[End]\n";
@@ -181,6 +202,19 @@ fn expands_touchstone_two_triangular_matrix_data() {
     assert_complex_close(s[(0, 1, 1)], Complex64::new(3.0, 0.0));
 }
 
+/// Reads HFSS per-frequency impedance and propagation-constant extensions.
+///
+/// Older HFSS versions may wrap values across comment lines and attach the
+/// first value directly to `Impedance`; newer versions write each record on a
+/// single line:
+///
+/// ```text
+/// ! Gamma re1 im1 re2 im2 ...
+/// ! Port Impedance re1 im1 re2 im2 ...
+/// ```
+///
+/// The parsed gamma and impedance arrays must retain one entry per network
+/// port at every frequency.
 #[test]
 fn reads_hfss_per_frequency_impedance_and_propagation_data() {
     let touchstone = Touchstone::from_path(fixture("ansys_modal_data.s2p"))
@@ -197,13 +231,14 @@ fn reads_hfss_per_frequency_impedance_and_propagation_data() {
         .propagation_constants
         .as_ref()
         .expect("HFSS propagation constants should be present");
-    assert_complex_close(gamma[(0, 0)], Complex64::new(0.00653730315138823, 0.0));
-    assert_complex_close(gamma[(0, 1)], Complex64::new(0.00654089320037521, 0.0));
+    assert_complex_close(gamma[(0, 0)], Complex64::new(0.006_537_303_151_388_23, 0.0));
+    assert_complex_close(gamma[(0, 1)], Complex64::new(0.006_540_893_200_375_21, 0.0));
 
     let network = touchstone.network().expect("network should be constructed");
     assert_complex_close(network.z0[(1, 0)], Complex64::new(61.0, 11.0));
 }
 
+/// Reads Touchstone noise data while preserving conventional two-port order.
 #[test]
 fn reads_touchstone_noise_data_and_two_port_order() {
     let touchstone =
@@ -213,9 +248,9 @@ fn reads_touchstone_noise_data_and_two_port_order() {
         .as_ref()
         .expect("noise data should be present");
     assert_eq!(noise.dim(), (2, 5));
-    assert_eq!(noise[(0, 0)], 4.0e9);
-    assert_eq!(noise[(0, 1)], 0.7);
-    assert_eq!(noise[(1, 4)], 20.0);
+    assert_relative_eq!(noise[(0, 0)], 4.0e9, epsilon = TOLERANCE);
+    assert_relative_eq!(noise[(0, 1)], 0.7, epsilon = TOLERANCE);
+    assert_relative_eq!(noise[(1, 4)], 20.0, epsilon = TOLERANCE);
     assert_complex_close(
         touchstone.s_parameters()[(0, 1, 0)],
         Complex64::from_polar(3.57, 157.0_f64.to_radians()),
@@ -230,11 +265,24 @@ fn reads_touchstone_noise_data_and_two_port_order() {
     );
     let network = touchstone.network().expect("network should retain noise");
     let network_noise = network.noise.expect("typed noise should be attached");
-    assert_eq!(network_noise.frequency.values_hz()[0], 4.0e9);
-    assert_eq!(network_noise.minimum_noise_figure_db[0], 0.7);
-    assert_eq!(network_noise.equivalent_noise_resistance[1], 20.0);
+    assert_relative_eq!(
+        network_noise.frequency.values_hz()[0],
+        4.0e9,
+        epsilon = TOLERANCE
+    );
+    assert_relative_eq!(
+        network_noise.minimum_noise_figure_db[0],
+        0.7,
+        epsilon = TOLERANCE
+    );
+    assert_relative_eq!(
+        network_noise.equivalent_noise_resistance[1],
+        20.0,
+        epsilon = TOLERANCE
+    );
 }
 
+/// Converts impedance and admittance parameter files to scattering parameters.
 #[test]
 fn converts_impedance_and_admittance_parameter_files_to_scattering() {
     let impedance = b"[Version] 2.0\n# Hz Z RI R 50\n[Number of Ports] 1\n[Number of Frequencies] 1\n[Network Data]\n1 50 0\n[End]\n";
@@ -256,6 +304,7 @@ fn converts_impedance_and_admittance_parameter_files_to_scattering() {
     );
 }
 
+/// Converts two-port hybrid and inverse-hybrid files to scattering parameters.
 #[test]
 fn converts_hybrid_and_inverse_hybrid_parameter_files_to_scattering() {
     let impedance = b"[Version] 2.0\n# Hz Z RI R 50\n[Number of Ports] 2\n[Number of Frequencies] 1\n[Network Data]\n1 75 0 20 0 30 0 80 0\n[End]\n";
@@ -291,6 +340,7 @@ fn converts_hybrid_and_inverse_hybrid_parameter_files_to_scattering() {
     }
 }
 
+/// Applies Touchstone 1 normalization before converting non-scattering data.
 #[test]
 fn applies_touchstone_one_normalization_before_parameter_conversion() {
     let normalized_impedance = b"# Hz Z RI R 50\n1 1 0\n";
@@ -302,6 +352,7 @@ fn applies_touchstone_one_normalization_before_parameter_conversion() {
     );
 }
 
+/// Rejects hybrid parameters for files that are not two-port.
 #[test]
 fn rejects_hybrid_parameters_for_non_two_port_files() {
     let hybrid = b"[Version] 2.0\n# Hz H RI R 50\n[Number of Ports] 1\n[Number of Frequencies] 1\n[Network Data]\n1 1 0\n[End]\n";

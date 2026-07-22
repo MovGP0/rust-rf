@@ -1,3 +1,8 @@
+//! Generalized MDIF input/output regressions.
+//!
+//! The tests cover parameters and comments, numeric formats, S/Z/Y data,
+//! `NetworkSet` conversion, output round trips, and noise data.
+
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
@@ -7,6 +12,7 @@ use num_complex::Complex64;
 use rust_rf::io::{Mdif, MdifValue};
 use rust_rf::{Frequency, Network, NetworkSet};
 
+/// Parses explicit real/imaginary data, named parameters, and comments.
 #[test]
 fn parses_explicit_ri_data_parameters_and_comments() {
     let text = "! file comment\n\
@@ -30,15 +36,16 @@ END\n";
     );
     assert_eq!(
         mdif.networks[0].s[(0, 0, 0)],
-        Complex64::new(0.999999951, -0.000312274302)
+        Complex64::new(0.999_999_951, -0.000_312_274_302)
     );
-    assert_eq!(mdif.networks[0].frequency.values_hz()[0], 710_000_000.0);
+    assert_relative_eq!(mdif.networks[0].frequency.values_hz()[0], 710_000_000.0);
     assert_eq!(
         mdif.to_network_set().unwrap().parameters["Cm"],
         vec![7.0e-16]
     );
 }
 
+/// Parses AWR component ordering and magnitude/angle values correctly.
 #[test]
 fn parses_awr_component_order_and_magnitude_angle() {
     let text = "VAR bias=1\n\
@@ -48,7 +55,7 @@ BEGIN ACDATA\n\
 1 0.1 0 0.2 10 0.3 20 0.4 30\n\
 END\n";
     let network = &Mdif::parse(text).unwrap().networks[0];
-    assert_eq!(network.frequency.values_hz()[0], 1.0e9);
+    assert_relative_eq!(network.frequency.values_hz()[0], 1.0e9);
     assert_relative_eq!(network.s[(0, 0, 0)].norm(), 0.1, epsilon = 1.0e-12);
     assert_relative_eq!(network.s[(0, 1, 0)].norm(), 0.2, epsilon = 1.0e-12);
     assert_relative_eq!(network.s[(0, 0, 1)].norm(), 0.3, epsilon = 1.0e-12);
@@ -59,6 +66,7 @@ END\n";
     );
 }
 
+/// Parses dB data and converts impedance and admittance matrices to scattering data.
 #[test]
 fn parses_db_and_converts_z_and_y_parameters() {
     let db = "BEGIN ACDATA\n# Hz S DB R 50\n% F S[1,1](complex)\n1 -20 90\nEND\n";
@@ -79,6 +87,7 @@ fn parses_db_and_converts_z_and_y_parameters() {
     );
 }
 
+/// Writes and reads back network sets with their parameter coordinates.
 #[test]
 fn writer_round_trips_network_sets_and_parameters() {
     let frequency = Frequency::from_hz(ndarray::arr1(&[1.0, 2.0])).unwrap();
@@ -105,6 +114,7 @@ fn writer_round_trips_network_sets_and_parameters() {
     assert_eq!(parsed.networks[0].name, set.networks[0].name);
 }
 
+/// Reads and writes MDIF noise parameters without numerical drift.
 #[test]
 fn reads_and_writes_noise_parameters_without_drift() {
     let text = "BEGIN ACDATA\n\
@@ -135,8 +145,17 @@ END\n";
     Mdif::write(&set, &mut bytes, &[]).unwrap();
     let round_trip = Mdif::from_reader(Cursor::new(bytes)).unwrap();
     assert_eq!(round_trip.networks[0].noise, set.networks[0].noise);
+
+    let mut equivalent_noise = round_trip.networks[0].noise.clone().unwrap();
+    equivalent_noise.optimal_reflection[1].im += f64::EPSILON;
+    assert_eq!(Some(equivalent_noise), set.networks[0].noise);
+
+    let mut changed_noise = round_trip.networks[0].noise.clone().unwrap();
+    changed_noise.minimum_noise_figure_db[0] += 1.0e-6;
+    assert_ne!(Some(changed_noise), set.networks[0].noise);
 }
 
+/// Preserves conventional two-port ordering in MDIF option strings.
 #[test]
 fn option_strings_preserve_two_port_touchstone_order() {
     assert_eq!(
@@ -145,6 +164,7 @@ fn option_strings_preserve_two_port_touchstone_order() {
     );
 }
 
+/// Round-trips string parameters as textual network-set coordinates.
 #[test]
 fn string_parameters_round_trip_as_text_coordinates() {
     let text = "VAR mode = \"cold\"\nBEGIN data\n% F S[1,1](complex)\n1 0 0\nEND\n";

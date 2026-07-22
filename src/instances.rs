@@ -1,3 +1,17 @@
+//! Standard frequency bands and rectangular-waveguide media.
+//!
+//! The named instances follow the
+//! [VDI-1002 waveguide-band designation note](http://vadiodes.com/VDI/pdf/waveguidechart200908.pdf)
+//! and the [Spinner hollow-metallic-waveguide cross reference](https://www.spinner-group.com/images/download/technical_documents/SPINNER_TD00036.pdf).
+//!
+//! | Frequency accessor | Waveguide accessor | Example band |
+//! | --- | --- | --- |
+//! | `f_wr10` | `wr10` | WR-10, 75–110 GHz |
+//! | `f_wr3p4` | `wr3p4` | WR-3.4, 220–330 GHz |
+//! | `f_wr2p2` | `wr2p2` | WR-2.2, 330–500 GHz |
+//! | `f_wr1p5` | `wr1p5` | WR-1.5, 500–750 GHz |
+//! | `f_wr1` | `wr1` | WR-1, 750–1100 GHz |
+
 use ndarray::Array1;
 use num_complex::Complex64;
 
@@ -10,46 +24,84 @@ use crate::{Frequency, FrequencyUnit, Result, SweepType};
 /// Origin: `skrf/instances.py::StaticInstances`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WaveguideBand {
+    /// WR-51 rectangular-waveguide band (15–22 GHz).
     Wr51,
+    /// WR-42 rectangular-waveguide band (17.5–26.5 GHz).
     Wr42,
+    /// WR-34 rectangular-waveguide band (22–33 GHz).
     Wr34,
+    /// WR-28 rectangular-waveguide band (26.5–40 GHz).
     Wr28,
+    /// WR-22.4 rectangular-waveguide band (33–50.5 GHz).
     Wr22p4,
+    /// WR-18.8 rectangular-waveguide band (40–60 GHz).
     Wr18p8,
+    /// WR-14.8 rectangular-waveguide band (50–75 GHz).
     Wr14p8,
+    /// WR-12.2 rectangular-waveguide band (60–90 GHz).
     Wr12p2,
+    /// WR-10 rectangular-waveguide band (75–110 GHz).
     Wr10,
+    /// WR-8 rectangular-waveguide band (90–140 GHz).
     Wr8,
+    /// WR-6.5 rectangular-waveguide band (110–170 GHz).
     Wr6p5,
+    /// WR-5.1 rectangular-waveguide band (140–220 GHz).
     Wr5p1,
+    /// WR-4.3 rectangular-waveguide band (170–260 GHz).
     Wr4p3,
+    /// WR-3.4 rectangular-waveguide band (220–330 GHz).
     Wr3p4,
+    /// WR-2.8 rectangular-waveguide band (260–400 GHz).
     Wr2p8,
+    /// WR-2.2 rectangular-waveguide band (330–500 GHz).
     Wr2p2,
+    /// WR-1.9 rectangular-waveguide band (400–600 GHz).
     Wr1p9,
+    /// WR-1.5 rectangular-waveguide band (500–750 GHz).
     Wr1p5,
+    /// WR-1.2 rectangular-waveguide band (600–900 GHz).
     Wr1p2,
+    /// WR-1 rectangular-waveguide band (750–1100 GHz).
     Wr1,
+    /// WR-0.8 rectangular-waveguide band (900–1400 GHz).
     Wr0p8,
+    /// WR-0.65 rectangular-waveguide band (1100–1700 GHz).
     Wr0p65,
+    /// WR-0.51 rectangular-waveguide band (1400–2200 GHz).
     Wr0p51,
+    /// WM-1295 rectangular-waveguide band (140–220 GHz).
     Wm1295,
+    /// WM-1092 rectangular-waveguide band (170–260 GHz).
     Wm1092,
+    /// WM-864 rectangular-waveguide band (220–330 GHz).
     Wm864,
+    /// WM-710 rectangular-waveguide band (260–400 GHz).
     Wm710,
+    /// WM-570 rectangular-waveguide band (330–500 GHz).
     Wm570,
+    /// WM-470 rectangular-waveguide band (400–600 GHz).
     Wm470,
+    /// WM-380 rectangular-waveguide band (500–750 GHz).
     Wm380,
+    /// WM-310 rectangular-waveguide band (600–900 GHz).
     Wm310,
+    /// WM-250 rectangular-waveguide band (750–1100 GHz).
     Wm250,
+    /// WM-200 rectangular-waveguide band (900–1400 GHz).
     Wm200,
+    /// WM-164 rectangular-waveguide band (1100–1700 GHz).
     Wm164,
+    /// WM-130 rectangular-waveguide band (1400–2200 GHz).
     Wm130,
+    /// WM-106 rectangular-waveguide band (1700–2600 GHz).
     Wm106,
+    /// WM-86 rectangular-waveguide band (2200–3300 GHz).
     Wm86,
 }
 
 impl WaveguideBand {
+    /// All standard rectangular-waveguide bands represented by this crate.
     pub const ALL: [Self; 37] = [
         Self::Wr51,
         Self::Wr42,
@@ -90,6 +142,7 @@ impl WaveguideBand {
         Self::Wm86,
     ];
 
+    /// Returns the standard operating range in gigahertz.
     const fn frequency_range_ghz(self) -> (f64, f64) {
         match self {
             Self::Wr51 => (15.0, 22.0),
@@ -120,6 +173,7 @@ impl WaveguideBand {
         }
     }
 
+    /// Returns the broad-wall and narrow-wall dimensions in meters.
     const fn dimensions_meters(self) -> (f64, f64) {
         match self {
             Self::Wr51 => (510.0 * MIL, 255.0 * MIL),
@@ -170,10 +224,21 @@ pub struct StaticInstances;
 macro_rules! named_instances {
     ($(($frequency:ident, $waveguide:ident, $band:ident)),+ $(,)?) => {
         $(
+            /// Creates the standard frequency axis for this named waveguide band.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error when the named band's frequency range cannot form a valid axis.
             pub fn $frequency(&self) -> Result<Frequency> {
                 self.frequency(WaveguideBand::$band)
             }
 
+            /// Creates the standard TE10 medium for this named waveguide band.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error when the named band's frequency axis or waveguide medium cannot
+            /// be constructed.
             pub fn $waveguide(&self) -> Result<RectangularWaveguide> {
                 self.waveguide(WaveguideBand::$band)
             }
@@ -182,6 +247,12 @@ macro_rules! named_instances {
 }
 
 impl StaticInstances {
+    /// Creates the default free-space medium used by the upstream `air` property.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the default frequency axis or free-space medium cannot be
+    /// constructed.
     pub fn air(&self) -> Result<Freespace> {
         Freespace::from_scalars(
             default_frequency()?,
@@ -190,6 +261,12 @@ impl StaticInstances {
         )
     }
 
+    /// Creates the default free-space medium with a 50-ohm reference impedance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the default frequency axis or 50-ohm free-space medium cannot be
+    /// constructed.
     pub fn air50(&self) -> Result<Freespace> {
         let frequency = default_frequency()?;
         let points = frequency.points();
@@ -205,11 +282,22 @@ impl StaticInstances {
         )
     }
 
+    /// Creates a 1,001-point linear GHz frequency axis for a standard waveguide band.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected band's frequency range cannot form a valid axis.
     pub fn frequency(&self, band: WaveguideBand) -> Result<Frequency> {
         let (start, stop) = band.frequency_range_ghz();
         Frequency::new(start, stop, 1001, FrequencyUnit::GHz, SweepType::Linear)
     }
 
+    /// Creates the standard TE10 rectangular-waveguide medium for `band`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the band's frequency axis or rectangular-waveguide medium cannot be
+    /// constructed.
     pub fn waveguide(&self, band: WaveguideBand) -> Result<RectangularWaveguide> {
         let frequency = self.frequency(band)?;
         let points = frequency.points();
@@ -256,4 +344,5 @@ fn default_frequency() -> Result<Frequency> {
     Frequency::new(1.0, 10.0, 101, FrequencyUnit::GHz, SweepType::Linear)
 }
 
+/// Global accessor for standard frequency and waveguide instances.
 pub const INSTANCES: StaticInstances = StaticInstances;

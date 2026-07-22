@@ -1,3 +1,5 @@
+//! Transmission-line conversion, propagation, conductor-loss, and validation tests.
+
 use approx::assert_relative_eq;
 use ndarray::array;
 use num_complex::Complex64;
@@ -14,6 +16,7 @@ use rust_rf::transmission_line::{
 
 const TOLERANCE: f64 = 1.0e-10;
 
+/// Checks impedance/reflection conversion round trips.
 #[test]
 fn converts_between_impedance_and_reflection_coefficient() {
     let z0 = Complex64::new(100.0, 0.0);
@@ -29,6 +32,7 @@ fn converts_between_impedance_and_reflection_coefficient() {
     );
 }
 
+/// Checks propagation-constant extraction from reflection measurements.
 #[test]
 fn calculates_propagation_constant_from_reflections() {
     let z0 = Complex64::new(100.0, 0.0);
@@ -43,6 +47,7 @@ fn calculates_propagation_constant_from_reflections() {
     assert_relative_eq!(propagation.im, 1.272, epsilon = 1.5e-4);
 }
 
+/// Checks physical/electrical length conversion round trips.
 #[test]
 fn converts_between_physical_and_electrical_length() {
     let propagation = Complex64::new(0.2, 5.0);
@@ -68,6 +73,7 @@ fn converts_between_physical_and_electrical_length() {
     );
 }
 
+/// Checks voltage/current propagation over open, short, and quarter-wave cases.
 #[test]
 fn propagates_voltage_and_current_over_special_lengths() {
     let voltage = Complex64::new(3.0, 0.0);
@@ -101,6 +107,7 @@ fn propagates_voltage_and_current_over_special_lengths() {
     assert_complex_close(half_current, -current, TOLERANCE);
 }
 
+/// Checks conductor skin depth and surface resistivity.
 #[test]
 fn calculates_skin_depth_and_surface_resistivity() {
     let frequencies = array![1.0e6, 10.0e6];
@@ -123,6 +130,7 @@ fn calculates_skin_depth_and_surface_resistivity() {
     );
 }
 
+/// Checks rejection of non-physical transmission-line inputs.
 #[test]
 fn rejects_non_physical_transmission_line_inputs() {
     assert!(skin_depth(&array![0.0], 1.68e-8, 1.0).is_err());
@@ -137,6 +145,7 @@ fn rejects_non_physical_transmission_line_inputs() {
     );
 }
 
+/// Checks conversions among distributed RLGC, $\gamma$, and $`Z_0`$.
 #[test]
 fn converts_distributed_circuit_and_wave_quantities() {
     let admittance = Complex64::new(0.0, 2.0e-3);
@@ -151,6 +160,7 @@ fn converts_distributed_circuit_and_wave_quantities() {
     assert_complex_close(recovered_impedance, impedance, TOLERANCE);
 }
 
+/// Checks reflection and impedance transformation along a line.
 #[test]
 fn converts_reflection_and_impedance_along_a_line() {
     let impedance = Complex64::new(50.0, 0.0);
@@ -176,6 +186,7 @@ fn converts_reflection_and_impedance_along_a_line() {
     );
 }
 
+/// Checks standing-wave ratio and mismatch/line total loss.
 #[test]
 fn calculates_standing_wave_ratio_and_total_loss() {
     let impedance = Complex64::new(50.0, 0.0);

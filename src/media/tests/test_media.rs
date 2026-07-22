@@ -1,5 +1,11 @@
 ﻿#![allow(unused_imports)]
 
+//! Shared media behavior and `DefinedGammaZ0` regression tests.
+//!
+//! The tests consolidate the Python media suite's lines, loads, lumped and
+//! shunt components, complex reference impedances, velocities, and distance
+//! extraction, together with free-space and circular-waveguide checks.
+
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
@@ -12,13 +18,14 @@ use rust_rf::media::{
     Freespace, LengthUnit, Media, MicrostripDispersionModel, MicrostripLine,
     MicrostripQuasiStaticModel, RectangularWaveguide, WaveguideMode,
 };
-use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
+use rust_rf::{Frequency, FrequencyUnit, Network, Result, SweepType};
 
 const TOLERANCE: f64 = 1.0e-10;
 
+/// Checks a directly defined medium and the transmission $e^{-\gamma d}$ of its matched line.
 #[test]
-fn constructs_defined_media_and_matched_line() {
-    let media = defined_media(None);
+fn constructs_defined_media_and_matched_line() -> Result<()> {
+    let media = defined_media(None)?;
     let line = media
         .line(0.25, LengthUnit::Meter)
         .expect("line should be constructed");
@@ -29,11 +36,13 @@ fn constructs_defined_media_and_matched_line() {
         assert_complex_close(line.s[(point, 1, 0)], expected);
         assert_complex_close(line.s[(point, 0, 1)], expected);
     }
+    Ok(())
 }
 
+/// Checks through, open, short, and arbitrary one-port load construction.
 #[test]
-fn constructs_thru_open_short_and_load() {
-    let media = defined_media(None);
+fn constructs_thru_open_short_and_load() -> Result<()> {
+    let media = defined_media(None)?;
     let thru = media.thru().expect("thru should be constructed");
     assert_complex_close(thru.s[(0, 1, 0)], Complex64::new(1.0, 0.0));
     assert_complex_close(thru.s[(0, 0, 0)], Complex64::new(0.0, 0.0));
@@ -46,11 +55,13 @@ fn constructs_thru_open_short_and_load() {
         .load(Complex64::new(0.25, -0.5))
         .expect("load should be constructed");
     assert_complex_close(load.s[(0, 0, 0)], Complex64::new(0.25, -0.5));
+    Ok(())
 }
 
+/// Checks conversion among physical, temporal, and electrical length units.
 #[test]
-fn converts_physical_and_electrical_length_units() {
-    let media = defined_media(None);
+fn converts_physical_and_electrical_length_units() -> Result<()> {
+    let media = defined_media(None)?;
     assert_relative_eq!(
         media
             .physical_length(10.0, LengthUnit::Centimeter)
@@ -65,8 +76,10 @@ fn converts_physical_and_electrical_length_units() {
         std::f64::consts::PI / 2.0,
         epsilon = TOLERANCE
     );
+    Ok(())
 }
 
+/// Checks shared attenuation, phase, velocity, CSV, and plot-data properties.
 #[test]
 fn exposes_shared_media_properties_time_units_and_plot_data() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -110,20 +123,23 @@ fn exposes_shared_media_properties_time_units_and_plot_data() {
     assert_eq!(plot.series[0].y.len(), 3);
 }
 
+/// Checks line renormalization from characteristic to configured port impedance.
 #[test]
-fn renormalizes_lines_to_port_reference_impedance() {
+fn renormalizes_lines_to_port_reference_impedance() -> Result<()> {
     let port_reference = Array1::from_elem(3, Complex64::new(75.0, 0.0));
-    let media = defined_media(Some(port_reference));
+    let media = defined_media(Some(port_reference))?;
     let line = media
         .thru()
         .expect("renormalized thru should be constructed");
     assert_eq!(line.z0[(0, 0)], Complex64::new(75.0, 0.0));
     assert_eq!(line.z0[(0, 1)], Complex64::new(75.0, 0.0));
+    Ok(())
 }
 
+/// Checks complex impedance steps under traveling-, pseudo-, and power-wave definitions.
 #[test]
-fn supports_complex_impedance_mismatches_and_wave_definitions() {
-    let media = defined_media(None);
+fn supports_complex_impedance_mismatches_and_wave_definitions() -> Result<()> {
+    let media = defined_media(None)?;
     let left = Array1::from_elem(3, Complex64::new(10.0, 10.0));
     let right = Array1::from_elem(3, Complex64::new(50.0, -20.0));
     for definition in [
@@ -148,7 +164,7 @@ fn supports_complex_impedance_mismatches_and_wave_definitions() {
     .expect("complex media should be valid");
     let short = complex_media.short().expect("short should be constructed");
     assert_ne!(short.s[(0, 0, 0)], Complex64::new(-1.0, 0.0));
-    let mut traveling = short.clone();
+    let mut traveling = short;
     traveling
         .renormalize(
             traveling.z0.clone(),
@@ -157,8 +173,10 @@ fn supports_complex_impedance_mismatches_and_wave_definitions() {
         .expect("short should convert to traveling waves");
     assert_relative_eq!(traveling.s[(0, 0, 0)].re, -1.0, epsilon = 1.0e-12);
     assert_relative_eq!(traveling.s[(0, 0, 0)].im, 0.0, epsilon = 1.0e-12);
+    Ok(())
 }
 
+/// Checks vacuum propagation and its free-space characteristic impedance.
 #[test]
 fn calculates_vacuum_wave_quantities() {
     let frequency = Frequency::new(75.0, 110.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -181,7 +199,7 @@ fn calculates_vacuum_wave_quantities() {
             max_relative = 1.0e-9
         );
     }
-    assert_eq!(impedance[0].re.round(), 377.0);
+    assert_relative_eq!(impedance[0].re.round(), 377.0);
 
     let line = media
         .line(1.0, LengthUnit::Millimeter)
@@ -190,6 +208,7 @@ fn calculates_vacuum_wave_quantities() {
     assert_eq!(line.frequency_points(), 3);
 }
 
+/// Checks electric/magnetic loss tangents and resistivity-induced dielectric loss.
 #[test]
 fn applies_freespace_loss_tangents_and_resistivity() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -224,6 +243,7 @@ fn applies_freespace_loss_tangents_and_resistivity() {
     );
 }
 
+/// Checks named materials, display formatting, and free-space plot data.
 #[test]
 fn resolves_freespace_materials_formats_and_builds_plot_data() {
     let frequency = Frequency::new(75.0, 110.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -269,6 +289,7 @@ fn resolves_freespace_materials_formats_and_builds_plot_data() {
     assert!(media.to_string().contains("75-110 GHz"));
 }
 
+/// Checks conversion of distributed $R'$, $L'$, $G'$, and $C'$ into free-space properties.
 #[test]
 fn converts_distributed_circuit_to_freespace() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -291,6 +312,7 @@ fn converts_distributed_circuit_to_freespace() {
     }
 }
 
+/// Checks circular-waveguide cutoff, propagation, and impedance.
 #[test]
 fn calculates_circular_waveguide_cutoff_and_propagation() {
     let radius = 0.5 * 2.39e-3;
@@ -316,6 +338,7 @@ fn calculates_circular_waveguide_cutoff_and_propagation() {
     assert!(gamma[2].re == 0.0 && gamma[2].im > gamma[1].im);
 }
 
+/// Checks derivation of circular-waveguide radius from target impedance.
 #[test]
 fn derives_circular_waveguide_radius_from_impedance() {
     let frequency = Frequency::new(90.0, 90.0, 1, FrequencyUnit::GHz, SweepType::Linear)
@@ -330,6 +353,7 @@ fn derives_circular_waveguide_radius_from_impedance() {
     assert_relative_eq!(impedance[0].im, 0.0, epsilon = TOLERANCE);
 }
 
+/// Checks circular-waveguide wall-conductor attenuation.
 #[test]
 fn applies_circular_waveguide_conductor_loss() {
     let frequency = Frequency::new(88.0, 110.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -365,6 +389,7 @@ fn applies_circular_waveguide_conductor_loss() {
     );
 }
 
+/// Checks circular-waveguide material aliases and display formatting.
 #[test]
 fn resolves_circular_waveguide_material_and_formats() {
     let frequency = Frequency::new(88.0, 110.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -400,9 +425,10 @@ fn resolves_circular_waveguide_material_and_formats() {
     );
 }
 
+/// Checks shared lumped components, impedance steps, junctions, and floating lines.
 #[test]
-fn constructs_shared_media_components() {
-    let media = defined_media(None);
+fn constructs_shared_media_components() -> Result<()> {
+    let media = defined_media(None)?;
     let points = media.frequency.points();
     let resistance = Array1::from_elem(points, 25.0);
     let capacitance = Array1::from_elem(points, 1.0e-12);
@@ -475,11 +501,13 @@ fn constructs_shared_media_components() {
             .ports(),
         2
     );
+    Ok(())
 }
 
+/// Checks attenuators, lossless mismatches, isolators, and random networks.
 #[test]
-fn constructs_attenuators_mismatches_isolators_and_random_networks() {
-    let media = defined_media(None);
+fn constructs_attenuators_mismatches_isolators_and_random_networks() -> Result<()> {
+    let media = defined_media(None)?;
     let attenuation = media
         .attenuator(&Array1::from_elem(3, -6.0), true, 0.0, LengthUnit::Meter)
         .expect("attenuator should be constructed");
@@ -527,11 +555,13 @@ fn constructs_attenuators_mismatches_isolators_and_random_networks() {
         .expect("polar Gaussian noise should be constructed");
     assert_eq!(noise.s.dim(), (3, 2, 2));
     assert!(noise.s.iter().any(|value| value.norm() > 0.0));
+    Ok(())
 }
 
+/// Checks delayed loads, opens, and shorts connected in shunt.
 #[test]
-fn constructs_shunted_delayed_loads() {
-    let media = defined_media(None);
+fn constructs_shunted_delayed_loads() -> Result<()> {
+    let media = defined_media(None)?;
     let open = media
         .shunt_delay_open(0.0, LengthUnit::Meter)
         .expect("shunted open should be constructed");
@@ -554,8 +584,10 @@ fn constructs_shunted_delayed_loads() {
         shunted.s[(0, 0, 0)],
         -(Complex64::new(1.0, 0.0) - reflection) / (3.0 + reflection),
     );
+    Ok(())
 }
 
+/// Checks phase/group velocities and distance extraction from reflection phase.
 #[test]
 fn calculates_media_velocities_and_extracts_reflection_distance() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -603,16 +635,14 @@ fn calculates_media_velocities_and_extracts_reflection_distance() {
     }
 }
 
-fn defined_media(port_z0: Option<Array1<Complex64>>) -> DefinedGammaZ0 {
-    let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
-        .expect("frequency should be valid");
+fn defined_media(port_z0: Option<Array1<Complex64>>) -> Result<DefinedGammaZ0> {
+    let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)?;
     DefinedGammaZ0::new(
         frequency,
         Array1::from_elem(3, Complex64::new(0.1, 2.0)),
         Array1::from_elem(3, Complex64::new(50.0, 0.0)),
         port_z0,
     )
-    .expect("media should be valid")
 }
 
 fn assert_complex_close(actual: Complex64, expected: Complex64) {

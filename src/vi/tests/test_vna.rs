@@ -1,5 +1,7 @@
 #![cfg(feature = "visa")]
 
+//! Integration tests for the shared VNA session, command, channel, and value APIs.
+
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read, Write};
 
@@ -44,6 +46,7 @@ impl InstrumentSession for MockSession {
 }
 
 #[test]
+/// Substitutes channel and argument placeholders in VNA command templates.
 fn formats_vna_command_placeholders() {
     for (command, parameters, expected) in [
         ("*IDN?", BTreeMap::new(), "*IDN?"),
@@ -66,6 +69,7 @@ fn formats_vna_command_placeholders() {
 }
 
 #[test]
+/// Creates, orders, activates, and deletes VNA channels.
 fn creates_activates_and_deletes_channels() {
     let mut vna = Vna::new("mock", MockSession::default(), None);
     vna.create_channel(2, "channel 2").unwrap();
@@ -79,6 +83,7 @@ fn creates_activates_and_deletes_channels() {
 }
 
 #[test]
+/// Exercises standard identification, error-query, and error-clear commands.
 fn implements_standard_scpi_commands_and_error_checking() {
     let session = MockSession {
         responses: BTreeMap::from([
@@ -101,6 +106,7 @@ fn implements_standard_scpi_commands_and_error_checking() {
 }
 
 #[test]
+/// Reads ASCII scalar and complex values and writes interleaved complex values.
 fn reads_and_writes_ascii_and_complex_values() {
     let session = MockSession {
         responses: BTreeMap::from([
@@ -118,6 +124,7 @@ fn reads_and_writes_ascii_and_complex_values() {
 }
 
 #[test]
+/// Decodes IEEE 488.2 definite-length binary floating-point blocks.
 fn reads_scpi_binary_value_blocks() {
     let payload = [1.5_f32.to_le_bytes(), (-2.0_f32).to_le_bytes()].concat();
     let mut response = b"#18".to_vec();

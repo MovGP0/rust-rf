@@ -1,4 +1,6 @@
-﻿#![allow(unused_imports)]
+#![allow(unused_imports)]
+
+//! Distributed RLGC transmission-line tests.
 
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
@@ -16,6 +18,7 @@ use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
 
 const TOLERANCE: f64 = 1.0e-10;
 
+/// Checks $\gamma=\sqrt{Z'Y'}$, `Z_0` $=\sqrt{Z'/Y'}$, and line construction.
 #[test]
 fn calculates_distributed_circuit_wave_quantities() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::MHz, SweepType::Linear)
@@ -41,6 +44,7 @@ fn calculates_distributed_circuit_wave_quantities() {
     assert_eq!(line.ports(), 2);
 }
 
+/// Checks that every distributed-parameter array matches the frequency length.
 #[test]
 fn rejects_mismatched_distributed_circuit_arrays() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::MHz, SweepType::Linear)
@@ -58,6 +62,7 @@ fn rejects_mismatched_distributed_circuit_arrays() {
     );
 }
 
+/// Checks lossless round-trip serialization through the media CSV format.
 #[test]
 fn converts_distributed_circuit_to_and_from_media_csv() {
     let frequency = Frequency::new(1.0, 10.0, 5, FrequencyUnit::MHz, SweepType::Linear)
@@ -115,6 +120,7 @@ fn converts_distributed_circuit_to_and_from_media_csv() {
     std::fs::remove_dir_all(directory).expect("temporary directory should be removed");
 }
 
+/// Compares a one-millimeter distributed line with the Qucs reference fixture.
 #[test]
 fn matches_qucs_distributed_circuit_line() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

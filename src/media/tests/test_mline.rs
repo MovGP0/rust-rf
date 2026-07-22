@@ -1,4 +1,6 @@
-﻿#![allow(unused_imports)]
+#![allow(unused_imports)]
+
+//! Microstrip-line regressions against analytical, Qucs, and ADS references.
 
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
@@ -12,8 +14,11 @@ use rust_rf::media::{
     Freespace, LengthUnit, Media, MicrostripDispersionModel, MicrostripLine,
     MicrostripQuasiStaticModel, RectangularWaveguide, WaveguideMode,
 };
-use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
+use rust_rf::{Frequency, FrequencyUnit, Network, Result, SweepType};
 
+/// Checks Hammerstad-Jensen impedance and effective permittivity against the
+/// [mcalc reference](http://web.mit.edu/~geda/arch/i386_rhel3/versions/20050830/html/mcalc-1.5/),
+/// including finite- and zero-thickness loss behavior.
 #[test]
 fn calculates_hammerstad_jensen_microstrip_characteristics() {
     let frequency = Frequency::new(1.0, 1.0, 1, FrequencyUnit::GHz, SweepType::Linear)
@@ -75,75 +80,111 @@ fn calculates_hammerstad_jensen_microstrip_characteristics() {
         .quasi_static_characteristics()
         .expect("zero-thickness quasi-static values should be defined");
     assert_relative_eq!(effective_width[0].re, 3.0e-3, epsilon = 1.0e-16);
-    assert_eq!(
+    assert_relative_eq!(
         zero_thickness
             .attenuation()
             .expect("zero-thickness attenuation should be defined")
             .0[0],
-        0.0
+        0.0,
+        epsilon = f64::EPSILON
     );
 }
 
+/// Checks all upstream quasi-static model reference values.
 #[test]
-fn matches_upstream_microstrip_quasi_static_models() {
+fn matches_upstream_microstrip_quasi_static_models() -> Result<()> {
     let cases = [
         (
             MicrostripQuasiStaticModel::Wheeler,
-            50.25326993664797,
-            3.2908553711645645,
+            50.253_269_936_647_97,
+            3.290_855_371_164_564_5,
         ),
         (
             MicrostripQuasiStaticModel::Schneider,
-            49.91669071856352,
-            3.2497653483627915,
+            49.916_690_718_563_52,
+            3.249_765_348_362_791_5,
         ),
         (
             MicrostripQuasiStaticModel::HammerstadJensen,
-            50.250686925360405,
-            3.174965337163942,
+            50.250_686_925_360_405,
+            3.174_965_337_163_942,
         ),
     ];
     for (model, expected_impedance, expected_effective) in cases {
-        let line = reference_microstrip(model, MicrostripDispersionModel::None);
+        let line = reference_microstrip(model, MicrostripDispersionModel::None)?;
         let (impedance, effective, _) = line
             .quasi_static_characteristics()
             .expect("quasi-static analysis should succeed");
         assert_relative_eq!(impedance[0].re, expected_impedance, max_relative = 5.0e-8);
         assert_relative_eq!(effective[0].re, expected_effective, max_relative = 5.0e-8);
     }
+    Ok(())
 }
 
+/// Checks the supported frequency-dispersion model reference values.
 #[test]
-fn matches_upstream_microstrip_dispersion_models() {
+fn matches_upstream_microstrip_dispersion_models() -> Result<()> {
     let cases = [
         (
             MicrostripDispersionModel::Schneider,
-            [50.2417205841579, 49.460917331488425, 44.13716658488521],
-            [3.176098672663985, 3.2771676602888085, 4.11541934109831],
+            [
+                50.241_720_584_157_9,
+                49.460_917_331_488_425,
+                44.137_166_584_885_21,
+            ],
+            [
+                3.176_098_672_663_985,
+                3.277_167_660_288_808_5,
+                4.115_419_341_098_31,
+            ],
         ),
         (
             MicrostripDispersionModel::HammerstadJensen,
-            [50.32134063158393, 54.956763626732084, 64.00728762637556],
-            [3.1796190181353805, 3.496027915825514, 4.178006987788865],
+            [
+                50.321_340_631_583_93,
+                54.956_763_626_732_084,
+                64.007_287_626_375_56,
+            ],
+            [
+                3.179_619_018_135_380_5,
+                3.496_027_915_825_514,
+                4.178_006_987_788_865,
+            ],
         ),
         (
             MicrostripDispersionModel::KirschningJansen,
-            [50.23096812314026, 52.70273556614812, 80.14258050526186],
-            [3.1884772169290407, 3.44507466274657, 4.1286772455509295],
+            [
+                50.230_968_123_140_26,
+                52.702_735_566_148_12,
+                80.142_580_505_261_86,
+            ],
+            [
+                3.188_477_216_929_040_7,
+                3.445_074_662_746_57,
+                4.128_677_245_550_929_5,
+            ],
         ),
         (
             MicrostripDispersionModel::Yamashita,
-            [50.250686925360405; 3],
-            [3.1895925742278344, 3.497212129448975, 4.1340488409114915],
+            [50.250_686_925_360_405; 3],
+            [
+                3.189_592_574_227_834_4,
+                3.497_212_129_448_975,
+                4.134_048_840_911_491_5,
+            ],
         ),
         (
             MicrostripDispersionModel::Kobayashi,
-            [50.250686925360405; 3],
-            [3.188493392139607, 3.4516442451970297, 4.108645706642019],
+            [50.250_686_925_360_405; 3],
+            [
+                3.188_493_392_139_607,
+                3.451_644_245_197_029_7,
+                4.108_645_706_642_019,
+            ],
         ),
     ];
     for (model, expected_impedance, expected_effective) in cases {
-        let line = reference_microstrip(MicrostripQuasiStaticModel::HammerstadJensen, model);
+        let line = reference_microstrip(MicrostripQuasiStaticModel::HammerstadJensen, model)?;
         let (impedance, effective) = line
             .frequency_dependent_characteristics()
             .expect("dispersion analysis should succeed");
@@ -160,10 +201,12 @@ fn matches_upstream_microstrip_dispersion_models() {
             );
         }
     }
+    Ok(())
 }
 
+/// Compares generated microstrip networks with Qucs fixtures.
 #[test]
-fn matches_mline_qucs_fixtures() {
+fn matches_mline_qucs_fixtures() -> Result<()> {
     let fixtures = [
         (
             "mline,hammerstad,hammerstad.s2p",
@@ -197,14 +240,14 @@ fn matches_mline_qucs_fixtures() {
         ),
     ];
     for (name, quasi_static_model, dispersion_model) in fixtures {
-        let reference = read_mline_fixture("qucs", name);
+        let reference = read_mline_fixture("qucs", name)?;
         let mut line = reference_mline(
             reference.frequency.clone(),
             DielectricDispersionModel::FrequencyInvariant,
             quasi_static_model,
             dispersion_model,
             CpwCompatibilityMode::Qucs,
-        );
+        )?;
         let actual = line
             .line(25.0e-3, LengthUnit::Meter)
             .expect("microstrip line should be constructed");
@@ -213,10 +256,12 @@ fn matches_mline_qucs_fixtures() {
             .expect("copper should resolve");
         assert!(line.to_string().contains("Microstrip Media"));
     }
+    Ok(())
 }
 
+/// Compares generated microstrip networks with ADS fixtures.
 #[test]
-fn matches_mline_ads_fixtures() {
+fn matches_mline_ads_fixtures() -> Result<()> {
     let fixtures = [
         (
             "mlin,freqencyinvariant,kirschning.s2p",
@@ -250,22 +295,23 @@ fn matches_mline_ads_fixtures() {
         ),
     ];
     for (name, dielectric_model, dispersion_model) in fixtures {
-        let reference = read_mline_fixture("ads", name);
+        let reference = read_mline_fixture("ads", name)?;
         let line = reference_mline(
             reference.frequency.clone(),
             dielectric_model,
             MicrostripQuasiStaticModel::HammerstadJensen,
             dispersion_model,
             CpwCompatibilityMode::Native,
-        );
+        )?;
         let actual = line
             .line(25.0e-3, LengthUnit::Meter)
             .expect("microstrip line should be constructed");
         assert_network_ratio_within(&actual, &reference, 1.0, 10.0, 0.1, 1.0, name);
     }
+    Ok(())
 }
 
-fn djordjevic_svensson() -> DielectricDispersionModel {
+const fn djordjevic_svensson() -> DielectricDispersionModel {
     DielectricDispersionModel::DjordjevicSvensson {
         low_frequency_hz: 1.0e3,
         high_frequency_hz: 1.0e12,
@@ -273,12 +319,12 @@ fn djordjevic_svensson() -> DielectricDispersionModel {
     }
 }
 
-fn read_mline_fixture(simulator: &str, name: &str) -> Network {
+fn read_mline_fixture(simulator: &str, name: &str) -> Result<Network> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/media/mline")
         .join(simulator)
         .join(name);
-    Network::read_touchstone(path).expect("microstrip fixture should load")
+    Network::read_touchstone(path)
 }
 
 fn reference_mline(
@@ -287,7 +333,7 @@ fn reference_mline(
     quasi_static_model: MicrostripQuasiStaticModel,
     dispersion_model: MicrostripDispersionModel,
     compatibility_mode: CpwCompatibilityMode,
-) -> MicrostripLine {
+) -> Result<MicrostripLine> {
     let points = frequency.points();
     MicrostripLine::new(
         frequency,
@@ -306,7 +352,6 @@ fn reference_mline(
         Some(Array1::from_elem(points, Complex64::new(50.0, 0.0))),
         None,
     )
-    .expect("reference microstrip should be valid")
 }
 
 fn assert_network_ratio_within(
@@ -350,10 +395,9 @@ fn assert_network_ratio_within(
 fn reference_microstrip(
     quasi_static_model: MicrostripQuasiStaticModel,
     dispersion_model: MicrostripDispersionModel,
-) -> MicrostripLine {
+) -> Result<MicrostripLine> {
     let frequency =
-        Frequency::from_values(Array1::from_vec(vec![1.0, 10.0, 100.0]), FrequencyUnit::GHz)
-            .expect("reference frequency should be valid");
+        Frequency::from_values(Array1::from_vec(vec![1.0, 10.0, 100.0]), FrequencyUnit::GHz)?;
     MicrostripLine::new(
         frequency,
         3.0e-3,
@@ -371,5 +415,4 @@ fn reference_microstrip(
         None,
         None,
     )
-    .expect("reference microstrip should be valid")
 }

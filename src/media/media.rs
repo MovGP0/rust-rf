@@ -1,10 +1,33 @@
-use super::*;
-/// Origin: `skrf/media/media.py::Media`.
+//! Common transmission-media abstractions and a medium defined directly by
+//! propagation constant and characteristic impedance.
+
+use super::{
+    Array1, Array2, Array3, Complex64, Error, Frequency, Network, Path, Result,
+    SParameterDefinition, random_complex, random_gaussian_polar,
+};
+use num_traits::ToPrimitive;
+
+/// A transmission medium capable of creating networks over a frequency axis.
+///
+/// Implementors provide the frequency, propagation constant $\gamma$, and
+/// characteristic impedance `$Z_0$`. The default methods construct common
+/// distributed and lumped components from those quantities.
 pub trait Media {
+    /// Returns the medium frequency axis.
     fn frequency(&self) -> &Frequency;
 
+    /// Returns the complex propagation constant $\gamma=\alpha+j\beta$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the medium cannot evaluate its propagation constant.
     fn propagation_constant(&self) -> Result<Array1<Complex64>>;
 
+    /// Returns the characteristic impedance `$Z_0$` at every frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the medium cannot evaluate its characteristic impedance.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>>;
 
     /// Returns the optional network port impedance used when generated networks are renormalized.
@@ -12,18 +35,36 @@ pub trait Media {
         None
     }
 
+    /// Returns the number of frequency points.
     fn points(&self) -> usize {
         self.frequency().points()
     }
 
+    /// Returns the attenuation constant $\alpha=\operatorname{Re}(\gamma)$ in Np/m.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the propagation constant cannot be evaluated.
     fn attenuation_constant(&self) -> Result<Array1<f64>> {
         Ok(self.propagation_constant()?.mapv(|value| value.re))
     }
 
+    /// Returns the phase constant $\beta=\operatorname{Im}(\gamma)$ in rad/m.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the propagation constant cannot be evaluated.
     fn phase_constant(&self) -> Result<Array1<f64>> {
         Ok(self.propagation_constant()?.mapv(|value| value.im))
     }
 
+    /// Returns the electrical length $\theta=\gamma d$ for a physical distance.
+    ///
+    /// When `degrees` is true the result is scaled by $180/\pi$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-finite distance or unavailable propagation constant.
     fn electrical_length(&self, distance_meters: f64, degrees: bool) -> Result<Array1<Complex64>> {
         if !distance_meters.is_finite() {
             return Err(Error::Unsupported(
@@ -40,6 +81,11 @@ pub trait Media {
             .mapv(|gamma| gamma * distance_meters * scale))
     }
 
+    /// Converts an electrical angle to physical distance at every frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the phase constant is unavailable or contains zero.
     fn distance_from_electrical_length(&self, angle: f64, degrees: bool) -> Result<Array1<f64>> {
         let angle = if degrees { angle.to_radians() } else { angle };
         let beta = self.phase_constant()?;
@@ -51,6 +97,11 @@ pub trait Media {
         Ok(beta.mapv(|value| angle / value))
     }
 
+    /// Converts an electrical angle to distance at the center frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when distances cannot be evaluated or the frequency axis is empty.
     fn center_distance_from_electrical_length(&self, angle: f64, degrees: bool) -> Result<f64> {
         let distances = self.distance_from_electrical_length(angle, degrees)?;
         distances.get(distances.len() / 2).copied().ok_or_else(|| {
@@ -60,6 +111,11 @@ pub trait Media {
         })
     }
 
+    /// Converts a length in [`LengthUnit`] to meters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the propagation constant or requested unit conversion is invalid.
     fn physical_length(&self, length: f64, unit: LengthUnit) -> Result<f64> {
         media_length_to_meters(
             self.frequency(),
@@ -69,6 +125,7 @@ pub trait Media {
         )
     }
 
+    /// Returns backend-independent plot data for the frequency axis.
     fn plot_frequency(&self) -> crate::plotting::Plot {
         let values = self.frequency().values_hz().to_vec();
         crate::plotting::Plot {
@@ -77,12 +134,19 @@ pub trait Media {
             y_label: "Frequency (Hz)".to_owned(),
             series: vec![crate::plotting::PlotSeries {
                 label: "frequency".to_owned(),
-                x: (0..values.len()).map(|point| point as f64).collect(),
+                x: (0..values.len())
+                    .map(|point| point.to_f64().unwrap_or(f64::INFINITY))
+                    .collect(),
                 y: values,
             }],
         }
     }
 
+    /// Writes frequency, $\gamma$, `$Z_0$`, and port impedance to a CSV file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when medium values cannot be evaluated or the CSV cannot be written.
     fn write_csv(&self, path: impl AsRef<Path>) -> Result<()>
     where
         Self: Sized,
@@ -96,6 +160,11 @@ pub trait Media {
         .write_csv(path)
     }
 
+    /// Returns the complex phase velocity `$v_p=j\omega/\gamma$`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the propagation constant cannot be evaluated.
     fn phase_velocity(&self) -> Result<Array1<Complex64>> {
         let gamma = self.propagation_constant()?;
         Ok(Array1::from_shape_fn(self.frequency().points(), |point| {
@@ -103,6 +172,11 @@ pub trait Media {
         }))
     }
 
+    /// Returns group velocity `$v_g=d\omega/d\gamma$`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either required gradient cannot be evaluated.
     fn group_velocity(&self) -> Result<Array1<Complex64>> {
         let angular_gradient = self.frequency().angular_gradient()?;
         let gamma_gradient = complex_gradient(&self.propagation_constant()?)?;
@@ -111,16 +185,46 @@ pub trait Media {
         }))
     }
 
+    /// Creates a matched transmission line of the requested length.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot construct the line.
     fn line(&self, length: f64, unit: LengthUnit) -> Result<Network>;
 
+    /// Creates a zero-length through network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot construct the through network.
     fn thru(&self) -> Result<Network>;
 
+    /// Creates a one-port load with the supplied reflection coefficient.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot construct the load.
     fn load(&self, reflection_coefficient: Complex64) -> Result<Network>;
 
+    /// Creates an ideal open circuit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot construct the open circuit.
     fn open(&self) -> Result<Network>;
 
+    /// Creates an ideal short circuit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the implementation cannot construct the short circuit.
     fn short(&self) -> Result<Network>;
 
+    /// Creates an ideal matched network with the requested number of ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero ports, incompatible impedance data, or network construction failure.
     fn match_network(
         &self,
         ports: usize,
@@ -149,6 +253,11 @@ pub trait Media {
         )
     }
 
+    /// Creates an equal load on every port from frequency-dependent reflections.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible reflection data or matched-network construction failure.
     fn load_nports(
         &self,
         reflection_coefficient: &Array1<Complex64>,
@@ -170,6 +279,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a two-port series impedance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible impedance data or unsupported reference impedances.
     fn series_impedance(&self, impedance: &Array1<Complex64>) -> Result<Network> {
         let points = self.frequency().points();
         if impedance.len() != points {
@@ -203,6 +317,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a two-port series resistor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid resistance data or series-network construction failure.
     fn resistor(&self, resistance: &Array1<f64>) -> Result<Network> {
         if resistance
             .iter()
@@ -215,6 +334,11 @@ pub trait Media {
         self.series_impedance(&resistance.mapv(|value| Complex64::new(value, 0.0)))
     }
 
+    /// Creates a two-port series capacitor with $Z=1/(j\omega C)$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid capacitance data, zero frequency, or network construction failure.
     fn capacitor(&self, capacitance: &Array1<f64>) -> Result<Network> {
         let points = self.frequency().points();
         if capacitance.len() != points
@@ -237,6 +361,11 @@ pub trait Media {
         }))
     }
 
+    /// Creates a two-port series inductor with $Z=j\omega L$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inductance data or series-network construction failure.
     fn inductor(&self, inductance: &Array1<f64>) -> Result<Network> {
         let points = self.frequency().points();
         if inductance.len() != points
@@ -254,6 +383,11 @@ pub trait Media {
         }))
     }
 
+    /// Creates a power-wave impedance step between real positive impedances.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the supplied impedances cannot form the requested mismatch.
     fn impedance_mismatch(
         &self,
         left_impedance: &Array1<f64>,
@@ -266,6 +400,11 @@ pub trait Media {
         )
     }
 
+    /// Creates an impedance step using the selected scattering-wave definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible or invalid impedances or network construction failure.
     fn impedance_mismatch_complex(
         &self,
         left_impedance: &Array1<Complex64>,
@@ -333,6 +472,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates an ideal lossless junction with the requested number of ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for fewer than two ports or matched-network construction failure.
     fn splitter(&self, ports: usize) -> Result<Network> {
         if ports < 2 {
             return Err(Error::Unsupported(
@@ -364,10 +508,20 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates an ideal three-port tee junction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying splitter cannot be constructed.
     fn tee(&self) -> Result<Network> {
         self.splitter(3)
     }
 
+    /// Creates a four-port balanced transmission line.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when medium properties, length conversion, or network construction fails.
     fn floating_line(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         let gamma = self.propagation_constant()?;
         let distance = media_length_to_meters(self.frequency(), &gamma, length, unit)?;
@@ -402,6 +556,11 @@ pub trait Media {
         )
     }
 
+    /// Creates a one-port load behind a transmission-line delay.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when medium properties, length conversion, or load construction fails.
     fn delay_load(
         &self,
         reflection_coefficient: Complex64,
@@ -414,14 +573,29 @@ pub trait Media {
         self.load_nports(&delayed, 1, None)
     }
 
+    /// Creates a delayed short circuit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the delayed load cannot be constructed.
     fn delay_short(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.delay_load(Complex64::new(-1.0, 0.0), length, unit)
     }
 
+    /// Creates a delayed open circuit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the delayed load cannot be constructed.
     fn delay_open(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.delay_load(Complex64::new(1.0, 0.0), length, unit)
     }
 
+    /// Connects a one-port network in shunt between two ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an incompatible load, singular junction, or network construction failure.
     fn shunt_load(&self, load: &Network) -> Result<Network> {
         if load.ports() != 1 || load.frequency != *self.frequency() {
             return Err(Error::IncompatibleShape(
@@ -447,6 +621,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a delayed load and connects it in shunt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when delayed-load or shunt construction fails.
     fn shunt_delay_load(
         &self,
         reflection_coefficient: Complex64,
@@ -456,14 +635,29 @@ pub trait Media {
         self.shunt_load(&self.delay_load(reflection_coefficient, length, unit)?)
     }
 
+    /// Creates a delayed open circuit connected in shunt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when delayed-open or shunt construction fails.
     fn shunt_delay_open(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.shunt_load(&self.delay_open(length, unit)?)
     }
 
+    /// Creates a delayed short circuit connected in shunt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when delayed-short or shunt construction fails.
     fn shunt_delay_short(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.shunt_load(&self.delay_short(length, unit)?)
     }
 
+    /// Creates a two-port shunt admittance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible admittance data or network construction failure.
     fn shunt_admittance(&self, admittance: &Array1<Complex64>) -> Result<Network> {
         let points = self.frequency().points();
         if admittance.len() != points {
@@ -491,6 +685,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a shunt resistor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid resistance data or shunt-network construction failure.
     fn shunt_resistor(&self, resistance: &Array1<f64>) -> Result<Network> {
         if resistance.len() != self.frequency().points()
             || resistance
@@ -504,6 +703,11 @@ pub trait Media {
         self.shunt_admittance(&resistance.mapv(|value| Complex64::new(1.0 / value, 0.0)))
     }
 
+    /// Creates a shunt capacitor with $Y=j\omega C$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid capacitance data or shunt-network construction failure.
     fn shunt_capacitor(&self, capacitance: &Array1<f64>) -> Result<Network> {
         if capacitance.len() != self.frequency().points()
             || capacitance
@@ -521,6 +725,11 @@ pub trait Media {
         }))
     }
 
+    /// Creates a shunt inductor with $Y=1/(j\omega L)$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inductance data, zero frequency, or shunt-network failure.
     fn shunt_inductor(&self, inductance: &Array1<f64>) -> Result<Network> {
         if inductance.len() != self.frequency().points()
             || inductance
@@ -542,6 +751,11 @@ pub trait Media {
         }))
     }
 
+    /// Creates a lossy series capacitor from its capacitance and quality factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid quality parameters or series-network construction failure.
     fn capacitor_with_q(
         &self,
         capacitance: &Array1<f64>,
@@ -569,6 +783,11 @@ pub trait Media {
         }))
     }
 
+    /// Creates a lossy series inductor from its inductance, quality factor, and DC resistance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid quality parameters or series-network construction failure.
     fn inductor_with_q(
         &self,
         inductance: &Array1<f64>,
@@ -597,6 +816,11 @@ pub trait Media {
         }))
     }
 
+    /// Creates a matched attenuator, optionally followed by a line delay.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid transmission data or network and line construction failure.
     fn attenuator(
         &self,
         transmission: &Array1<f64>,
@@ -632,6 +856,11 @@ pub trait Media {
         attenuator.cascade(&self.line(length, unit)?)
     }
 
+    /// Creates a reciprocal lossless two-port with the supplied reflection coefficient.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible, non-finite, or over-unity reflection data.
     fn lossless_mismatch(&self, reflection: &Array1<Complex64>) -> Result<Network> {
         if reflection.len() != self.frequency().points()
             || reflection
@@ -669,6 +898,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a lossless mismatch from return loss in decibels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid return-loss data or mismatch construction failure.
     fn lossless_mismatch_db(&self, return_loss_db: &Array1<f64>) -> Result<Network> {
         if return_loss_db.len() != self.frequency().points()
             || return_loss_db.iter().any(|value| !value.is_finite())
@@ -682,6 +916,11 @@ pub trait Media {
         )
     }
 
+    /// Creates an ideal two-port isolator passing away from `source_port`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid source port or through-network construction failure.
     fn isolator(&self, source_port: usize) -> Result<Network> {
         if source_port > 1 {
             return Err(Error::InvalidPort {
@@ -698,6 +937,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a random network with optional reciprocity, matching, and symmetry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the initial matched network cannot be constructed.
     fn random_network(
         &self,
         ports: usize,
@@ -741,6 +985,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Creates a network whose magnitude and phase are Gaussian random variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid distributions or matched-network construction failure.
     fn white_gaussian_polar(
         &self,
         phase_standard_deviation: f64,
@@ -764,6 +1013,11 @@ pub trait Media {
         Ok(network)
     }
 
+    /// Estimates distance from the unwrapped reflection-phase gradient.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an incompatible network or unavailable gradients and propagation data.
     fn extract_distance(&self, network: &Network) -> Result<Array1<f64>> {
         if network.ports() != 1 || network.frequency != *self.frequency() {
             return Err(Error::IncompatibleShape(
@@ -820,10 +1074,16 @@ pub(super) fn unwrap_phase(values: &[f64]) -> Vec<f64> {
     let mut unwrapped = values.to_vec();
     for index in 1..unwrapped.len() {
         let mut difference = values[index] - values[index - 1];
-        while difference > std::f64::consts::PI {
+        loop {
+            if difference <= std::f64::consts::PI {
+                break;
+            }
             difference -= std::f64::consts::TAU;
         }
-        while difference < -std::f64::consts::PI {
+        loop {
+            if difference >= -std::f64::consts::PI {
+                break;
+            }
             difference += std::f64::consts::TAU;
         }
         unwrapped[index] = unwrapped[index - 1] + difference;
@@ -858,7 +1118,7 @@ pub(super) fn media_length_to_meters(
                 .zip(gamma_gradient.iter())
                 .map(|(angular, gamma)| -(*angular / *gamma).im)
                 .sum::<f64>()
-                / frequency.points() as f64;
+                / frequency.points().to_f64().unwrap_or(f64::INFINITY);
             let seconds = match unit {
                 LengthUnit::Second => length,
                 LengthUnit::Microsecond => length * 1.0e-6,
@@ -885,33 +1145,59 @@ pub(super) fn media_length_to_meters(
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Unit used to specify a physical, temporal, or electrical line length.
 pub enum LengthUnit {
+    /// Meters.
     Meter,
+    /// Centimeters.
     Centimeter,
+    /// Millimeters.
     Millimeter,
+    /// Micrometers.
     Micrometer,
+    /// Inches.
     Inch,
+    /// Thousandths of an inch.
     Mil,
+    /// Seconds of propagation delay.
     Second,
+    /// Microseconds of propagation delay.
     Microsecond,
+    /// Nanoseconds of propagation delay.
     Nanosecond,
+    /// Picoseconds of propagation delay.
     Picosecond,
+    /// Degrees of electrical length at the center frequency.
     #[default]
     Degree,
+    /// Radians of electrical length at the center frequency.
     Radian,
 }
 
-/// Origin: `skrf/media/media.py::DefinedGammaZ0`.
+/// A medium whose propagation constant and characteristic impedance are supplied directly.
+///
+/// This is useful when measured, simulated, or analytically calculated values
+/// of $\gamma$ and `$Z_0$` are already available.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DefinedGammaZ0 {
+    /// Frequencies at which the medium is defined.
     pub frequency: Frequency,
+    /// Complex propagation constant $\gamma=\alpha+j\beta$.
     pub gamma: Array1<Complex64>,
+    /// Complex characteristic impedance `$Z_0$`.
     pub z0: Array1<Complex64>,
+    /// Optional impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
 }
 
 impl DefinedGammaZ0 {
-    /// Port of `skrf.media.DefinedGammaZ0.__init__`.
+    /// Creates a medium from frequency-dependent $\gamma$ and `$Z_0$` arrays.
+    ///
+    /// Each array must contain one value per frequency point.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any supplied array does not match the frequency length.
     pub fn new(
         frequency: Frequency,
         gamma: Array1<Complex64>,
@@ -942,6 +1228,11 @@ impl DefinedGammaZ0 {
         })
     }
 
+    /// Converts a line length from the requested unit to meters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the requested length conversion is invalid.
     pub fn physical_length(&self, length: f64, unit: LengthUnit) -> Result<f64> {
         media_length_to_meters(&self.frequency, &self.gamma, length, unit)
     }
@@ -950,7 +1241,11 @@ impl DefinedGammaZ0 {
         self.port_z0.as_ref().unwrap_or(&self.z0)
     }
 
-    /// Port of `skrf.media.Media.write_csv`.
+    /// Writes frequency, `$Z_0$`, $\gamma$, and port impedance to CSV.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the CSV file cannot be created or written.
     pub fn write_csv(&self, path: impl AsRef<Path>) -> Result<()> {
         let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
@@ -986,7 +1281,11 @@ impl DefinedGammaZ0 {
         Ok(())
     }
 
-    /// Port of `skrf.media.DefinedGammaZ0.from_csv`.
+    /// Reads a medium written by [`write_csv`](Self::write_csv).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the CSV cannot be read, parsed, or converted into a valid medium.
     pub fn from_csv(path: impl AsRef<Path>) -> Result<Self> {
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(true)
@@ -1047,22 +1346,27 @@ impl DefinedGammaZ0 {
 }
 
 impl Media for DefinedGammaZ0 {
+    /// Returns the stored frequency axis.
     fn frequency(&self) -> &Frequency {
         &self.frequency
     }
 
+    /// Returns the stored propagation constant.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         Ok(self.gamma.clone())
     }
 
+    /// Returns the stored characteristic impedance.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         Ok(self.z0.clone())
     }
 
+    /// Returns the optional network port impedance.
     fn port_impedance(&self) -> Option<&Array1<Complex64>> {
         self.port_z0.as_ref()
     }
 
+    /// Creates a matched line with transmission $e^{-\gamma d}$.
     fn line(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         let distance = self.physical_length(length, unit)?;
         let points = self.frequency.points();
@@ -1094,10 +1398,12 @@ impl Media for DefinedGammaZ0 {
         Ok(network)
     }
 
+    /// Creates a zero-length through network.
     fn thru(&self) -> Result<Network> {
         self.line(0.0, LengthUnit::Meter)
     }
 
+    /// Creates a one-port load with the supplied reflection coefficient.
     fn load(&self, reflection_coefficient: Complex64) -> Result<Network> {
         let points = self.frequency.points();
         let scattering = Array3::from_elem((points, 1, 1), reflection_coefficient);
@@ -1107,10 +1413,12 @@ impl Media for DefinedGammaZ0 {
         Network::new(self.frequency.clone(), scattering, z0)
     }
 
+    /// Creates an ideal open circuit.
     fn open(&self) -> Result<Network> {
         self.load(Complex64::new(1.0, 0.0))
     }
 
+    /// Creates an ideal short circuit for the configured reference impedance.
     fn short(&self) -> Result<Network> {
         let points = self.frequency.points();
         let reference = self.network_reference_impedance();

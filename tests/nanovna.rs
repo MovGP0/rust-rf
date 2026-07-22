@@ -17,7 +17,12 @@ impl Read for SerialMock {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
         let count = buffer.len().min(self.reads.len());
         for target in &mut buffer[..count] {
-            *target = self.reads.pop_front().unwrap();
+            *target = self.reads.pop_front().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "NanoVNA scripted read queue was exhausted",
+                )
+            })?;
         }
         Ok(count)
     }

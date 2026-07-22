@@ -11,9 +11,8 @@ Optional integrations are isolated behind Cargo features:
 - `dataframe`: Polars adapters for pandas-facing APIs.
 - `plot`: Plotters-based visualization.
 - `visa`: transport-independent VNA APIs. Native `visa-rs` sessions support
-  Windows x86/x64 (`visa32`/`visa64`, optionally via `LIB_VISA_PATH`) and macOS
-  x86_64/aarch64 (`VISA.framework`) when `RUST_RF_NATIVE_VISA=1`; Linux is not
-  supported for native VISA.
+  Windows x86/x64 (`visa32`/`visa64`, optionally via `LIB_VISA_PATH`) when
+  `RUST_RF_NATIVE_VISA=1`; macOS and Linux are not supported for native VISA.
 - `xlsx`: Excel workbook writing.
 - `full`: all optional integrations.
 

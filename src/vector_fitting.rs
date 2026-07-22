@@ -1,3 +1,16 @@
+//! Rational approximation of sampled network responses by vector fitting.
+//!
+//! The fitted model uses pole-residue form for each response:
+//!
+//! $$
+//! H(s) = d + se + \sum_{k} \frac{r_k}{s-p_k}.
+//! $$
+//!
+//! Complex poles are stored once, using the member with positive imaginary
+//! part; evaluation adds the missing conjugate pole and residue. The module also
+//! provides model analysis, sampled passivity evaluation and enforcement,
+//! NumPy-compatible persistence, plotting data, and SPICE export.
+
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -5,31 +18,79 @@ use std::path::Path;
 use ndarray::{Array1, Array2, Array3};
 use ndarray_npy::{NpzReader, NpzWriter};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 
 use crate::math::left_solve;
 use crate::plotting::{Component, Plot, PlotSeries};
 use crate::{Error, Network, Result};
 
+/// Real-valued state-space representation of a fitted scattering model.
+///
+/// The response is evaluated as
+///
+/// $$
+/// S(s) = C(sI-A)^{-1}B + D + sE.
+/// $$
 #[derive(Clone, Debug, PartialEq)]
 pub struct StateSpaceModel {
+    /// State matrix containing real poles and real blocks for complex poles.
     pub a: Array2<f64>,
+    /// Input matrix determined by the real or complex pole blocks.
     pub b: Array2<f64>,
+    /// Output matrix containing the fitted residues.
     pub c: Array2<f64>,
+    /// Direct matrix containing the constant coefficients.
     pub d: Array2<f64>,
+    /// Proportional matrix containing the coefficients multiplied by $s$.
     pub e: Array2<f64>,
 }
 
-/// Origin: `skrf/vectorFitting.py::VectorFitting`.
+/// Fits a rational macromodel to all responses of an N-port [`Network`].
+///
+/// The implementation supports fixed or relocated poles, automatic model-order
+/// selection, response and RMS-error evaluation, state-space conversion,
+/// sampled passivity checks and enforcement, plotting data, NPZ persistence,
+/// and SPICE equivalent-circuit export.
+///
+/// # References
+///
+/// - B. Gustavsen and A. Semlyen, “Rational Approximation of Frequency Domain
+///   Responses by Vector Fitting,” [IEEE Transactions on Power Delivery,
+///   1999](https://doi.org/10.1109/61.772353).
+/// - B. Gustavsen, “Improving the Pole Relocating Properties of Vector
+///   Fitting,” [IEEE Transactions on Power Delivery,
+///   2006](https://doi.org/10.1109/TPWRD.2005.860281).
+/// - D. Deschrijver et al., “Macromodeling of Multiport Systems Using a Fast
+///   Implementation of the Vector Fitting Method,” [IEEE Microwave and Wireless
+///   Components Letters, 2008](https://doi.org/10.1109/LMWC.2008.922585).
+/// - [Vector Fitting project](https://www.sintef.no/projectweb/vectorfitting/).
 #[derive(Clone, Debug)]
 pub struct VectorFitting {
+    /// Network whose scattering responses are fitted.
     pub network: Network,
+    /// Fitted poles in radians per second.
+    ///
+    /// A complex-conjugate pair is represented only by its member with positive
+    /// imaginary part. If $K_{r}$ real and $K_{c}$ complex poles are stored, the
+    /// state-space model order is $K_{r} + 2K_{c}$.
     pub poles: Array1<Complex64>,
+    /// Fitted residues with shape $(N^2, K)$.
+    ///
+    /// Rows are response pairs in row-major order: for a two-port network they
+    /// are $S_{11}$, $S_{12}$, $S_{21}$, and $S_{22}$.
     pub residues: Array2<Complex64>,
+    /// Proportional coefficients for the $N^2$ responses in row-major order.
     pub proportional_coefficients: Array1<f64>,
+    /// Constant coefficients for the $N^2$ responses in row-major order.
     pub constant_coefficients: Array1<f64>,
 }
 
 impl VectorFitting {
+    /// Creates an unfitted model for `network`.
+    ///
+    /// Pole and residue arrays are initially empty; constant and proportional
+    /// coefficient arrays are initialized to zero for every response.
+    #[must_use]
     pub fn new(network: Network) -> Self {
         let responses = network.ports() * network.ports();
         Self {
@@ -46,6 +107,16 @@ impl VectorFitting {
     /// This is the residue-identification stage of the upstream vector fitting
     /// algorithm. Complex poles store only the positive-imaginary member of a
     /// conjugate pair, matching scikit-rf's pole representation.
+    ///
+    /// Smooth responses often need only one to three real poles. Resonant
+    /// responses generally require a comparable number of complex-conjugate
+    /// poles. Excessive poles increase cost and can introduce resonances outside
+    /// the fitted frequency interval.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no poles are requested, the sampled frequency axis
+    /// is unsuitable, or the least-squares problem cannot be solved.
     pub fn vector_fit(&mut self, real_poles: usize, complex_poles: usize) -> Result<()> {
         if real_poles + complex_poles == 0 {
             return Err(Error::Unsupported(
@@ -58,7 +129,8 @@ impl VectorFitting {
                 "vector fitting requires at least two increasing frequency samples".to_owned(),
             ));
         }
-        let normalization = frequencies.iter().sum::<f64>() / frequencies.len() as f64;
+        let sample_count = frequencies.len().to_f64().unwrap_or(f64::NAN);
+        let normalization = frequencies.iter().sum::<f64>() / sample_count;
         if !normalization.is_finite() || normalization <= 0.0 {
             return Err(Error::InvalidFrequency(
                 "vector fitting requires a positive frequency scale".to_owned(),
@@ -99,6 +171,11 @@ impl VectorFitting {
     /// Fits model coefficients using caller-supplied poles in radians per second.
     ///
     /// This is the typed Rust counterpart of upstream `init_pole_spacing="custom"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the poles are empty, non-finite, or unstable; the
+    /// sampled frequency axis is unsuitable; or the fit cannot be solved.
     pub fn fit_with_poles(&mut self, poles: &Array1<Complex64>) -> Result<()> {
         if poles.is_empty()
             || poles
@@ -115,7 +192,8 @@ impl VectorFitting {
                 "vector fitting requires at least two increasing frequency samples".to_owned(),
             ));
         }
-        let normalization = frequencies.iter().sum::<f64>() / frequencies.len() as f64;
+        let sample_count = frequencies.len().to_f64().unwrap_or(f64::NAN);
+        let normalization = frequencies.iter().sum::<f64>() / sample_count;
         if !normalization.is_finite() || normalization <= 0.0 {
             return Err(Error::InvalidFrequency(
                 "vector fitting requires a positive frequency scale".to_owned(),
@@ -132,6 +210,15 @@ impl VectorFitting {
     ///
     /// This implements the shared-denominator Sanathanan-Koerner stage used by
     /// upstream `VectorFitting._pole_relocation`.
+    ///
+    /// Relocation stops when the relative pole-set change is no greater than
+    /// `tolerance` or `maximum_iterations` has been reached. A final residue fit
+    /// is then performed with the relocated poles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid pole counts, iteration limits, tolerance,
+    /// frequency samples, or an unsolvable relocation or residue-fit system.
     pub fn vector_fit_relocating(
         &mut self,
         real_poles: usize,
@@ -155,7 +242,8 @@ impl VectorFitting {
                 "vector fitting requires at least two increasing frequency samples".to_owned(),
             ));
         }
-        let normalization = frequencies.iter().sum::<f64>() / frequencies.len() as f64;
+        let sample_count = frequencies.len().to_f64().unwrap_or(f64::NAN);
+        let normalization = frequencies.iter().sum::<f64>() / sample_count;
         if !normalization.is_finite() || normalization <= 0.0 {
             return Err(Error::InvalidFrequency(
                 "vector fitting requires a positive frequency scale".to_owned(),
@@ -257,12 +345,24 @@ impl VectorFitting {
         Ok(())
     }
 
-    /// Baseline automatic fit using the upstream default initial model order.
+    /// Performs a baseline automatic fit with three real and three complex poles.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors reported by [`vector_fit`](Self::vector_fit).
     pub fn auto_fit(&mut self) -> Result<()> {
         self.vector_fit(3, 3)
     }
 
-    /// Adaptive-order fit which retains the lowest-error model encountered.
+    /// Fits increasing model orders and retains the lowest-error model encountered.
+    ///
+    /// The search stops early when the RMS error reaches `target_rms_error` and
+    /// never exceeds `maximum_model_order`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the maximum order is zero, the target is invalid,
+    /// or a candidate fit or error evaluation fails.
     pub fn auto_fit_with_tolerance(
         &mut self,
         maximum_model_order: usize,
@@ -298,7 +398,8 @@ impl VectorFitting {
         Ok(())
     }
 
-    /// Port of `VectorFitting.get_model_order`.
+    /// Calculates model order as $N_{real} + 2N_{complex}$.
+    #[must_use]
     pub fn model_order(poles: &Array1<Complex64>) -> usize {
         poles
             .iter()
@@ -306,7 +407,25 @@ impl VectorFitting {
             .sum()
     }
 
-    /// Port of `VectorFitting.get_spurious` using trapezoidal energy norms.
+    /// Classifies complex pole-residue pairs as spurious using band-limited
+    /// energy norms.
+    ///
+    /// Only complex-conjugate pairs are candidates. `frequency_samples`
+    /// controls the numeric integration grid and `gamma` is the sensitivity
+    /// threshold; typical thresholds range from `0.01` to `0.05`. `true` marks
+    /// a spurious pole.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when residue dimensions do not match the poles, fewer
+    /// than two frequency samples are requested, or `gamma` is invalid.
+    ///
+    /// # Reference
+    ///
+    /// S. Grivet-Talocia and M. Bandinu, “Improving the convergence of vector
+    /// fitting for equivalent circuit extraction from noisy frequency
+    /// responses,” [IEEE Transactions on Electromagnetic Compatibility,
+    /// 2006](https://doi.org/10.1109/TEMC.2006.870814).
     pub fn spurious_poles(
         poles: &Array1<Complex64>,
         residues: &Array2<Complex64>,
@@ -365,7 +484,8 @@ impl VectorFitting {
                 norms[(response, candidate)] = integral.sqrt();
             }
         }
-        let mean = norms.iter().sum::<f64>() / norms.len() as f64;
+        let norm_count = norms.len().to_f64().unwrap_or(f64::NAN);
+        let mean = norms.iter().sum::<f64>() / norm_count;
         if mean > 0.0 {
             for (candidate, pole_index) in complex_indexes.iter().copied().enumerate() {
                 spurious[pole_index] = (0..residues.nrows())
@@ -375,55 +495,81 @@ impl VectorFitting {
         Ok(spurious)
     }
 
-    /// Port of `VectorFitting._get_ABCDE`.
+    /// Builds the real-valued state-space matrices of the fitted rational model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model has not been fitted or its coefficient
+    /// dimensions are inconsistent with the network.
+    ///
+    /// # Reference
+    ///
+    /// B. Gustavsen and A. Semlyen, “Fast Passivity Assessment for S-Parameter
+    /// Rational Models Via a Half-Size Test Matrix,” [IEEE Transactions on
+    /// Microwave Theory and Techniques,
+    /// 2008](https://doi.org/10.1109/TMTT.2008.2007319).
     pub fn state_space(&self) -> Result<StateSpaceModel> {
         self.validate_model_state()?;
         let ports = self.network.ports();
         let order = Self::model_order(&self.poles);
         let dimension = order * ports;
-        let mut a = Array2::eye(dimension);
-        let mut b = Array2::zeros((dimension, ports));
+        // Named `A` and `B` in the original scikit-rf state-space formulation.
+        let mut state_matrix = Array2::eye(dimension);
+        let mut input_matrix = Array2::zeros((dimension, ports));
         let mut state = 0;
         for input in 0..ports {
             for pole in &self.poles {
+                state_matrix[(state, state)] = pole.re;
                 if pole.im == 0.0 {
-                    a[(state, state)] = pole.re;
-                    b[(state, input)] = 1.0;
+                    input_matrix[(state, input)] = 1.0;
                     state += 1;
                 } else {
-                    a[(state, state)] = pole.re;
-                    a[(state, state + 1)] = pole.im;
-                    a[(state + 1, state)] = -pole.im;
-                    a[(state + 1, state + 1)] = pole.re;
-                    b[(state, input)] = 2.0;
+                    state_matrix[(state, state + 1)] = pole.im;
+                    state_matrix[(state + 1, state)] = -pole.im;
+                    state_matrix[(state + 1, state + 1)] = pole.re;
+                    input_matrix[(state, input)] = 2.0;
                     state += 2;
                 }
             }
         }
-        let mut c = Array2::zeros((ports, dimension));
-        let mut d = Array2::zeros((ports, ports));
-        let mut e = Array2::zeros((ports, ports));
+        // Named `C`, `D`, and `E` in the original scikit-rf state-space formulation.
+        let mut output_matrix = Array2::zeros((ports, dimension));
+        let mut direct_matrix = Array2::zeros((ports, ports));
+        let mut proportional_matrix = Array2::zeros((ports, ports));
         for output in 0..ports {
             for input in 0..ports {
                 let response = output * ports + input;
                 let mut residue_state = input * order;
                 for (pole_index, pole) in self.poles.iter().enumerate() {
                     let residue = self.residues[(response, pole_index)];
-                    c[(output, residue_state)] = residue.re;
+                    output_matrix[(output, residue_state)] = residue.re;
                     residue_state += 1;
                     if pole.im != 0.0 {
-                        c[(output, residue_state)] = residue.im;
+                        output_matrix[(output, residue_state)] = residue.im;
                         residue_state += 1;
                     }
                 }
-                d[(output, input)] = self.constant_coefficients[response];
-                e[(output, input)] = self.proportional_coefficients[response];
+                direct_matrix[(output, input)] = self.constant_coefficients[response];
+                proportional_matrix[(output, input)] = self.proportional_coefficients[response];
             }
         }
-        Ok(StateSpaceModel { a, b, c, d, e })
+        Ok(StateSpaceModel {
+            a: state_matrix,
+            b: input_matrix,
+            c: output_matrix,
+            d: direct_matrix,
+            e: proportional_matrix,
+        })
     }
 
-    /// Port of `VectorFitting._get_s_from_ABCDE`.
+    /// Evaluates a state-space scattering model at frequencies in hertz.
+    ///
+    /// Returns complex matrices with shape `(frequency, output, input)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when state-space dimensions are inconsistent, a
+    /// frequency is non-finite, or a state matrix cannot be solved.
     pub fn response_from_state_space(
         frequencies_hz: &Array1<f64>,
         model: &StateSpaceModel,
@@ -482,7 +628,15 @@ impl VectorFitting {
         ))
     }
 
-    /// Port of `skrf.vectorFitting.VectorFitting.get_model_response`.
+    /// Evaluates one fitted response $H_{i+1,j+1}$ at frequencies in hertz.
+    ///
+    /// Real poles contribute one pole-residue term. Each stored complex pole
+    /// contributes both itself and its complex conjugate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a port is out of range, the model is unfitted or
+    /// inconsistent, or an evaluation frequency is non-finite.
     pub fn model_response(
         &self,
         i: usize,
@@ -530,6 +684,16 @@ impl VectorFitting {
         }))
     }
 
+    /// Returns the root-mean-square error across every sampled response.
+    ///
+    /// $$
+    /// \epsilon_{rms} = \sqrt{\operatorname{mean}\left(|S-S_{fit}|^2\right)}.
+    /// $$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model cannot be evaluated at the network's
+    /// sample frequencies.
     pub fn rms_error(&self) -> Result<f64> {
         let mut squared_error = 0.0;
         let mut samples = 0;
@@ -544,10 +708,19 @@ impl VectorFitting {
                 }
             }
         }
-        Ok((squared_error / samples as f64).sqrt())
+        Ok((squared_error / f64::from(samples)).sqrt())
     }
 
-    /// Backend-neutral data for upstream `VectorFitting.plot` wrappers.
+    /// Builds backend-neutral plot data for fitted response components.
+    ///
+    /// When `ports` is `None`, every response is included. When frequencies are
+    /// omitted, the network samples are used and both sampled and fitted series
+    /// are returned; caller-supplied frequencies produce fitted series only.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model is invalid, a requested port is out of
+    /// range, or a response cannot be evaluated.
     pub fn model_plot(
         &self,
         component: Component,
@@ -599,7 +772,13 @@ impl VectorFitting {
         })
     }
 
-    /// Singular values of the fitted scattering matrix over frequency.
+    /// Builds plot data for the largest singular value of the fitted scattering
+    /// matrix over frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the fitted model or its state-space response is
+    /// invalid.
     pub fn singular_value_plot(&self, frequencies_hz: Option<&Array1<f64>>) -> Result<Plot> {
         self.validate_model_state()?;
         let frequencies = frequencies_hz
@@ -620,7 +799,18 @@ impl VectorFitting {
         })
     }
 
-    /// Sampled passivity violation bands for scattering models.
+    /// Returns sampled frequency bands where the scattering model is non-passive.
+    ///
+    /// A sample violates passivity when the largest singular value is greater
+    /// than one. The returned `(start, stop)` pairs are in hertz. If
+    /// `maximum_frequency_hz` is omitted, the search extends to 120% of the
+    /// network's stop frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model is invalid, fewer than two samples are
+    /// requested, the maximum frequency is invalid, or state-space evaluation
+    /// fails.
     pub fn passivity_bands(
         &self,
         frequency_samples: usize,
@@ -663,11 +853,26 @@ impl VectorFitting {
         Ok(bands)
     }
 
+    /// Returns `true` when no sampled passivity-violation bands are found.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors reported by [`passivity_bands`](Self::passivity_bands).
     pub fn is_passive(&self) -> Result<bool> {
         Ok(self.passivity_bands(200, None)?.is_empty())
     }
 
     /// Enforces sampled passivity by uniformly scaling the fitted transfer matrix.
+    ///
+    /// The model is evaluated on a linear grid. If its largest singular value
+    /// exceeds one, residues and constant and proportional coefficients are
+    /// scaled uniformly so the sampled maximum is slightly below one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model is invalid, fewer than two samples are
+    /// requested, the maximum frequency is invalid, or state-space evaluation
+    /// fails.
     pub fn enforce_passivity(
         &mut self,
         frequency_samples: usize,
@@ -702,7 +907,15 @@ impl VectorFitting {
         Ok(())
     }
 
-    /// NumPy-compatible NPZ persistence for fitted model coefficients.
+    /// Writes fitted coefficients to a NumPy-compatible NPZ archive.
+    ///
+    /// Arrays are stored under `poles`, `residues`, `constants`, and
+    /// `proportionals`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model is invalid or the archive cannot be
+    /// created and written.
     pub fn write_npz(&self, path: impl AsRef<Path>) -> Result<()> {
         self.validate_model_state()?;
         let file = File::create(path)?;
@@ -721,6 +934,15 @@ impl VectorFitting {
         Ok(())
     }
 
+    /// Reads fitted coefficients from a NumPy-compatible NPZ archive.
+    ///
+    /// The archive must contain arrays named `poles`, `residues`, `constants`,
+    /// and `proportionals`, with dimensions matching this model's network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the archive cannot be read, an array is missing, or
+    /// the loaded coefficient dimensions are inconsistent.
     pub fn read_npz(&mut self, path: impl AsRef<Path>) -> Result<()> {
         let file = File::open(path)?;
         let mut archive = NpzReader::new(file).map_err(npy_error)?;
@@ -731,9 +953,23 @@ impl VectorFitting {
         self.validate_model_state()
     }
 
-    /// Writes an S-parameter state-space equivalent subcircuit.
+    /// Writes an S-parameter state-space equivalent subcircuit in SPICE syntax.
     ///
-    /// Origin: `VectorFitting.write_spice_subcircuit_s`.
+    /// The generated netlist is suitable for simulators such as `LTspice`,
+    /// ngspice, and Xyce. When `create_reference_pins` is `true`, each port has
+    /// a signal/reference pair (`p1 p1_ref ...`); otherwise the reference nodes
+    /// are connected internally to global ground.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model is invalid, `model_name` contains
+    /// unsupported characters, a port reference impedance is unsuitable, or the
+    /// output file cannot be written.
+    ///
+    /// # Reference
+    ///
+    /// S. Grivet-Talocia and B. Gustavsen, *Passive Macromodeling*,
+    /// [Wiley, 2016](https://doi.org/10.1002/9781119140931).
     pub fn write_spice_subcircuit(
         &self,
         path: impl AsRef<Path>,
@@ -752,6 +988,24 @@ impl VectorFitting {
             ));
         }
         let mut file = File::create(path)?;
+        self.write_spice_header(&mut file, model_name, create_reference_pins)?;
+        let build_proportional = self
+            .proportional_coefficients
+            .iter()
+            .any(|coefficient| *coefficient != 0.0);
+        for output in 0..self.network.ports() {
+            self.write_spice_port(&mut file, output, create_reference_pins, build_proportional)?;
+        }
+        writeln!(file, ".ENDS {model_name}")?;
+        Ok(())
+    }
+
+    fn write_spice_header(
+        &self,
+        file: &mut File,
+        model_name: &str,
+        create_reference_pins: bool,
+    ) -> Result<()> {
         writeln!(file, "* EQUIVALENT CIRCUIT FOR VECTOR FITTED S-MATRIX")?;
         writeln!(file, "* Created using rust-rf vector_fitting.rs")?;
         writeln!(file, "*")?;
@@ -766,148 +1020,190 @@ impl VectorFitting {
             .collect::<Vec<_>>()
             .join(" ");
         writeln!(file, ".SUBCKT {model_name} {pins}")?;
-        let build_proportional = self
-            .proportional_coefficients
-            .iter()
-            .any(|coefficient| *coefficient != 0.0);
+        Ok(())
+    }
 
-        for output in 0..self.network.ports() {
-            let port = output + 1;
-            let output_reference = spice_reference_node(output, create_reference_pins);
-            let z0 = self.network.z0[(0, output)].re;
-            if !z0.is_finite() || z0 <= 0.0 {
-                return Err(Error::Unsupported(format!(
-                    "SPICE synthesis requires positive real reference impedance at port {port}"
-                )));
-            }
-            let voltage_wave_gain = 0.5 / z0.sqrt();
-            let current_wave_gain = 0.5 * z0.sqrt();
-            let reflected_wave_gain = 2.0 / z0.sqrt();
+    fn write_spice_port(
+        &self,
+        file: &mut File,
+        output: usize,
+        create_reference_pins: bool,
+        build_proportional: bool,
+    ) -> Result<()> {
+        let port = output + 1;
+        let output_reference = spice_reference_node(output, create_reference_pins);
+        let z0 = self.network.z0[(0, output)].re;
+        if !z0.is_finite() || z0 <= 0.0 {
+            return Err(Error::Unsupported(format!(
+                "SPICE synthesis requires positive real reference impedance at port {port}"
+            )));
+        }
+        let voltage_wave_gain = 0.5 / z0.sqrt();
+        let current_wave_gain = 0.5 * z0.sqrt();
+        let reflected_wave_gain = 2.0 / z0.sqrt();
+        writeln!(file, "*")?;
+        writeln!(file, "* Port network for port {port}")?;
+        writeln!(file, "V{port} p{port} s{port} 0")?;
+        writeln!(file, "R{port} s{port} {output_reference} {z0}")?;
+
+        for input in 0..self.network.ports() {
+            self.write_spice_response(
+                file,
+                output,
+                input,
+                reflected_wave_gain,
+                create_reference_pins,
+                build_proportional,
+            )?;
+        }
+        self.write_spice_state_networks(
+            file,
+            output,
+            &output_reference,
+            voltage_wave_gain,
+            current_wave_gain,
+        )?;
+        if build_proportional {
             writeln!(file, "*")?;
-            writeln!(file, "* Port network for port {port}")?;
-            writeln!(file, "V{port} p{port} s{port} 0")?;
-            writeln!(file, "R{port} s{port} {output_reference} {z0}")?;
+            writeln!(file, "* Network with derivative of input a_{port}")?;
+            writeln!(file, "Le{port} e{port} 0 1.0")?;
+            writeln!(
+                file,
+                "Ge{port} 0 e{port} p{port} {output_reference} {voltage_wave_gain}"
+            )?;
+            writeln!(file, "Fe{port} 0 e{port} V{port} {current_wave_gain}")?;
+        }
+        Ok(())
+    }
 
-            for input in 0..self.network.ports() {
-                let input_port = input + 1;
-                let input_reference = spice_reference_node(input, create_reference_pins);
-                let input_z0 = self.network.z0[(0, input)].re;
-                if !input_z0.is_finite() || input_z0 <= 0.0 {
-                    return Err(Error::Unsupported(format!(
-                        "SPICE synthesis requires positive real reference impedance at port {input_port}"
-                    )));
-                }
-                let response = output * self.network.ports() + input;
-                let constant = self.constant_coefficients[response];
-                if constant != 0.0 {
-                    let voltage_gain = reflected_wave_gain * constant * 0.5 / input_z0.sqrt();
-                    let current_gain = reflected_wave_gain * constant * 0.5 * input_z0.sqrt();
-                    writeln!(
-                        file,
-                        "Gd{port}_{input_port} {output_reference} s{port} p{input_port} {input_reference} {voltage_gain}"
-                    )?;
-                    writeln!(
-                        file,
-                        "Fd{port}_{input_port} {output_reference} s{port} V{input_port} {current_gain}"
-                    )?;
-                }
-                let proportional = self.proportional_coefficients[response];
-                if build_proportional && proportional != 0.0 {
-                    let gain = reflected_wave_gain * proportional;
-                    writeln!(
-                        file,
-                        "Ge{port}_{input_port} {output_reference} s{port} e{input_port} 0 {gain}"
-                    )?;
-                }
-                for (pole_index, pole) in self.poles.iter().enumerate() {
-                    let state = pole_index + 1;
-                    let residue = self.residues[(response, pole_index)];
-                    let real_gain = reflected_wave_gain * residue.re;
-                    if pole.im == 0.0 {
-                        writeln!(
-                            file,
-                            "Gr{state}_{port}_{input_port} {output_reference} s{port} x{state}_a{input_port} 0 {real_gain}"
-                        )?;
-                    } else {
-                        let imaginary_gain = reflected_wave_gain * residue.im;
-                        writeln!(
-                            file,
-                            "Gr{state}_re_{port}_{input_port} {output_reference} s{port} x{state}_re_a{input_port} 0 {real_gain}"
-                        )?;
-                        writeln!(
-                            file,
-                            "Gr{state}_im_{port}_{input_port} {output_reference} s{port} x{state}_im_a{input_port} 0 {imaginary_gain}"
-                        )?;
-                    }
-                }
-            }
-
-            writeln!(file, "*")?;
-            writeln!(file, "* State networks driven by port {port}")?;
-            for (pole_index, pole) in self.poles.iter().enumerate() {
-                let state = pole_index + 1;
-                if pole.im == 0.0 {
-                    writeln!(file, "Cx{state}_a{port} x{state}_a{port} 0 1.0")?;
-                    writeln!(
-                        file,
-                        "Gx{state}_a{port} 0 x{state}_a{port} p{port} {output_reference} {voltage_wave_gain}"
-                    )?;
-                    writeln!(
-                        file,
-                        "Fx{state}_a{port} 0 x{state}_a{port} V{port} {current_wave_gain}"
-                    )?;
-                    writeln!(
-                        file,
-                        "Rp{state}_a{port} 0 x{state}_a{port} {}",
-                        -1.0 / pole.re
-                    )?;
-                } else {
-                    writeln!(file, "Cx{state}_re_a{port} x{state}_re_a{port} 0 1.0")?;
-                    writeln!(
-                        file,
-                        "Gx{state}_re_a{port} 0 x{state}_re_a{port} p{port} {output_reference} {}",
-                        2.0 * voltage_wave_gain
-                    )?;
-                    writeln!(
-                        file,
-                        "Fx{state}_re_a{port} 0 x{state}_re_a{port} V{port} {}",
-                        2.0 * current_wave_gain
-                    )?;
-                    writeln!(
-                        file,
-                        "Rp{state}_re_re_a{port} 0 x{state}_re_a{port} {}",
-                        -1.0 / pole.re
-                    )?;
-                    writeln!(
-                        file,
-                        "Gp{state}_re_im_a{port} 0 x{state}_re_a{port} x{state}_im_a{port} 0 {}",
-                        pole.im
-                    )?;
-                    writeln!(file, "Cx{state}_im_a{port} x{state}_im_a{port} 0 1.0")?;
-                    writeln!(
-                        file,
-                        "Gp{state}_im_re_a{port} 0 x{state}_im_a{port} x{state}_re_a{port} 0 {}",
-                        -pole.im
-                    )?;
-                    writeln!(
-                        file,
-                        "Rp{state}_im_im_a{port} 0 x{state}_im_a{port} {}",
-                        -1.0 / pole.re
-                    )?;
-                }
-            }
-            if build_proportional {
-                writeln!(file, "*")?;
-                writeln!(file, "* Network with derivative of input a_{port}")?;
-                writeln!(file, "Le{port} e{port} 0 1.0")?;
+    fn write_spice_response(
+        &self,
+        file: &mut File,
+        output: usize,
+        input: usize,
+        reflected_wave_gain: f64,
+        create_reference_pins: bool,
+        build_proportional: bool,
+    ) -> Result<()> {
+        let port = output + 1;
+        let input_port = input + 1;
+        let output_reference = spice_reference_node(output, create_reference_pins);
+        let input_reference = spice_reference_node(input, create_reference_pins);
+        let input_z0 = self.network.z0[(0, input)].re;
+        if !input_z0.is_finite() || input_z0 <= 0.0 {
+            return Err(Error::Unsupported(format!(
+                "SPICE synthesis requires positive real reference impedance at port {input_port}"
+            )));
+        }
+        let response = output * self.network.ports() + input;
+        let constant = self.constant_coefficients[response];
+        if constant != 0.0 {
+            let voltage_gain = reflected_wave_gain * constant * 0.5 / input_z0.sqrt();
+            let current_gain = reflected_wave_gain * constant * 0.5 * input_z0.sqrt();
+            writeln!(
+                file,
+                "Gd{port}_{input_port} {output_reference} s{port} p{input_port} {input_reference} {voltage_gain}"
+            )?;
+            writeln!(
+                file,
+                "Fd{port}_{input_port} {output_reference} s{port} V{input_port} {current_gain}"
+            )?;
+        }
+        let proportional = self.proportional_coefficients[response];
+        if build_proportional && proportional != 0.0 {
+            let gain = reflected_wave_gain * proportional;
+            writeln!(
+                file,
+                "Ge{port}_{input_port} {output_reference} s{port} e{input_port} 0 {gain}"
+            )?;
+        }
+        for (pole_index, pole) in self.poles.iter().enumerate() {
+            let state = pole_index + 1;
+            let residue = self.residues[(response, pole_index)];
+            let real_gain = reflected_wave_gain * residue.re;
+            if pole.im == 0.0 {
                 writeln!(
                     file,
-                    "Ge{port} 0 e{port} p{port} {output_reference} {voltage_wave_gain}"
+                    "Gr{state}_{port}_{input_port} {output_reference} s{port} x{state}_a{input_port} 0 {real_gain}"
                 )?;
-                writeln!(file, "Fe{port} 0 e{port} V{port} {current_wave_gain}")?;
+            } else {
+                let imaginary_gain = reflected_wave_gain * residue.im;
+                writeln!(
+                    file,
+                    "Gr{state}_re_{port}_{input_port} {output_reference} s{port} x{state}_re_a{input_port} 0 {real_gain}"
+                )?;
+                writeln!(
+                    file,
+                    "Gr{state}_im_{port}_{input_port} {output_reference} s{port} x{state}_im_a{input_port} 0 {imaginary_gain}"
+                )?;
             }
         }
-        writeln!(file, ".ENDS {model_name}")?;
+        Ok(())
+    }
+
+    fn write_spice_state_networks(
+        &self,
+        file: &mut File,
+        output: usize,
+        output_reference: &str,
+        voltage_wave_gain: f64,
+        current_wave_gain: f64,
+    ) -> Result<()> {
+        let port = output + 1;
+        writeln!(file, "*")?;
+        writeln!(file, "* State networks driven by port {port}")?;
+        for (pole_index, pole) in self.poles.iter().enumerate() {
+            let state = pole_index + 1;
+            if pole.im == 0.0 {
+                writeln!(file, "Cx{state}_a{port} x{state}_a{port} 0 1.0")?;
+                writeln!(
+                    file,
+                    "Gx{state}_a{port} 0 x{state}_a{port} p{port} {output_reference} {voltage_wave_gain}"
+                )?;
+                writeln!(
+                    file,
+                    "Fx{state}_a{port} 0 x{state}_a{port} V{port} {current_wave_gain}"
+                )?;
+                writeln!(
+                    file,
+                    "Rp{state}_a{port} 0 x{state}_a{port} {}",
+                    -1.0 / pole.re
+                )?;
+            } else {
+                writeln!(file, "Cx{state}_re_a{port} x{state}_re_a{port} 0 1.0")?;
+                writeln!(
+                    file,
+                    "Gx{state}_re_a{port} 0 x{state}_re_a{port} p{port} {output_reference} {}",
+                    2.0 * voltage_wave_gain
+                )?;
+                writeln!(
+                    file,
+                    "Fx{state}_re_a{port} 0 x{state}_re_a{port} V{port} {}",
+                    2.0 * current_wave_gain
+                )?;
+                writeln!(
+                    file,
+                    "Rp{state}_re_re_a{port} 0 x{state}_re_a{port} {}",
+                    -1.0 / pole.re
+                )?;
+                writeln!(
+                    file,
+                    "Gp{state}_re_im_a{port} 0 x{state}_re_a{port} x{state}_im_a{port} 0 {}",
+                    pole.im
+                )?;
+                writeln!(file, "Cx{state}_im_a{port} x{state}_im_a{port} 0 1.0")?;
+                writeln!(
+                    file,
+                    "Gp{state}_im_re_a{port} 0 x{state}_im_a{port} x{state}_re_a{port} 0 {}",
+                    -pole.im
+                )?;
+                writeln!(
+                    file,
+                    "Rp{state}_im_im_a{port} 0 x{state}_im_a{port} {}",
+                    -1.0 / pole.re
+                )?;
+            }
+        }
         Ok(())
     }
 
@@ -978,7 +1274,7 @@ fn project_component(value: Complex64, component: Component) -> f64 {
     }
 }
 
-fn vector_component_label(component: Component) -> &'static str {
+const fn vector_component_label(component: Component) -> &'static str {
     match component {
         Component::Decibels => "Magnitude (dB)",
         Component::Decibels10 => "Magnitude (dB10)",
@@ -992,7 +1288,8 @@ fn vector_component_label(component: Component) -> &'static str {
 
 fn largest_singular_value(scattering: &Array3<Complex64>, point: usize) -> f64 {
     let ports = scattering.dim().1;
-    let mut vector = vec![Complex64::new(1.0 / (ports as f64).sqrt(), 0.0); ports];
+    let port_count = ports.to_f64().unwrap_or(f64::NAN);
+    let mut vector = vec![Complex64::new(1.0 / port_count.sqrt(), 0.0); ports];
     let mut singular = 0.0;
     for _ in 0..32 {
         let transformed = (0..ports)
@@ -1009,11 +1306,7 @@ fn largest_singular_value(scattering: &Array3<Complex64>, point: usize) -> f64 {
                     .sum::<Complex64>()
             })
             .collect::<Vec<_>>();
-        let norm = adjoint
-            .iter()
-            .map(|value| value.norm_sqr())
-            .sum::<f64>()
-            .sqrt();
+        let norm = adjoint.iter().map(Complex64::norm_sqr).sum::<f64>().sqrt();
         if norm == 0.0 {
             return 0.0;
         }
@@ -1022,7 +1315,7 @@ fn largest_singular_value(scattering: &Array3<Complex64>, point: usize) -> f64 {
         }
         singular = transformed
             .iter()
-            .map(|value| value.norm_sqr())
+            .map(Complex64::norm_sqr)
             .sum::<f64>()
             .sqrt();
     }
@@ -1080,9 +1373,10 @@ fn relocate_poles(
     for (basis_index, sum) in basis_sums.into_iter().enumerate() {
         normalization_row[denominator_offset + basis_index] = sum;
     }
-    normalization_row[columns - 1] = frequencies_hz.len() as f64;
+    let frequency_count = frequencies_hz.len().to_f64().unwrap_or(f64::NAN);
+    normalization_row[columns - 1] = frequency_count;
     design.push(normalization_row);
-    right.push(frequencies_hz.len() as f64);
+    right.push(frequency_count);
     let solution = solve_least_squares(&design, &right)?;
     let denominator = &solution[denominator_offset..denominator_offset + basis_count];
     let constant = solution[columns - 1];
@@ -1095,26 +1389,7 @@ fn relocate_poles(
     } else {
         constant
     };
-    let mut state = faer::Mat::<Complex64>::zeros(basis_count, basis_count);
-    let mut row = 0;
-    for pole in poles {
-        if pole.im == 0.0 {
-            state[(row, row)] = *pole;
-            for column in 0..basis_count {
-                state[(row, column)] -= denominator[column] / divisor;
-            }
-            row += 1;
-        } else {
-            state[(row, row)] = Complex64::new(pole.re, 0.0);
-            state[(row, row + 1)] = Complex64::new(pole.im, 0.0);
-            state[(row + 1, row)] = Complex64::new(-pole.im, 0.0);
-            state[(row + 1, row + 1)] = Complex64::new(pole.re, 0.0);
-            for column in 0..basis_count {
-                state[(row, column)] -= 2.0 * denominator[column] / divisor;
-            }
-            row += 2;
-        }
-    }
+    let state = relocation_state_matrix(poles, basis_count, denominator, divisor);
     let decomposition = state.eigen().map_err(|error| {
         Error::Unsupported(format!("pole eigendecomposition failed: {error:?}"))
     })?;
@@ -1146,6 +1421,35 @@ fn relocate_poles(
         ));
     }
     Ok(relocated)
+}
+
+fn relocation_state_matrix(
+    poles: &[Complex64],
+    basis_count: usize,
+    denominator: &[f64],
+    divisor: f64,
+) -> faer::Mat<Complex64> {
+    let mut state = faer::Mat::<Complex64>::zeros(basis_count, basis_count);
+    let mut row = 0;
+    for pole in poles {
+        if pole.im == 0.0 {
+            state[(row, row)] = *pole;
+            for column in 0..basis_count {
+                state[(row, column)] -= denominator[column] / divisor;
+            }
+            row += 1;
+        } else {
+            state[(row, row)] = Complex64::new(pole.re, 0.0);
+            state[(row, row + 1)] = Complex64::new(pole.im, 0.0);
+            state[(row + 1, row)] = Complex64::new(-pole.im, 0.0);
+            state[(row + 1, row + 1)] = Complex64::new(pole.re, 0.0);
+            for column in 0..basis_count {
+                state[(row, column)] -= 2.0 * denominator[column] / divisor;
+            }
+            row += 2;
+        }
+    }
+    state
 }
 
 fn rational_basis(s: Complex64, poles: &[Complex64]) -> Vec<Complex64> {
@@ -1226,7 +1530,7 @@ fn solve_least_squares(design: &[Vec<f64>], right: &[f64]) -> Result<Vec<f64>> {
         for column in 0..columns {
             projected[column] += row[column] * value;
             for other in 0..columns {
-                normal[column][other] += row[column] * row[other];
+                normal[column][other] = row[column].mul_add(row[other], normal[column][other]);
             }
         }
     }
@@ -1264,7 +1568,7 @@ fn solve_linear_system(mut matrix: Vec<Vec<f64>>, mut right: Vec<f64>) -> Option
             {
                 *value -= multiplier * pivot_value;
             }
-            right[row] -= multiplier * right[pivot];
+            right[row] = multiplier.mul_add(-right[pivot], right[row]);
         }
     }
     let mut solution = vec![0.0; dimension];
@@ -1288,7 +1592,9 @@ fn linear_space(start: f64, stop: f64, points: usize) -> Vec<f64> {
                 if index + 1 == points {
                     stop
                 } else {
-                    start + (stop - start) * index as f64 / (points - 1) as f64
+                    let index = index.to_f64().unwrap_or(f64::NAN);
+                    let interval_count = (points - 1).to_f64().unwrap_or(f64::NAN);
+                    start + (stop - start) * index / interval_count
                 }
             })
             .collect(),

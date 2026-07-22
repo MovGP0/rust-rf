@@ -1,4 +1,6 @@
-﻿#![allow(unused_imports)]
+#![allow(unused_imports)]
+
+//! Coplanar-waveguide model regressions against analytical, Qucs, and ADS data.
 
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
@@ -12,8 +14,11 @@ use rust_rf::media::{
     Freespace, LengthUnit, Media, MicrostripDispersionModel, MicrostripLine,
     MicrostripQuasiStaticModel, RectangularWaveguide, WaveguideMode,
 };
-use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
+use rust_rf::{Frequency, FrequencyUnit, Network, Result, SweepType};
 
+/// Checks characteristic impedance and effective permittivity against published values.
+///
+/// The impedance reference is the [Wcalc coplanar calculator](http://wcalc.sourceforge.net/cgi-bin/coplanar.cgi).
 #[test]
 fn calculates_cpw_quasi_static_characteristics() {
     let frequency = Frequency::new(1.0, 20.0, 21, FrequencyUnit::GHz, SweepType::Linear)
@@ -34,6 +39,7 @@ fn calculates_cpw_quasi_static_characteristics() {
     assert_relative_eq!(effective[0].re, 6.94, epsilon = 0.02);
 }
 
+/// Checks that zero thickness removes conductor loss and finite thickness produces loss.
 #[test]
 fn handles_cpw_zero_thickness_and_losses() {
     let frequency = Frequency::new(1.0, 20.0, 5, FrequencyUnit::GHz, SweepType::Linear)
@@ -95,122 +101,132 @@ fn handles_cpw_zero_thickness_and_losses() {
     );
 }
 
-#[test]
-fn matches_cpw_qucs_and_ads_fixtures() {
-    struct Fixture<'a> {
-        simulator: &'a str,
-        name: &'a str,
-        width: f64,
-        thickness: f64,
-        height: f64,
-        metal_backside: bool,
-        tolerance: f64,
-    }
-    let fixtures = [
-        Fixture {
-            simulator: "qucs",
-            name: "cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
-            width: 1.6e-3,
-            thickness: 35.0e-6,
-            height: 1.55e-3,
-            metal_backside: true,
-            tolerance: 2.0e-3,
-        },
-        Fixture {
-            simulator: "qucs",
-            name: "cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
-            width: 3.0e-3,
-            thickness: 35.0e-6,
-            height: 1.55e-3,
-            metal_backside: false,
-            tolerance: 2.0e-3,
-        },
-        Fixture {
-            simulator: "qucs",
-            name: "cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
-            width: 3.0e-3,
-            thickness: 0.0,
-            height: 100.0e-3,
-            metal_backside: false,
-            tolerance: 2.0e-3,
-        },
-        Fixture {
-            simulator: "ads",
-            name: "cpw,t=0um.s2p",
-            width: 3.0e-3,
-            thickness: 0.0,
-            height: 1.55e-3,
-            metal_backside: false,
-            tolerance: 1.0e-3,
-        },
-        Fixture {
-            simulator: "ads",
-            name: "cpwg,t=0um.s2p",
-            width: 1.6e-3,
-            thickness: 0.0,
-            height: 1.55e-3,
-            metal_backside: true,
-            tolerance: 1.0e-3,
-        },
-    ];
-    for fixture in fixtures {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/media/cpw")
-            .join(fixture.simulator)
-            .join(fixture.name);
-        let reference = Network::read_touchstone(path).expect("CPW fixture should load");
-        let points = reference.frequency_points();
-        let (dispersion, compatibility) = if fixture.simulator == "qucs" {
-            (
-                DielectricDispersionModel::FrequencyInvariant,
-                CpwCompatibilityMode::Qucs,
-            )
-        } else {
-            (
-                DielectricDispersionModel::DjordjevicSvensson {
-                    low_frequency_hz: 1.0e3,
-                    high_frequency_hz: 1.0e12,
-                    specification_frequency_hz: 1.0e9,
-                },
-                CpwCompatibilityMode::Ads,
-            )
-        };
-        let mut cpw = Cpw::new(
-            reference.frequency.clone(),
-            fixture.width,
-            0.3e-3,
-            fixture.height,
-            Some(fixture.thickness),
-            4.5,
-            0.018,
-            Some(1.7e-8),
-            dispersion,
-            fixture.metal_backside,
-            compatibility,
-            Some(Array1::from_elem(points, Complex64::new(50.0, 0.0))),
-            None,
+struct CpwNetworkFixture {
+    simulator: &'static str,
+    name: &'static str,
+    width: f64,
+    thickness: f64,
+    height: f64,
+    metal_backside: bool,
+    tolerance: f64,
+}
+
+const CPW_NETWORK_FIXTURES: [CpwNetworkFixture; 5] = [
+    CpwNetworkFixture {
+        simulator: "qucs",
+        name: "cpw,t=35um,w=1.6mm,s=0.3mm,l=25mm,backside=metal.s2p",
+        width: 1.6e-3,
+        thickness: 35.0e-6,
+        height: 1.55e-3,
+        metal_backside: true,
+        tolerance: 2.0e-3,
+    },
+    CpwNetworkFixture {
+        simulator: "qucs",
+        name: "cpw,t=35um,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+        width: 3.0e-3,
+        thickness: 35.0e-6,
+        height: 1.55e-3,
+        metal_backside: false,
+        tolerance: 2.0e-3,
+    },
+    CpwNetworkFixture {
+        simulator: "qucs",
+        name: "cpw,t=0,h=100mm,w=3mm,s=0.3mm,l=25mm,backside=air.s2p",
+        width: 3.0e-3,
+        thickness: 0.0,
+        height: 100.0e-3,
+        metal_backside: false,
+        tolerance: 2.0e-3,
+    },
+    CpwNetworkFixture {
+        simulator: "ads",
+        name: "cpw,t=0um.s2p",
+        width: 3.0e-3,
+        thickness: 0.0,
+        height: 1.55e-3,
+        metal_backside: false,
+        tolerance: 1.0e-3,
+    },
+    CpwNetworkFixture {
+        simulator: "ads",
+        name: "cpwg,t=0um.s2p",
+        width: 1.6e-3,
+        thickness: 0.0,
+        height: 1.55e-3,
+        metal_backside: true,
+        tolerance: 1.0e-3,
+    },
+];
+
+fn fixture_models(simulator: &str) -> (DielectricDispersionModel, CpwCompatibilityMode) {
+    if simulator == "qucs" {
+        (
+            DielectricDispersionModel::FrequencyInvariant,
+            CpwCompatibilityMode::Qucs,
         )
-        .expect("CPW should be valid");
-        let actual = cpw
-            .line(25.0e-3, LengthUnit::Meter)
-            .expect("CPW line should be constructed");
-        let maximum_error = actual
-            .s
-            .iter()
-            .zip(reference.s.iter())
-            .map(|(actual, expected)| (*actual - *expected).norm())
-            .fold(0.0_f64, f64::max);
-        assert!(
-            maximum_error < fixture.tolerance,
-            "{} maximum error was {maximum_error}",
-            fixture.name
-        );
-        cpw.set_resistivity_material("copper")
-            .expect("copper should resolve");
-        assert!(cpw.to_string().contains("Coplanar Waveguide Media"));
+    } else {
+        (
+            DielectricDispersionModel::DjordjevicSvensson {
+                low_frequency_hz: 1.0e3,
+                high_frequency_hz: 1.0e12,
+                specification_frequency_hz: 1.0e9,
+            },
+            CpwCompatibilityMode::Ads,
+        )
     }
 }
 
+fn assert_cpw_fixture_matches(fixture: &CpwNetworkFixture) -> Result<()> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/media/cpw")
+        .join(fixture.simulator)
+        .join(fixture.name);
+    let reference = Network::read_touchstone(path)?;
+    let points = reference.frequency_points();
+    let (dispersion, compatibility) = fixture_models(fixture.simulator);
+    let mut cpw = Cpw::new(
+        reference.frequency.clone(),
+        fixture.width,
+        0.3e-3,
+        fixture.height,
+        Some(fixture.thickness),
+        4.5,
+        0.018,
+        Some(1.7e-8),
+        dispersion,
+        fixture.metal_backside,
+        compatibility,
+        Some(Array1::from_elem(points, Complex64::new(50.0, 0.0))),
+        None,
+    )?;
+    let actual = cpw.line(25.0e-3, LengthUnit::Meter)?;
+    let maximum_error = actual
+        .s
+        .iter()
+        .zip(reference.s.iter())
+        .map(|(actual, expected)| (*actual - *expected).norm())
+        .fold(0.0_f64, f64::max);
+    assert!(
+        maximum_error < fixture.tolerance,
+        "{} maximum error was {maximum_error}",
+        fixture.name
+    );
+    cpw.set_resistivity_material("copper")?;
+    assert!(cpw.to_string().contains("Coplanar Waveguide Media"));
+    Ok(())
+}
+
+/// Compares generated CPW networks with the Qucs and ADS simulator fixtures.
+#[test]
+fn matches_cpw_qucs_and_ads_fixtures() -> Result<()> {
+    for fixture in &CPW_NETWORK_FIXTURES {
+        assert_cpw_fixture_matches(fixture)?;
+    }
+    Ok(())
+}
+
+/// Compares characteristic impedance versus geometry with the Qucs reference curve.
 #[test]
 fn matches_cpw_qucs_impedance_curve() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

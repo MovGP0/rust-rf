@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use rust_rf::Network;
 use rust_rf::plotting::{Component, Parameter, Plot, network_plot, render_svg, smith_plot};
 
+/// Loads the requested Touchstone files and writes dB, phase, and Smith SVG plots.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = Options::parse(std::env::args_os().skip(1))?;
     if options.help {
@@ -46,11 +47,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug)]
+/// Parsed command-line options for the Touchstone plotting utility.
 struct Options {
+    /// Input Touchstone files.
     inputs: Vec<PathBuf>,
+    /// Output path for the rectangular dB plot.
     output: PathBuf,
+    /// Optional one-based `-m` port converted to a zero-based output index.
     output_port: Option<usize>,
+    /// Optional one-based `-n` port converted to a zero-based input index.
     input_port: Option<usize>,
+    /// Whether help was requested.
     help: bool,
 }
 
@@ -58,6 +65,7 @@ impl Options {
     const USAGE: &'static str =
         "usage: plot-touchstone [-m PORT] [-n PORT] [-o OUTPUT.svg] file.sNp [file2.sNp ...]";
 
+    /// Parses the Python-compatible `-m` and `-n` options plus Rust's SVG output option.
     fn parse(
         arguments: impl Iterator<Item = OsString>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
@@ -125,6 +133,7 @@ impl Options {
     }
 }
 
+/// Parses a positive one-based port number and returns its zero-based index.
 fn parse_port(value: Option<&OsString>, option: &str) -> Result<usize, Box<dyn std::error::Error>> {
     let value = value.ok_or_else(|| format!("missing one-based port number after {option}"))?;
     let port = value
@@ -135,6 +144,7 @@ fn parse_port(value: Option<&OsString>, option: &str) -> Result<usize, Box<dyn s
         .ok_or_else(|| format!("port number for {option} must be at least 1").into())
 }
 
+/// Merges rectangular scattering plots from all input networks.
 fn rectangular_plots(
     networks: &[Network],
     component: Component,
@@ -149,6 +159,7 @@ fn rectangular_plots(
     )
 }
 
+/// Merges Smith-chart data from all input networks.
 fn smith_plots(
     networks: &[Network],
     output_port: Option<usize>,
@@ -157,6 +168,7 @@ fn smith_plots(
     merge_plots(networks, smith_plot, output_port, input_port)
 }
 
+/// Applies a plot builder to selected port pairs and merges the series.
 fn merge_plots(
     networks: &[Network],
     mut plot: impl FnMut(&Network, Option<(usize, usize)>) -> rust_rf::Result<Plot>,
@@ -188,6 +200,7 @@ fn merge_plots(
     Ok(merged)
 }
 
+/// Returns every port pair matching the optional output and input filters.
 fn selected_pairs(
     ports: usize,
     output_port: Option<usize>,
@@ -202,6 +215,7 @@ fn selected_pairs(
         .collect()
 }
 
+/// Produces a sibling output filename with the supplied suffix.
 fn sibling_output(output: &Path, suffix: &str) -> PathBuf {
     let mut sibling = output.to_path_buf();
     let stem = output

@@ -1,22 +1,50 @@
-use super::media::*;
-use super::*;
-/// A homogeneous plane-wave medium.
+//! Plane-wave (TEM-mode) propagation in a homogeneous free space.
+//!
+//! A [`Freespace`] medium is defined by its relative permittivity and
+//! permeability. Loss may be included either in those complex quantities or
+//! through separate electric and magnetic loss tangents.
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{
+    Array1, Complex64, DistributedCircuit, Error, FREE_SPACE_PERMEABILITY, FREE_SPACE_PERMITTIVITY,
+    Frequency, Network, Result, fmt,
+};
+/// A homogeneous plane-wave (TEM-mode) medium.
 ///
-/// Origin: `skrf/media/freespace.py::Freespace`.
+/// The medium can be constructed from complex relative material properties or
+/// from real properties and separate loss tangents. An equivalent medium can
+/// also be recovered from a [`DistributedCircuit`] with
+/// [`from_distributed_circuit`](Self::from_distributed_circuit).
 #[derive(Clone, Debug)]
 pub struct Freespace {
+    /// Frequencies at which the medium is evaluated.
     pub frequency: Frequency,
+    /// Complex relative dielectric permittivity; a negative imaginary part is lossy.
     pub relative_permittivity: Array1<Complex64>,
+    /// Complex relative magnetic permeability; a negative imaginary part is lossy.
     pub relative_permeability: Array1<Complex64>,
+    /// Electric loss tangent `$\tan\delta_e$`, overriding the imaginary permittivity.
     pub electric_loss_tangent: Option<Array1<f64>>,
+    /// Magnetic loss tangent `$\tan\delta_m$`, overriding the imaginary permeability.
     pub magnetic_loss_tangent: Option<Array1<f64>>,
+    /// Conductor resistivity in $\Omega\,\mathrm{m}$, or `None` for no conductor loss.
     pub resistivity: Option<Array1<f64>>,
+    /// Optional port impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Optional override for the medium's calculated characteristic impedance.
     pub characteristic_impedance_override: Option<Array1<Complex64>>,
 }
 
 impl Freespace {
-    /// Port of `skrf.media.Freespace.__init__`.
+    /// Creates a free-space medium from frequency-dependent material properties.
+    ///
+    /// Every supplied array must have one value per frequency point. When a loss
+    /// tangent is supplied, the corresponding relative property's imaginary part
+    /// is ignored.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible arrays or invalid resistivity values.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
@@ -84,6 +112,11 @@ impl Freespace {
         })
     }
 
+    /// Creates a lossless medium by repeating scalar relative properties over the band.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the repeated properties cannot form a valid medium.
     pub fn from_scalars(
         frequency: Frequency,
         relative_permittivity: Complex64,
@@ -102,6 +135,11 @@ impl Freespace {
         )
     }
 
+    /// Creates an ideal vacuum with `$\varepsilon_r` = `$\mu_r` = 1.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the vacuum medium cannot be constructed.
     pub fn vacuum(frequency: Frequency) -> Result<Self> {
         Self::from_scalars(
             frequency,
@@ -110,7 +148,11 @@ impl Freespace {
         )
     }
 
-    /// Resolves a conductor name or alias through `skrf.data.materials`.
+    /// Sets the resistivity from a named entry in [`crate::data::MATERIALS`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the material is unknown or has no resistivity value.
     pub fn set_resistivity_material(&mut self, material: &str) -> Result<()> {
         let properties = crate::data::MATERIALS
             .get(material.to_ascii_lowercase().as_str())
@@ -122,7 +164,14 @@ impl Freespace {
         Ok(())
     }
 
-    /// Complex dielectric permittivity in farads per meter.
+    /// Returns the complex dielectric permittivity in farads per meter.
+    ///
+    /// Without an electric loss tangent,
+    /// $\varepsilon = `\varepsilon_0\varepsilon_r`.$
+    /// Otherwise,
+    /// $\varepsilon = `\varepsilon_0\operatorname{Re}(\varepsilon_r)`
+    /// $(1-j\tan\delta_e)$.
+    #[must_use]
     pub fn permittivity(&self) -> Array1<Complex64> {
         Array1::from_shape_fn(self.frequency.points(), |point| {
             let relative = self.electric_loss_tangent.as_ref().map_or(
@@ -138,7 +187,13 @@ impl Freespace {
         })
     }
 
-    /// Complex magnetic permeability in henries per meter.
+    /// Returns the complex magnetic permeability in henries per meter.
+    ///
+    /// Without a magnetic loss tangent,
+    /// $\mu = `\mu_0\mu_r`.$
+    /// Otherwise,
+    /// $$\mu = \mu_0\operatorname{Re}(\mu_r)(1-j\tan\delta_m).$$
+    #[must_use]
     pub fn permeability(&self) -> Array1<Complex64> {
         Array1::from_shape_fn(self.frequency.points(), |point| {
             let relative = self.magnetic_loss_tangent.as_ref().map_or(
@@ -154,7 +209,14 @@ impl Freespace {
         })
     }
 
-    /// Permittivity with finite conductivity represented as dielectric loss.
+    /// Returns permittivity with finite conductivity represented as dielectric loss.
+    ///
+    /// The resistive contribution is
+    /// $$\varepsilon_\rho = \varepsilon - \frac{j}{\rho\omega}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when resistive loss is requested at zero frequency.
     pub fn permittivity_with_resistivity(&self) -> Result<Array1<Complex64>> {
         let mut permittivity = self.permittivity();
         if let Some(resistivity) = &self.resistivity {
@@ -172,7 +234,17 @@ impl Freespace {
         Ok(permittivity)
     }
 
-    /// Port of `skrf.media.Freespace.from_distributed_circuit`.
+    /// Constructs an equivalent free-space medium from a distributed circuit.
+    ///
+    /// For angular frequency $\omega$, series impedance $Z'$ and shunt
+    /// admittance $Y'$ are converted using
+    /// $$`\varepsilon_r` = \frac{-jY'}{`\omega\varepsilon_0`},\qquad
+    /// `\mu_r` = \frac{-jZ'}{`\omega\mu_0`}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the circuit includes zero frequency or the
+    /// resulting material parameters cannot be constructed.
     pub fn from_distributed_circuit(circuit: &DistributedCircuit) -> Result<Self> {
         let angular = circuit.frequency.angular();
         if angular.iter().any(|value| *value == 0.0) {
@@ -212,7 +284,8 @@ impl Freespace {
         )
     }
 
-    /// Port of `skrf.media.Freespace.plot_ep` as backend-independent plot data.
+    /// Returns backend-independent plot data for the real and imaginary permittivity.
+    #[must_use]
     pub fn plot_permittivity(&self) -> crate::plotting::Plot {
         complex_material_plot(
             &self.frequency,
@@ -222,7 +295,8 @@ impl Freespace {
         )
     }
 
-    /// Port of `skrf.media.Freespace.plot_mu` as backend-independent plot data.
+    /// Returns backend-independent plot data for the real and imaginary permeability.
+    #[must_use]
     pub fn plot_permeability(&self) -> crate::plotting::Plot {
         complex_material_plot(
             &self.frequency,
@@ -232,20 +306,27 @@ impl Freespace {
         )
     }
 
-    /// Port of `skrf.media.Freespace.plot_ep_mu` as backend-independent plot data.
+    /// Returns one plot containing complex permittivity and permeability.
+    #[must_use]
     pub fn plot_permittivity_and_permeability(&self) -> crate::plotting::Plot {
         let mut plot = self.plot_permittivity();
-        plot.title = "Relative permittivity and permeability".to_owned();
+        "Relative permittivity and permeability".clone_into(&mut plot.title);
         plot.series.extend(self.plot_permeability().series);
         plot
     }
 }
 
 impl Media for Freespace {
+    /// Returns the medium frequency axis.
     fn frequency(&self) -> &Frequency {
         &self.frequency
     }
 
+    /// Returns the propagation constant
+    /// $\gamma=j\omega\sqrt{\varepsilon\mu}$.
+    ///
+    /// Positive real $\gamma$ denotes attenuation and positive imaginary
+    /// $\gamma$ denotes forward propagation.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         let permittivity = self.permittivity_with_resistivity()?;
         let permeability = self.permeability();
@@ -255,6 +336,8 @@ impl Media for Freespace {
         }))
     }
 
+    /// Returns the characteristic impedance
+    /// `$Z_0=\sqrt{\mu/\varepsilon}$`, unless an override was supplied.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         if let Some(impedance) = &self.characteristic_impedance_override {
             return Ok(impedance.clone());
@@ -271,26 +354,32 @@ impl Media for Freespace {
         }))
     }
 
+    /// Returns the optional port-renormalization impedance.
     fn port_impedance(&self) -> Option<&Array1<Complex64>> {
         self.port_z0.as_ref()
     }
 
+    /// Creates a matched transmission line of the requested length.
     fn line(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.as_defined()?.line(length, unit)
     }
 
+    /// Creates a zero-length through network.
     fn thru(&self) -> Result<Network> {
         self.as_defined()?.thru()
     }
 
+    /// Creates a one-port load with the supplied reflection coefficient.
     fn load(&self, reflection_coefficient: Complex64) -> Result<Network> {
         self.as_defined()?.load(reflection_coefficient)
     }
 
+    /// Creates an ideal open circuit.
     fn open(&self) -> Result<Network> {
         self.as_defined()?.open()
     }
 
+    /// Creates an ideal short circuit.
     fn short(&self) -> Result<Network> {
         self.as_defined()?.short()
     }

@@ -1,11 +1,21 @@
-//! Calibration uncertainty combinatorics.
+//! Calibration sets and calibration uncertainty combinatorics.
 //!
-//! Origin: `skrf/calibration/calibrationSet.py`.
+//! This module provides the [`crate::calibration_set::DotCalibrationSet`] type and functions for
+//! constructing calibrations from corresponding or Cartesian combinations of
+//! measured standards.
 
 use crate::calibration::Calibration;
 use crate::{Error, Network, NetworkSet, Result};
 
-/// Port of `skrf.calibration.calibrationSet.dot_product`.
+/// Constructs calibrations from corresponding observations in each measured set.
+///
+/// All measured sets must have the same non-zero length. Observation `n` from
+/// each set is combined with `ideals` to create calibration `n`.
+///
+/// # Errors
+///
+/// Returns an error if the ideals and measured sets are misaligned or the factory rejects an
+/// observation.
 pub fn dot_product<C, F>(
     ideals: &[Network],
     measured_sets: &[NetworkSet],
@@ -28,7 +38,14 @@ where
         .collect()
 }
 
-/// Port of `skrf.calibration.calibrationSet.cartesian_product`.
+/// Constructs calibrations for the Cartesian product of the measured sets.
+///
+/// Each combination contains one measured network for every ideal standard.
+///
+/// # Errors
+///
+/// Returns an error if the ideals and measured sets are misaligned, a measured set is empty, or
+/// the factory rejects a combination.
 pub fn cartesian_product<C, F>(
     ideals: &[Network],
     measured_sets: &[NetworkSet],
@@ -68,12 +85,28 @@ where
         .collect()
 }
 
-/// Origin: `skrf/calibration/calibrationSet.py::Dot`.
+/// A set of calibrations built from corresponding measured observations.
+///
+/// This supports experimental calibration-uncertainty analysis by applying a
+/// collection of calibrations to the same network.
+///
+/// # References
+///
+/// A. Arsenovic, L. Chen, M. F. Bauwens, H. Li, N. S. Barker, and R. M.
+/// Weikle, "An Experimental Technique for Calibration Uncertainty Analysis,"
+/// *IEEE Transactions on Microwave Theory and Techniques*, vol. 61, no. 1,
+/// pp. 263–269, 2013.
 #[derive(Clone, Debug)]
 pub struct DotCalibrationSet<C> {
+    /// Ideal calibration standards shared by every calibration.
     pub ideals: Vec<Network>,
+    /// Repeated measurements corresponding to the ideal standards.
+    ///
+    /// Every set must contain the same number of observations.
     pub measured_sets: Vec<NetworkSet>,
+    /// Calibrations produced from corresponding observations.
     pub calibrations: Vec<C>,
+    /// Optional name assigned to network sets produced by [`Self::apply`].
     pub name: Option<String>,
 }
 
@@ -81,6 +114,16 @@ impl<C> DotCalibrationSet<C>
 where
     C: Calibration,
 {
+    /// Creates a calibration set using `factory` as the calibration class.
+    ///
+    /// `measured_sets[i]` contains repeated measurements corresponding to
+    /// `ideals[i]`. Each generated calibration uses one observation from every
+    /// measured set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the ideals and measured sets are misaligned or the factory rejects an
+    /// observation.
     pub fn new<F>(
         ideals: Vec<Network>,
         measured_sets: Vec<NetworkSet>,
@@ -99,15 +142,24 @@ where
         })
     }
 
+    /// Returns the number of calibrations in the set.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.calibrations.len()
     }
 
+    /// Returns `true` when the set contains no calibrations.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.calibrations.is_empty()
     }
 
-    /// Port of `CalibrationSet.apply_cal`.
+    /// Applies every calibration to `raw_network` and returns the results as a set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a calibration cannot correct the network or the corrected networks are
+    /// incompatible.
     pub fn apply(&self, raw_network: &Network) -> Result<NetworkSet> {
         NetworkSet::new(
             self.calibrations
@@ -118,12 +170,27 @@ where
         )
     }
 
-    /// Port of `CalibrationSet.apply_cal`.
+    /// Applies every calibration to `raw_network`.
+    ///
+    /// This is an alias for [`Self::apply`], corresponding to scikit-rf's
+    /// `CalibrationSet.apply_cal` method.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the conditions described by [`Self::apply`].
     pub fn apply_cal(&self, raw_network: &Network) -> Result<NetworkSet> {
         self.apply(raw_network)
     }
 
-    /// Port of `CalibrationSet.corrected_sets`.
+    /// Returns the corrected networks grouped by calibration standard.
+    ///
+    /// Each returned set contains one corrected network from every calibration
+    /// for the corresponding element of [`Self::ideals`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if corrected standards cannot be obtained, calibrations return different
+    /// standard counts, or grouped networks are incompatible.
     pub fn corrected_sets(&self) -> Result<Vec<NetworkSet>> {
         let calibrated = self
             .calibrations
@@ -153,6 +220,7 @@ where
     }
 }
 
+/// Validates the dimensions required by [`dot_product`].
 fn validate_measured_sets(ideals: &[Network], measured_sets: &[NetworkSet]) -> Result<()> {
     if measured_sets.len() != ideals.len() || measured_sets.is_empty() {
         return Err(Error::IncompatibleShape(format!(

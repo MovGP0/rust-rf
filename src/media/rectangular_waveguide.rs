@@ -1,39 +1,70 @@
-use super::media::*;
-use super::*;
+//! Single-mode propagation in a homogeneously filled rectangular waveguide.
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{
+    Array1, Complex64, Error, FREE_SPACE_PERMEABILITY, FREE_SPACE_PERMITTIVITY, Frequency, Network,
+    Result, fmt,
+};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Electromagnetic mode family in a rectangular waveguide.
 pub enum WaveguideMode {
+    /// Transverse-electric mode ($`E_z=0`$).
     TransverseElectric,
+    /// Transverse-magnetic mode ($`H_z=0`$).
     TransverseMagnetic,
 }
 
 /// A single mode of a homogeneously filled rectangular waveguide.
 ///
-/// Origin: `skrf/media/rectangularWaveguide.py::RectangularWaveguide`.
+/// Mode indices $(m,n)$ determine the cutoff wavenumber
+/// $$`k_c=\sqrt{(m\pi/a)^2+(n\pi/b)^2`}.$$
 #[derive(Clone, Debug)]
 pub struct RectangularWaveguide {
+    /// Frequencies at which the waveguide is evaluated.
     pub frequency: Frequency,
+    /// Broad-wall dimension $a$ in meters.
     pub width: f64,
+    /// Narrow-wall dimension $b$ in meters.
     pub height: f64,
+    /// TE or TM mode family.
     pub mode: WaveguideMode,
-    pub horizontal_mode_index: usize,
-    pub vertical_mode_index: usize,
+    /// Horizontal mode index $m$.
+    pub horizontal_mode_index: u32,
+    /// Vertical mode index $n$.
+    pub vertical_mode_index: u32,
+    /// Filling material's relative permittivity.
     pub relative_permittivity: Array1<f64>,
+    /// Filling material's relative permeability.
     pub relative_permeability: Array1<f64>,
+    /// Optional wall resistivity in $\Omega\,\mathrm{m}$.
     pub resistivity: Option<Array1<f64>>,
+    /// Optional RMS wall roughness in meters.
     pub roughness: Option<Array1<f64>>,
+    /// Optional port-renormalization impedance.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Optional characteristic-impedance override.
     pub characteristic_impedance_override: Option<Array1<Complex64>>,
 }
 
 impl RectangularWaveguide {
+    /// Creates a rectangular-waveguide mode from geometry and material properties.
+    ///
+    /// If `height` is omitted it defaults to half the width. TM modes require
+    /// both mode indices to be non-zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the geometry or mode indices are invalid, when a
+    /// material-property array has the wrong length or invalid values, or when
+    /// roughness is supplied without valid wall resistivity.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
         width: f64,
         height: Option<f64>,
         mode: WaveguideMode,
-        horizontal_mode_index: usize,
-        vertical_mode_index: usize,
+        horizontal_mode_index: u32,
+        vertical_mode_index: u32,
         relative_permittivity: Array1<f64>,
         relative_permeability: Array1<f64>,
         resistivity: Option<Array1<f64>>,
@@ -133,6 +164,12 @@ impl RectangularWaveguide {
         })
     }
 
+    /// Creates an air-filled dominant $\mathrm{TE}_{10}$ waveguide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `width` is not positive and finite or when the
+    /// generated material arrays are incompatible with `frequency`.
     pub fn dominant_mode(frequency: Frequency, width: f64) -> Result<Self> {
         let points = frequency.points();
         Self::new(
@@ -151,7 +188,11 @@ impl RectangularWaveguide {
         )
     }
 
-    /// Resolves a sidewall conductor name or alias through `skrf.data.materials`.
+    /// Sets wall resistivity from a named entry in [`crate::data::MATERIALS`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `material` is unknown or has no resistivity value.
     pub fn set_resistivity_material(&mut self, material: &str) -> Result<()> {
         let properties = crate::data::MATERIALS
             .get(material.to_ascii_lowercase().as_str())
@@ -163,6 +204,13 @@ impl RectangularWaveguide {
         Ok(())
     }
 
+    /// Derives the broad-wall width from a desired $\mathrm{TE}_{10}$ impedance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the requested impedance or specification frequency
+    /// is invalid, the requested mode cannot propagate, or the derived
+    /// waveguide fails construction validation.
     pub fn from_characteristic_impedance(
         frequency: Frequency,
         characteristic_impedance: f64,
@@ -208,14 +256,20 @@ impl RectangularWaveguide {
         )
     }
 
+    /// Returns absolute permittivity $`\varepsilon=\varepsilon_0\varepsilon_r`$.
+    #[must_use]
     pub fn permittivity(&self) -> Array1<f64> {
         &self.relative_permittivity * FREE_SPACE_PERMITTIVITY
     }
 
+    /// Returns absolute permeability $`\mu=\mu_0\mu_r`$.
+    #[must_use]
     pub fn permeability(&self) -> Array1<f64> {
         &self.relative_permeability * FREE_SPACE_PERMEABILITY
     }
 
+    /// Returns the material wavenumber $`k_0=\omega\sqrt{\mu\varepsilon}`$.
+    #[must_use]
     pub fn characteristic_wavenumber(&self) -> Array1<f64> {
         let permittivity = self.permittivity();
         let permeability = self.permeability();
@@ -225,19 +279,27 @@ impl RectangularWaveguide {
         })
     }
 
+    /// Returns $`k_x=m\pi/a`$.
+    #[must_use]
     pub fn horizontal_wavenumber(&self) -> f64 {
-        self.horizontal_mode_index as f64 * std::f64::consts::PI / self.width
+        f64::from(self.horizontal_mode_index) * std::f64::consts::PI / self.width
     }
 
+    /// Returns $`k_y=n\pi/b`$.
+    #[must_use]
     pub fn vertical_wavenumber(&self) -> f64 {
-        self.vertical_mode_index as f64 * std::f64::consts::PI / self.height
+        f64::from(self.vertical_mode_index) * std::f64::consts::PI / self.height
     }
 
+    /// Returns cutoff wavenumber $`k_c=\sqrt{k_x^2+k_y^2}`$.
+    #[must_use]
     pub fn cutoff_wavenumber(&self) -> f64 {
         self.horizontal_wavenumber()
             .hypot(self.vertical_wavenumber())
     }
 
+    /// Returns cutoff frequency $`f_c=k_c/(2\pi\sqrt{\mu\varepsilon})`$.
+    #[must_use]
     pub fn cutoff_frequency(&self) -> Array1<f64> {
         let permittivity = self.permittivity();
         let permeability = self.permeability();
@@ -247,6 +309,8 @@ impl RectangularWaveguide {
         })
     }
 
+    /// Returns normalized frequency $`f/f_c`$.
+    #[must_use]
     pub fn normalized_frequency(&self) -> Array1<f64> {
         let cutoff = self.cutoff_frequency();
         Array1::from_shape_fn(self.frequency.points(), |point| {
@@ -254,11 +318,19 @@ impl RectangularWaveguide {
         })
     }
 
+    /// Returns guide wavelength $`\lambda_g=2\pi/\beta`$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the propagation constant cannot be evaluated for
+    /// the configured frequencies or wall properties.
     pub fn guide_wavelength(&self) -> Result<Array1<Complex64>> {
         let gamma = self.propagation_constant()?;
         Ok(gamma.mapv(|value| Complex64::new(0.0, std::f64::consts::TAU) / value))
     }
 
+    /// Returns cutoff wavelength $`\lambda_c=2\pi/k_c`$.
+    #[must_use]
     pub fn cutoff_wavelength(&self) -> Array1<f64> {
         let permittivity = self.permittivity();
         let permeability = self.permeability();
@@ -268,6 +340,12 @@ impl RectangularWaveguide {
         })
     }
 
+    /// Returns wall resistivity corrected for surface roughness.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when roughness correction is requested at a
+    /// non-positive frequency.
     pub fn effective_resistivity(&self) -> Result<Option<Array1<f64>>> {
         let Some(resistivity) = &self.resistivity else {
             return Ok(None);
@@ -300,6 +378,12 @@ impl RectangularWaveguide {
         )))
     }
 
+    /// Returns conductor attenuation in nepers per meter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when effective resistivity cannot be evaluated or when
+    /// any configured frequency is at or below cutoff.
     pub fn conductor_attenuation(&self) -> Result<Array1<f64>> {
         let Some(resistivity) = self.effective_resistivity()? else {
             return Ok(Array1::zeros(self.frequency.points()));
@@ -316,7 +400,7 @@ impl RectangularWaveguide {
             let inverse_normalized_squared = normalized[point].powi(-2);
             1.0 / self.height
                 * (angular[point] * permittivity[point] * resistivity[point] / 2.0).sqrt()
-                * (1.0 + 2.0 * self.height / self.width * inverse_normalized_squared)
+                * (2.0 * self.height / self.width).mul_add(inverse_normalized_squared, 1.0)
                 / (1.0 - inverse_normalized_squared).sqrt()
         }))
     }
@@ -332,10 +416,12 @@ impl RectangularWaveguide {
 }
 
 impl Media for RectangularWaveguide {
+    /// Returns the waveguide frequency axis.
     fn frequency(&self) -> &Frequency {
         &self.frequency
     }
 
+    /// Returns the propagation constant, including wall loss when configured.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         let k0 = self.characteristic_wavenumber();
         let cutoff = self.cutoff_wavenumber();
@@ -344,16 +430,17 @@ impl Media for RectangularWaveguide {
             if k0[point] > cutoff {
                 Complex64::new(
                     attenuation[point],
-                    (k0[point].powi(2) - cutoff.powi(2)).sqrt(),
+                    k0[point].mul_add(k0[point], -cutoff.powi(2)).sqrt(),
                 )
             } else if k0[point] < cutoff {
-                Complex64::new((cutoff.powi(2) - k0[point].powi(2)).sqrt(), 0.0)
+                Complex64::new(cutoff.mul_add(cutoff, -k0[point].powi(2)).sqrt(), 0.0)
             } else {
                 Complex64::new(attenuation[point], 0.0)
             }
         }))
     }
 
+    /// Returns TE or TM characteristic impedance, unless overridden.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         if let Some(impedance) = &self.characteristic_impedance_override {
             return Ok(impedance.clone());
@@ -383,26 +470,32 @@ impl Media for RectangularWaveguide {
         ))
     }
 
+    /// Returns the optional port-renormalization impedance.
     fn port_impedance(&self) -> Option<&Array1<Complex64>> {
         self.port_z0.as_ref()
     }
 
+    /// Creates a matched waveguide section of the requested length.
     fn line(&self, length: f64, unit: LengthUnit) -> Result<Network> {
         self.as_defined()?.line(length, unit)
     }
 
+    /// Creates a zero-length through network.
     fn thru(&self) -> Result<Network> {
         self.as_defined()?.thru()
     }
 
+    /// Creates a one-port load with the supplied reflection coefficient.
     fn load(&self, reflection_coefficient: Complex64) -> Result<Network> {
         self.as_defined()?.load(reflection_coefficient)
     }
 
+    /// Creates an ideal open circuit.
     fn open(&self) -> Result<Network> {
         self.as_defined()?.open()
     }
 
+    /// Creates an ideal short circuit.
     fn short(&self) -> Result<Network> {
         self.as_defined()?.short()
     }

@@ -64,8 +64,13 @@ fn detects_impulse_span_and_applies_time_gate() {
     )
     .expect("frequency should be valid");
     let two_impulses = Array3::from_shape_fn((POINTS, 1, 1), |(bin, _, _)| {
-        let angle_one = -std::f64::consts::TAU * bin as f64 / POINTS as f64;
-        let angle_three = -3.0 * std::f64::consts::TAU * bin as f64 / POINTS as f64;
+        let angle_one = -std::f64::consts::TAU
+            * f64::from(u32::try_from(bin).expect("FFT bin should fit in u32"))
+            / f64::from(u32::try_from(POINTS).expect("FFT point count should fit in u32"));
+        let angle_three = -3.0
+            * std::f64::consts::TAU
+            * f64::from(u32::try_from(bin).expect("FFT bin should fit in u32"))
+            / f64::from(u32::try_from(POINTS).expect("FFT point count should fit in u32"));
         Complex64::from_polar(1.0, angle_one) + Complex64::from_polar(0.5, angle_three)
     });
     let z0 = Array2::from_elem((POINTS, 1), Complex64::new(50.0, 0.0));
@@ -92,7 +97,7 @@ fn detects_impulse_span_and_applies_time_gate() {
         Window::Rectangular,
     )
     .expect("centered impulse should pass");
-    for value in passed.s.iter() {
+    for value in &passed.s {
         assert_relative_eq!(value.re, 1.0, epsilon = 1.0e-12);
         assert_relative_eq!(value.im, 0.0, epsilon = 1.0e-12);
     }
@@ -140,7 +145,7 @@ fn supports_all_gate_methods_and_bandstop_mode() {
             },
         )
         .expect("gate method should succeed");
-        for value in passed.s.iter() {
+        for value in &passed.s {
             assert_relative_eq!(value.re, 1.0, epsilon = 1.0e-12);
             assert_relative_eq!(value.im, 0.0, epsilon = 1.0e-12);
         }

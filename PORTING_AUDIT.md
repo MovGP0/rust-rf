@@ -23,9 +23,9 @@ The authoritative audit at upstream commit
   commands exit successfully; production has zero `unwrap()`/`expect()`
   diagnostics. Pedantic/nursery rules remain warning-level by repository
   policy.
-- The native VISA dependency graph is present for Windows x86/x64 and macOS
-  x86_64/aarch64, absent on Linux, and the Windows native adapter type-checks
-  when `RUST_RF_NATIVE_VISA=1`.
+- The native VISA dependency graph is present for Windows x86/x64, absent on
+  macOS and Linux, and the Windows native adapter type-checks when
+  `RUST_RF_NATIVE_VISA=1`.
 
 ## Initial symbol-name snapshot
 

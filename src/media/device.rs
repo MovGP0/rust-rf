@@ -1,27 +1,50 @@
+//! Ideal microwave-device network generators.
+
 use ndarray::Array1;
 use num_complex::Complex64;
 
 use super::Media;
 use crate::{Error, Network, Result};
 
-/// Common behavior of the device types in `skrf.media.device`.
+/// Common behavior of microwave-device generators.
 pub trait Device {
+    /// Return the network representation of the device.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the device network cannot be constructed.
     fn network(&self) -> Result<Network>;
 }
 
 /// Ideal reciprocal matched symmetric directional coupler.
 ///
-/// Origin: `skrf/media/device.py::MatchedSymmetricCoupler`.
+/// Port assignment is insertion, transmit, coupled, and isolated. A three-port
+/// device terminates the fourth port in a match.
 #[derive(Clone, Debug)]
 pub struct MatchedSymmetricCoupler<M> {
+    /// Medium defining frequency and reference impedance.
     pub media: M,
+    /// Complex coupled-arm transmission coefficient.
     pub coupling: Array1<Complex64>,
+    /// Complex through-arm transmission coefficient.
     pub transmission: Array1<Complex64>,
+    /// Complex isolated-arm leakage coefficient.
     pub isolation: Array1<Complex64>,
+    /// Exposed port count, either three or four.
     pub ports: usize,
 }
 
 impl<M: Media> MatchedSymmetricCoupler<M> {
+    /// Construct a matched symmetric coupler from coupling or transmission.
+    ///
+    /// The missing magnitude is derived from $|c|^2+|t|^2=1$. Phase arguments
+    /// are in degrees.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `ports` is not three or four, neither coefficient is
+    /// supplied, or a supplied coefficient array has an incompatible length or
+    /// contains an invalid value.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         media: M,
@@ -76,6 +99,12 @@ impl<M: Media> MatchedSymmetricCoupler<M> {
         })
     }
 
+    /// Construct a zero-phase coupler from a linear coupling magnitude.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `ports` is not three or four or `coupling` is not
+    /// finite or has a magnitude greater than one.
     pub fn from_coupling(media: M, coupling: f64, ports: usize) -> Result<Self> {
         let points = media.frequency().points();
         Self::new(
@@ -88,7 +117,14 @@ impl<M: Media> MatchedSymmetricCoupler<M> {
         )
     }
 
-    /// Port of `MatchedSymmetricCoupler.from_dbdeg`.
+    /// Construct a coupler from coupling in dB and phase offset in degrees.
+    ///
+    /// Coupling sign is ignored and converted as $10^{-|dB|/20}$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `ports` is not three or four or `coupling_db`
+    /// converts to an invalid coupling magnitude.
     pub fn from_db_degrees(
         media: M,
         coupling_db: f64,
@@ -134,11 +170,17 @@ impl<M: Media> Device for MatchedSymmetricCoupler<M> {
     }
 }
 
-/// Ideal 3 dB coupler with configurable common phase.
+/// Ideal 3 dB coupler with configurable common and differential phase.
 #[derive(Clone, Debug)]
 pub struct Hybrid<M>(MatchedSymmetricCoupler<M>);
 
 impl<M: Media> Hybrid<M> {
+    /// Construct an equal-split four-port hybrid.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backing matched symmetric coupler cannot be
+    /// constructed.
     pub fn new(
         media: M,
         transmission_phase_degrees: f64,
@@ -165,11 +207,17 @@ impl<M: Media> Device for Hybrid<M> {
     }
 }
 
-/// Ideal quadrature hybrid.
+/// Ideal 3 dB quadrature hybrid with a $-90^\circ$ coupled-arm offset.
 #[derive(Clone, Debug)]
 pub struct QuadratureHybrid<M>(MatchedSymmetricCoupler<M>);
 
 impl<M: Media> QuadratureHybrid<M> {
+    /// Construct a quadrature hybrid with a common transmission phase.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backing matched symmetric coupler cannot be
+    /// constructed.
     pub fn new(media: M, transmission_phase_degrees: f64) -> Result<Self> {
         let points = media.frequency().points();
         Ok(Self(MatchedSymmetricCoupler::new(
@@ -192,14 +240,24 @@ impl<M: Media> Device for QuadratureHybrid<M> {
     }
 }
 
-/// Ideal 180-degree hybrid.
+/// Ideal 180-degree hybrid for in-phase/out-of-phase combining or division.
+///
+/// Port order is sum $(A+B)$, input A, input B, and difference $(A-B)$.
+/// See [hybrid couplers](http://www.microwaves101.com/encyclopedias/hybrid-couplers).
 #[derive(Clone, Debug)]
 pub struct Hybrid180<M> {
+    /// Medium defining frequency and reference impedance.
     pub media: M,
+    /// Exposed port count, either three or four.
     pub ports: usize,
 }
 
 impl<M: Media> Hybrid180<M> {
+    /// Construct a three- or four-port 180-degree hybrid.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `ports` is not three or four.
     pub fn new(media: M, ports: usize) -> Result<Self> {
         if ports != 3 && ports != 4 {
             return Err(Error::Unsupported(
@@ -232,13 +290,24 @@ impl<M: Media> Device for Hybrid180<M> {
 }
 
 /// Pair of back-to-back three-port directional couplers.
+///
+/// Ports are the insertion ports of couplers 1 and 2 followed by their
+/// respective coupled ports.
 #[derive(Clone, Debug)]
 pub struct DualCoupler<M> {
+    /// First directional coupler.
     pub first: MatchedSymmetricCoupler<M>,
+    /// Second directional coupler.
     pub second: MatchedSymmetricCoupler<M>,
 }
 
 impl<M: Media + Clone> DualCoupler<M> {
+    /// Construct a dual coupler; the second coupling defaults to the first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either coupling is not finite or has a magnitude
+    /// greater than one.
     pub fn new(media: M, first_coupling: f64, second_coupling: Option<f64>) -> Result<Self> {
         Ok(Self {
             first: MatchedSymmetricCoupler::from_coupling(media.clone(), first_coupling, 3)?,

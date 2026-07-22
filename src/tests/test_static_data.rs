@@ -3,6 +3,7 @@
 mod data {
     use rust_rf::data::{DATA, MATERIALS, SKRF_MATPLOTLIB_STYLE};
 
+    /// Checks every embedded network named by the upstream static-data suite.
     #[test]
     fn loads_every_embedded_static_network() {
         let networks = [
@@ -35,6 +36,7 @@ mod data {
         }
     }
 
+    /// Checks material aliases, representative properties, and the embedded plot style.
     #[test]
     fn exposes_material_properties_and_upstream_aliases() {
         assert_eq!(MATERIALS["cu"], MATERIALS["copper"]);
@@ -45,11 +47,11 @@ mod data {
         assert!(SKRF_MATPLOTLIB_STYLE.contains("axes.grid"));
     }
 
+    /// Checks that the unsafe Python pickle calibration fixture is not decoded.
     #[test]
     fn rejects_the_unsafe_python_pickle_calibration_fixture() {
-        let error = match DATA.one_port_calibration() {
-            Ok(_) => panic!("Python pickle should not be decoded"),
-            Err(error) => error,
+        let Err(error) = DATA.one_port_calibration() else {
+            panic!("Python pickle should not be decoded");
         };
         assert!(error.to_string().contains("pickle"));
     }
@@ -61,6 +63,7 @@ mod instances {
     use rust_rf::instances::{INSTANCES, WaveguideBand};
     use rust_rf::media::Media;
 
+    /// Checks the default free-space and 50-ohm free-space instances.
     #[test]
     fn creates_default_air_and_fifty_ohm_air() {
         let air = INSTANCES.air().unwrap();
@@ -73,6 +76,7 @@ mod instances {
         );
     }
 
+    /// Checks every standard WR and WM frequency/waveguide pair.
     #[test]
     fn constructs_every_standard_waveguide_band() {
         for band in WaveguideBand::ALL {
@@ -93,6 +97,7 @@ mod instances {
         }
     }
 
+    /// Checks representative named WR and WM accessors against upstream values.
     #[test]
     fn exposes_named_wr_and_wm_accessors_with_upstream_values() {
         let wr10 = INSTANCES.wr10().unwrap();

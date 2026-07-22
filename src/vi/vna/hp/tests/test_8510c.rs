@@ -1,9 +1,12 @@
 #![allow(dead_code)]
 #![cfg(feature = "visa")]
 
+//! Mock-session integration tests for the HP 8510C driver.
+
 use std::collections::{BTreeMap, VecDeque};
 use std::io::{Read, Write};
 
+use approx::assert_relative_eq;
 use ndarray::Array1;
 use rust_rf::vi::vna::hp::{Hp8510C, Hp8720B};
 use rust_rf::vi::vna::{InstrumentSession, Vna};
@@ -62,15 +65,18 @@ impl InstrumentSession for HpMock {
     }
 }
 
+/// Wraps a mock session as an HP 8510C without hardware initialization.
 fn hp8510(session: HpMock) -> Hp8510C<HpMock> {
     Hp8510C::from_vna(Vna::new("mock", session, None))
 }
 
+/// Wraps a mock session as an HP 8720B for shared HP test support.
 fn hp8720(session: HpMock) -> Hp8720B<HpMock> {
     Hp8720B::from_vna(Vna::new("mock", session, None))
 }
 
 #[test]
+/// Queries identification and frequency state and writes core sweep settings.
 fn hp8510_queries_and_sets_core_parameters() {
     let mut session = HpMock::default();
     session.push_text("OUTPIDEN;", "HP8510C.07.14: Aug 26  1998");
@@ -79,8 +85,8 @@ fn hp8510_queries_and_sets_core_parameters() {
     session.push_text("GROU?", "\"CONTINUAL\"");
     let mut hp = hp8510(session);
     assert_eq!(hp.id().unwrap(), "HP8510C.07.14: Aug 26  1998");
-    assert_eq!(hp.frequency_start().unwrap(), 100.0);
-    assert_eq!(hp.frequency_stop().unwrap(), 200.0);
+    assert_relative_eq!(hp.frequency_start().unwrap(), 100.0, epsilon = 1.0e-12);
+    assert_relative_eq!(hp.frequency_stop().unwrap(), 200.0, epsilon = 1.0e-12);
     assert!(hp.is_continuous().unwrap());
     hp.set_frequency_start(100.0).unwrap();
     hp.set_frequency_stop(200.0).unwrap();
@@ -92,6 +98,7 @@ fn hp8510_queries_and_sets_core_parameters() {
 }
 
 #[test]
+/// Resets the instrument and chooses native or compound sweep programming.
 fn hp8510_resets_and_builds_native_or_compound_sweeps() {
     let mut session = HpMock::default();
     session.push_text("OUTPIDEN;", "HP8510C");
@@ -119,6 +126,7 @@ fn hp8510_resets_and_builds_native_or_compound_sweeps() {
 }
 
 #[test]
+/// Uses a requested sweep plan as the public frequency and point-count state.
 fn hp8510_frequency_property_uses_the_sweep_plan() {
     let frequency = Frequency::from_hz(Array1::linspace(100.0, 200.0, 51)).unwrap();
     let mut hp = hp8510(HpMock::default());
@@ -130,6 +138,7 @@ fn hp8510_frequency_property_uses_the_sweep_plan() {
 }
 
 #[test]
+/// Decodes FORM2 traces and assembles them into the correct two-port matrix.
 fn hp8510_decodes_binary_data_and_assembles_two_ports() {
     let mut session = HpMock::default();
     for _ in 0..4 {
@@ -151,6 +160,7 @@ fn hp8510_decodes_binary_data_and_assembles_two_ports() {
     assert_eq!(network.s[[0, 1, 1]], rust_rf::Complex64::new(4.0, -4.0));
 }
 
+/// Encodes complex test samples in the HP FORM2 binary representation.
 fn hp_form2(values: &[(f32, f32)]) -> Vec<u8> {
     let mut bytes = vec![0, 0, 0, 0];
     for (real, imaginary) in values {

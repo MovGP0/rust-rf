@@ -1,26 +1,65 @@
 //! De-embedding algorithms.
 //!
-//! Origin: `skrf/calibration/deembedding.py`.
+//! De-embedding removes the effects of a test fixture from measurements of a
+//! device or circuit. It is commonly performed after SOLT, TRL, or a similar
+//! calibration has moved the reference plane to a known location such as an
+//! on-wafer probe tip.
+//!
+//! The methods in this module cover lumped open, short, pi, and tee fixture
+//! models as well as IEEE 370 2x-thru fixture extraction and quality metrics.
 
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 use rustfft::FftPlanner;
 
 use super::ensure_nonzero;
 use crate::network::{concatenate_ports, s_to_y, s_to_z, y_to_s, y_to_z, z_to_s, z_to_y};
 use crate::{Error, Frequency, Network, Result};
-/// Origin: `skrf/calibration/deembedding.py::Deembedding`.
+/// Common interface for de-embedding algorithms.
+///
+/// Implementations hold the dummy measurements or extracted fixture models
+/// required to remove parasitics from a measured [`Network`]. The dummy and
+/// device frequency axes must match or be suitable for interpolation.
 pub trait Deembedding {
+    /// Applies the de-embedding correction to `network`.
+    ///
+    /// The returned network represents the device after the fixture or
+    /// parasitic model has been removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input network is incompatible with the
+    /// de-embedding data or the correction cannot be computed.
     fn deembed(&self, network: &Network) -> Result<Network>;
 }
 
-/// Removes forward and reverse VNA switch-term loading from a two-port measurement.
+/// Common helpers for IEEE 370 de-embedding algorithms.
 ///
-/// Common IEEE 370 helpers originating from `skrf/calibration/deembedding.py::IEEEP370`.
+/// These functions implement the shared DC extrapolation, Nyquist-rate-point,
+/// time shift, transmission-line, and lossless peeling operations used by the
+/// IEEE 370 fixture-extraction methods.
+///
+/// # References
+///
+/// - J. Ellison, S. B. Smith, and S. Agili, "Using a 2x-thru standard to
+///   achieve accurate de-embedding of measurements," *Microwave and Optical
+///   Technology Letters*, 2020. [doi:10.1002/mop.32098](https://doi.org/10.1002/mop.32098)
+/// - [IEEE 370 open-source reference implementation](https://opensource.ieee.org/elec-char/ieee-370)
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IeeeP370;
 
 impl IeeeP370 {
+    /// Extrapolates a network to DC using the IEEE 370 NZC algorithm.
+    ///
+    /// This is useful when comparing extracted fixtures and de-embedded
+    /// networks under the same conditions used by the NZC algorithm. An
+    /// existing DC point is replaced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the network has fewer than two frequency samples,
+    /// interpolation fails, or DC extrapolation cannot be computed.
     pub fn extrapolate_to_dc(network: &Network) -> Result<Network> {
         if network.frequency_points() < 2 {
             return Err(Error::InvalidFrequency(
@@ -38,10 +77,24 @@ impl IeeeP370 {
         source.extrapolate_to_dc(None, None)
     }
 
+    /// Extrapolates every S-parameter of a network to DC by interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if DC extrapolation cannot be computed for the
+    /// network.
     pub fn add_dc(network: &Network) -> Result<Network> {
         network.extrapolate_to_dc(None, None)
     }
 
+    /// Creates a perfect matched, lossless, zero-length two-port thru.
+    ///
+    /// The returned network copies the frequency axis, reference impedance,
+    /// and other metadata from `network` while replacing its S-parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is not a two-port network.
     pub fn thru(network: &Network) -> Result<Network> {
         if network.ports() != 2 {
             return Err(Error::IncompatibleShape(
@@ -58,6 +111,13 @@ impl IeeeP370 {
         Ok(thru)
     }
 
+    /// Returns the COM receiver noise filter defined by equation 93A-20.
+    ///
+    /// The expression follows Annex 93A of IEEE 802.3-2022.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `receiver_frequency` is not finite and positive.
     pub fn com_receiver_noise_filter(
         frequencies: &[f64],
         receiver_frequency: f64,
@@ -70,13 +130,15 @@ impl IeeeP370 {
         Ok(Array1::from_iter(frequencies.iter().map(|frequency| {
             let ratio = frequency / receiver_frequency;
             Complex64::new(
-                1.0 - 3.414_214 * ratio.powi(2) + ratio.powi(4),
+                3.414_214f64.mul_add(-ratio.powi(2), 1.0) + ratio.powi(4),
                 2.613_126 * (ratio - ratio.powi(3)),
             )
             .inv()
         })))
     }
 
+    /// Integrates an impulse response to produce a time-domain step response.
+    #[must_use]
     pub fn make_step(impulse: &[f64]) -> Array1<f64> {
         let mut sum = 0.0;
         Array1::from_iter(impulse.iter().map(|value| {
@@ -85,10 +147,13 @@ impl IeeeP370 {
         }))
     }
 
-    /// Symmetrically interpolates a scalar S-parameter to DC from its first
-    /// frequency samples.
+    /// Enforces symmetry on the first frequency samples and interpolates a
+    /// scalar S-parameter to DC.
     ///
-    /// Origin: `skrf/calibration/deembedding.py::IEEEP370.dc_interp`.
+    /// # Errors
+    ///
+    /// Returns an error if the value and frequency arrays differ in length,
+    /// contain fewer than two samples, or contain invalid frequencies.
     pub fn dc_interp(values: &[Complex64], frequencies_hz: &[f64]) -> Result<f64> {
         if values.len() != frequencies_hz.len() || values.len() < 2 {
             return Err(Error::IncompatibleShape(
@@ -133,6 +198,14 @@ impl IeeeP370 {
     /// receiver-filter time-domain constraint.
     ///
     /// Origin: `skrf/calibration/deembedding.py::IEEEP370.DC`.
+    /// Performs advanced reflective DC-point extrapolation.
+    ///
+    /// Iteration stops when the residual falls below `allowed_error`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible input arrays, invalid frequencies or
+    /// tolerance, failed transforms, or a non-convergent iteration.
     pub fn dc(values: &[Complex64], frequencies_hz: &[f64], allowed_error: f64) -> Result<f64> {
         if values.len() != frequencies_hz.len() || values.len() < 2 {
             return Err(Error::IncompatibleShape(
@@ -157,9 +230,11 @@ impl IeeeP370 {
         let time_index = (0..output_length)
             .min_by(|left, right| {
                 let left_time = -1.0 / delta_frequency
-                    + 2.0 / delta_frequency * *left as f64 / output_length as f64;
+                    + 2.0 / delta_frequency * left.to_f64().unwrap_or(f64::INFINITY)
+                        / output_length.to_f64().unwrap_or(f64::INFINITY);
                 let right_time = -1.0 / delta_frequency
-                    + 2.0 / delta_frequency * *right as f64 / output_length as f64;
+                    + 2.0 / delta_frequency * right.to_f64().unwrap_or(f64::INFINITY)
+                        / output_length.to_f64().unwrap_or(f64::INFINITY);
                 (left_time + 3.0e-9)
                     .abs()
                     .total_cmp(&(right_time + 3.0e-9).abs())
@@ -212,6 +287,15 @@ impl IeeeP370 {
     /// reflection spectrum.
     ///
     /// Origin: `skrf/calibration/deembedding.py::IEEEP370.getz`.
+    /// Computes a time-domain impedance step response from one-port S-parameters.
+    ///
+    /// The S-parameters are extrapolated to DC before transforming to the time
+    /// domain. `reference_impedance` is the port reference impedance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid reference impedance, failed DC extraction,
+    /// or a failed inverse transform.
     pub fn getz(
         values: &[Complex64],
         frequencies_hz: &[f64],
@@ -238,6 +322,17 @@ impl IeeeP370 {
         Ok(ifft_shift_real(&shifted_impedance.to_vec()))
     }
 
+    /// Computes the S-parameters of a transmission line.
+    ///
+    /// `line_impedance` is the characteristic impedance,
+    /// `reference_impedance` is the port impedance used for renormalization,
+    /// `propagation` is the frequency-dependent propagation constant, and
+    /// `length` uses the reciprocal length unit of `propagation`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid line parameters or a singular transmission
+    /// line calculation.
     pub fn make_transmission_line(
         line_impedance: f64,
         reference_impedance: f64,
@@ -259,11 +354,13 @@ impl IeeeP370 {
         for (point, gamma) in propagation.iter().enumerate() {
             let sinh = (*gamma * length).sinh();
             let cosh = (*gamma * length).cosh();
-            let denominator = (line_impedance.powi(2) + reference_impedance.powi(2)) * sinh
+            let denominator = line_impedance.mul_add(line_impedance, reference_impedance.powi(2))
+                * sinh
                 + 2.0 * reference_impedance * line_impedance * cosh;
             ensure_nonzero(denominator, "IEEE 370 transmission line is singular")?;
-            let reflection =
-                (line_impedance.powi(2) - reference_impedance.powi(2)) * sinh / denominator;
+            let reflection = line_impedance.mul_add(line_impedance, -reference_impedance.powi(2))
+                * sinh
+                / denominator;
             let transmission = 2.0 * reference_impedance * line_impedance / denominator;
             scattering[(point, 0, 0)] = reflection;
             scattering[(point, 1, 1)] = reflection;
@@ -274,6 +371,15 @@ impl IeeeP370 {
     }
 
     /// Exact-name wrapper for `IEEEP370.makeTL`.
+    /// Computes transmission-line S-parameters.
+    ///
+    /// This snake-case compatibility method forwards to
+    /// [`Self::make_transmission_line`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the conditions documented by
+    /// [`Self::make_transmission_line`].
     pub fn make_tl(
         line_impedance: f64,
         reference_impedance: f64,
@@ -289,6 +395,19 @@ impl IeeeP370 {
     /// removes those delays; `port` restricts removal to one port.
     ///
     /// Origin: `skrf/calibration/deembedding.py::IEEEP370.NRP`.
+    /// Enforces the Nyquist rate point on a transmissive network.
+    ///
+    /// The fixture length is forced to an integer multiple of the wavelength
+    /// at the highest frequency. When `delays` is `None`, the required delay is
+    /// calculated and added; supplied delays are removed to restore the
+    /// original length. `port` limits removal to one zero-based port.
+    ///
+    /// Returns the shifted network and the delay applied to each port.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid port or delay array, invalid frequency
+    /// data, or a failed network delay operation.
     pub fn enforce_nyquist_rate_point(
         network: &Network,
         delays: Option<&Array1<f64>>,
@@ -357,6 +476,14 @@ impl IeeeP370 {
     }
 
     /// Exact-name wrapper for `IEEEP370.NRP`.
+    /// Enforces the Nyquist rate point.
+    ///
+    /// This compatibility method forwards to [`Self::enforce_nyquist_rate_point`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the conditions documented by
+    /// [`Self::enforce_nyquist_rate_point`].
     pub fn nrp(
         network: &Network,
         delays: Option<&Array1<f64>>,
@@ -368,6 +495,13 @@ impl IeeeP370 {
     /// Shifts one network port by an integer number of time samples.
     ///
     /// Origin: `skrf/calibration/deembedding.py::IEEEP370.shiftOnePort`.
+    /// Shifts one zero-based port by `samples` in the time domain.
+    ///
+    /// The shift is implemented by cascading a delay at the selected port.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `port` is outside the network's port range.
     pub fn shift_one_port(network: &Network, samples: isize, port: usize) -> Result<Network> {
         if port >= network.ports() {
             return Err(Error::InvalidPort {
@@ -378,8 +512,10 @@ impl IeeeP370 {
         let points = network.frequency_points();
         let mut result = network.clone();
         for point in 0..points {
-            let omega = std::f64::consts::PI * (point + 1) as f64 / points as f64;
-            let factor = Complex64::from_polar(1.0, -(samples as f64) * omega / 2.0);
+            let omega = std::f64::consts::PI * (point + 1).to_f64().unwrap_or(f64::INFINITY)
+                / points.to_f64().unwrap_or(f64::INFINITY);
+            let factor =
+                Complex64::from_polar(1.0, -samples.to_f64().unwrap_or(f64::NAN) * omega / 2.0);
             for other in 0..network.ports() {
                 result.s[(point, port, other)] *= factor;
                 result.s[(point, other, port)] *= factor;
@@ -391,6 +527,13 @@ impl IeeeP370 {
     /// Shifts every network port by an integer number of time samples.
     ///
     /// Origin: `skrf/calibration/deembedding.py::IEEEP370.shiftNPoints`.
+    /// Shifts the complete network by `samples` in the time domain.
+    ///
+    /// The shift is implemented by cascading delays at every port.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if shifting any network port fails.
     pub fn shift_points(network: &Network, samples: isize) -> Result<Network> {
         let mut result = network.clone();
         for port in 0..network.ports() {
@@ -400,6 +543,14 @@ impl IeeeP370 {
     }
 
     /// Exact-name wrapper for `IEEEP370.shiftNPoints`.
+    /// Shifts the complete network by `samples` in the time domain.
+    ///
+    /// This compatibility method forwards to [`Self::shift_points`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the conditions documented by
+    /// [`Self::shift_points`].
     pub fn shift_n_points(network: &Network, samples: isize) -> Result<Network> {
         Self::shift_points(network, samples)
     }
@@ -408,6 +559,16 @@ impl IeeeP370 {
     /// remaining network plus the accumulated left and right error boxes.
     ///
     /// Origin: `skrf/calibration/deembedding.py::IEEEP370.peelNPointsLossless`.
+    /// Peels `samples` from both sides of a network using a lossless model.
+    ///
+    /// The propagation constant does not need to be determined. The returned
+    /// tuple contains the peeled network, the port-1 error box, and the port-2
+    /// error box, respectively.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible network shape or sample count, or if
+    /// transmission-line construction, inversion, or cascading fails.
     pub fn peel_n_points_lossless(
         network: &Network,
         samples: usize,
@@ -423,7 +584,9 @@ impl IeeeP370 {
         let propagation = Array1::from_iter((0..points).map(|point| {
             Complex64::new(
                 0.0,
-                std::f64::consts::PI * (point + 1) as f64 / points as f64 / 2.0,
+                std::f64::consts::PI * (point + 1).to_f64().unwrap_or(f64::INFINITY)
+                    / points.to_f64().unwrap_or(f64::INFINITY)
+                    / 2.0,
             )
         }));
         let mut remaining = network.clone();
@@ -509,18 +672,24 @@ fn ieee_p370_line_network(
     Network::new(template.frequency.clone(), scattering, z0)
 }
 
-/// Frequency-domain traces used by IEEE 370 fixture electrical requirements.
-///
-/// Origin: `skrf/calibration/deembedding.py::IEEEP370_FER`.
+/// Frequency-domain traces used to check IEEE 370 fixture electrical requirements.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FixtureElectricalRequirements {
+    /// Forward 2x-thru insertion loss in decibels.
     pub insertion_loss_forward_db: Array1<f64>,
+    /// Reverse 2x-thru insertion loss in decibels.
     pub insertion_loss_reverse_db: Array1<f64>,
+    /// Return loss at port 1 in decibels.
     pub return_loss_port1_db: Array1<f64>,
+    /// Return loss at port 2 in decibels.
     pub return_loss_port2_db: Array1<f64>,
+    /// Forward insertion loss minus port-1 return loss, in decibels.
     pub insertion_minus_return_port1_db: Array1<f64>,
+    /// Reverse insertion loss minus port-2 return loss, in decibels.
     pub insertion_minus_return_port2_db: Array1<f64>,
+    /// Forward differential-to-common conversion relative to insertion loss.
     pub differential_to_common_forward_db: Option<Array1<f64>>,
+    /// Reverse differential-to-common conversion relative to insertion loss.
     pub differential_to_common_reverse_db: Option<Array1<f64>>,
 }
 
@@ -529,24 +698,45 @@ pub struct FixtureElectricalRequirements {
 /// The upstream class renders these values with Matplotlib. The Rust port
 /// returns the traces so any plotting backend can apply the standard limits.
 ///
-/// Origin: `skrf/calibration/deembedding.py::IEEEP370_FER`.
+///
+/// The requirements are defined by *IEEE Standard for Electrical
+/// Characterization of Printed Circuit Board and Related Interconnects at
+/// Frequencies up to 50 GHz*, IEEE 370-2020.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IeeeP370FixtureElectricalRequirements;
 
 impl IeeeP370FixtureElectricalRequirements {
+    /// FER1 minimum insertion-loss limit for class A, in decibels.
     pub const FER1_MINIMUM_A_DB: f64 = -10.0;
+    /// FER1 minimum insertion-loss limit for classes B and C, in decibels.
     pub const FER1_MINIMUM_BC_DB: f64 = -15.0;
+    /// FER2 maximum return-loss limit for class A, in decibels.
     pub const FER2_MAXIMUM_A_DB: f64 = -20.0;
+    /// FER2 maximum return-loss limit for class B, in decibels.
     pub const FER2_MAXIMUM_B_DB: f64 = -10.0;
+    /// FER2 maximum return-loss limit for class C, in decibels.
     pub const FER2_MAXIMUM_C_DB: f64 = -6.0;
+    /// FER3 minimum insertion-loss-minus-return-loss limit for class A.
     pub const FER3_MINIMUM_A_DB: f64 = 5.0;
+    /// FER3 minimum insertion-loss-minus-return-loss limit for classes B and C.
     pub const FER3_MINIMUM_BC_DB: f64 = 0.0;
+    /// FER5 relative impedance-variation limit for class A.
     pub const FER5_RELATIVE_A: f64 = 0.025;
+    /// FER5 relative impedance-variation limit for class B.
     pub const FER5_RELATIVE_B: f64 = 0.05;
+    /// FER5 relative impedance-variation limit for class C.
     pub const FER5_RELATIVE_C: f64 = 0.1;
+    /// FER6 maximum differential-to-common conversion limit, in decibels.
     pub const FER6_MAXIMUM_DB: f64 = -15.0;
 
-    /// Origin: `IEEEP370_FER.plot_fd_se_fer` without renderer side effects.
+    /// Calculates single-ended frequency-domain FER traces for a two-port 2x-thru.
+    ///
+    /// This is the data-producing counterpart of scikit-rf's
+    /// `plot_fd_se_fer`; it does not select a plotting backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is not a two-port network.
     pub fn single_ended(network: &Network) -> Result<FixtureElectricalRequirements> {
         if network.ports() != 2 {
             return Err(Error::IncompatibleShape(
@@ -556,7 +746,15 @@ impl IeeeP370FixtureElectricalRequirements {
         Ok(ieee_p370_fer_traces(network, false))
     }
 
-    /// Origin: `IEEEP370_FER.plot_fd_mm_fer` without renderer side effects.
+    /// Calculates mixed-mode frequency-domain FER traces for a four-port 2x-thru.
+    ///
+    /// The network is transformed to mixed mode before differential and
+    /// common-mode fixture requirements are evaluated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is not a four-port network or mixed-mode
+    /// conversion fails.
     pub fn mixed_mode(network: &Network) -> Result<FixtureElectricalRequirements> {
         if network.ports() != 4 {
             return Err(Error::IncompatibleShape(
@@ -606,37 +804,61 @@ fn ieee_p370_fer_traces(network: &Network, mixed_mode: bool) -> FixtureElectrica
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Qualitative IEEE 370 assessment of a quality metric.
 pub enum QualityEvaluation {
+    /// The metric fails the poor-quality threshold.
     Poor,
+    /// The metric falls in the inconclusive range.
     Inconclusive,
+    /// The metric is acceptable but not in the best range.
     Acceptable,
+    /// The metric meets the good-quality threshold.
     Good,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// A frequency-domain quality value and its qualitative assessment.
 pub struct QualityMetric {
+    /// Quality value expressed as a percentage.
     pub value_percent: f64,
+    /// Interpretation of [`Self::value_percent`].
     pub evaluation: QualityEvaluation,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// IEEE 370 initial frequency-domain quality metrics.
 pub struct FrequencyDomainQuality {
+    /// Initial causality quality metric (`CQMi`).
     pub causality: QualityMetric,
+    /// Initial passivity quality metric (`PQMi`).
     pub passivity: QualityMetric,
+    /// Initial reciprocity quality metric (`RQMi`).
     pub reciprocity: QualityMetric,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Frequency-domain quality metrics for differential and common modes.
 pub struct MixedModeFrequencyDomainQuality {
+    /// Quality metrics for the differential-mode sub-network.
     pub differential: FrequencyDomainQuality,
+    /// Quality metrics for the common-mode sub-network.
     pub common: FrequencyDomainQuality,
 }
 
-/// Origin: `skrf/calibration/deembedding.py::IEEEP370_FD_QM`.
+/// IEEE 370 initial quality checks at the measured frequency samples.
+///
+/// Passivity (`PQMi`), reciprocity (`RQMi`), and causality (`CQMi`) are evaluated on
+/// the original S-parameters in the frequency domain according to IEEE
+/// 370-2020.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IeeeP370FrequencyDomainQuality;
 
 impl IeeeP370FrequencyDomainQuality {
+    /// Calculates the initial causality quality metric (`CQMi`), in percent.
+    ///
+    /// Causality is estimated by checking that complex S-parameter traces
+    /// rotate clockwise between consecutive frequency samples.
+    #[must_use]
     pub fn check_causality(network: &Network) -> f64 {
         let points = network.frequency_points();
         if points < 3 {
@@ -656,7 +878,7 @@ impl IeeeP370FrequencyDomainQuality {
                         network.s[(point + 1, output, input)] - network.s[(point, output, input)];
                     let next = network.s[(point + 2, output, input)]
                         - network.s[(point + 1, output, input)];
-                    let rotation = next.re * current.im - next.im * current.re;
+                    let rotation = next.im.mul_add(-current.re, next.re * current.im);
                     if rotation > 0.0 {
                         positive += rotation;
                     }
@@ -673,6 +895,14 @@ impl IeeeP370FrequencyDomainQuality {
         minimum
     }
 
+    /// Calculates the initial passivity quality metric (`PQMi`), in percent.
+    ///
+    /// The spectral norm of the S-parameter matrix must be at most one at
+    /// every frequency. This metric is undefined for one-port networks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is a one-port network.
     pub fn check_passivity(network: &Network) -> Result<f64> {
         if network.ports() == 1 {
             return Err(Error::Unsupported(
@@ -690,9 +920,21 @@ impl IeeeP370FrequencyDomainQuality {
                 }
             })
             .sum::<f64>();
-        Ok(((points as f64 - penalty).max(0.0) / points as f64) * 100.0)
+        Ok(
+            ((points.to_f64().unwrap_or(f64::INFINITY) - penalty).max(0.0)
+                / points.to_f64().unwrap_or(f64::INFINITY))
+                * 100.0,
+        )
     }
 
+    /// Calculates the initial reciprocity quality metric (`RQMi`), in percent.
+    ///
+    /// The metric integrates the absolute difference between $S_{ij}$ and
+    /// $S_{ji}$ over frequency. It is undefined for one-port networks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is a one-port network.
     pub fn check_reciprocity(network: &Network) -> Result<f64> {
         if network.ports() == 1 {
             return Err(Error::Unsupported(
@@ -709,7 +951,7 @@ impl IeeeP370FrequencyDomainQuality {
                         (network.s[(point, row, column)] - network.s[(point, column, row)]).norm()
                     })
                     .sum::<f64>()
-                    / (ports * (ports - 1)) as f64;
+                    / (ports * (ports - 1)).to_f64().unwrap_or(f64::INFINITY);
                 if difference > 1.0e-6 {
                     (difference - 1.0e-6) / 0.1
                 } else {
@@ -717,9 +959,18 @@ impl IeeeP370FrequencyDomainQuality {
                 }
             })
             .sum::<f64>();
-        Ok(((points as f64 - penalty).max(0.0) / points as f64) * 100.0)
+        Ok(
+            ((points.to_f64().unwrap_or(f64::INFINITY) - penalty).max(0.0)
+                / points.to_f64().unwrap_or(f64::INFINITY))
+                * 100.0,
+        )
     }
 
+    /// Checks causality, passivity, and reciprocity of a single-ended network.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the passivity or reciprocity metric is undefined.
     pub fn check_single_ended(network: &Network) -> Result<FrequencyDomainQuality> {
         let causality = Self::check_causality(network);
         let passivity = Self::check_passivity(network)?;
@@ -740,9 +991,15 @@ impl IeeeP370FrequencyDomainQuality {
         })
     }
 
-    /// Checks the differential and common sub-networks of a four-port network.
+    /// Checks differential and common modes of a four-port single-ended network.
     ///
-    /// Origin: `skrf/calibration/deembedding.py::IEEEP370_FD_QM.check_mm_quality`.
+    /// The input is transformed to mixed mode and only its differential and
+    /// common two-port sub-networks are evaluated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is not a four-port network, conversion or
+    /// sub-network extraction fails, or a metric is undefined.
     pub fn check_mixed_mode(network: &Network) -> Result<MixedModeFrequencyDomainQuality> {
         if network.ports() != 4 {
             return Err(Error::IncompatibleShape(
@@ -757,36 +1014,68 @@ impl IeeeP370FrequencyDomainQuality {
     }
 }
 
-/// Core signal helpers from `skrf/calibration/deembedding.py::IEEEP370_TD_QM`.
+/// IEEE 370 application-based quality checks in the time domain.
+///
+/// Causal, passive, and reciprocal models are reconstructed and stimulated by
+/// a pulse. Their differences from the original response are integrated to
+/// produce causality (`CQMa`), passivity (`PQMa`), and reciprocity (`RQMa`) metrics
+/// in millivolts.
 #[derive(Clone, Copy, Debug)]
 pub struct IeeeP370TimeDomainQuality {
+    /// Application data rate in bits per second.
     pub data_rate: f64,
+    /// Number of samples per unit interval.
     pub samples_per_unit_interval: usize,
+    /// Ratio of the 20%–80% rise time to the pulse width.
     pub rise_time_fraction: f64,
+    /// Pulse shape: `1` Gaussian, `2` Butterworth-filtered rectangular, or `3`
+    /// Gaussian-filtered rectangular.
     pub pulse_shape: usize,
+    /// High-frequency extrapolation: `1` constant or `2` zero padding.
     pub extrapolation: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// An application-based time-domain quality value and assessment.
 pub struct TimeDomainQualityMetric {
+    /// Worst-case pulse-response difference in millivolts.
     pub value_millivolts: f64,
+    /// Interpretation of [`Self::value_millivolts`].
     pub evaluation: QualityEvaluation,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// IEEE 370 application-based time-domain quality metrics.
 pub struct TimeDomainQuality {
+    /// Application-based causality metric (`CQMa`).
     pub causality: TimeDomainQualityMetric,
+    /// Application-based passivity metric (`PQMa`).
     pub passivity: TimeDomainQualityMetric,
+    /// Application-based reciprocity metric (`RQMa`).
     pub reciprocity: TimeDomainQualityMetric,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Time-domain quality metrics for differential and common modes.
 pub struct MixedModeTimeDomainQuality {
+    /// Quality metrics for the differential-mode sub-network.
     pub differential: TimeDomainQuality,
+    /// Quality metrics for the common-mode sub-network.
     pub common: TimeDomainQuality,
 }
 
 impl IeeeP370TimeDomainQuality {
+    /// Creates an application-based time-domain quality checker.
+    ///
+    /// `pulse_shape` accepts `1` for Gaussian, `2` for a rectangular pulse
+    /// with a Butterworth filter, or `3` for a rectangular pulse with a
+    /// Gaussian filter. `extrapolation` accepts `1` for constant extrapolation
+    /// or `2` for zero padding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid data rate, sampling, rise-time, pulse-shape,
+    /// or extrapolation parameters.
     pub fn new(
         data_rate: f64,
         samples_per_unit_interval: usize,
@@ -828,13 +1117,21 @@ impl IeeeP370TimeDomainQuality {
         })
     }
 
+    /// Adds the negative-frequency complex conjugates required by an IFFT.
+    #[must_use]
     pub fn add_conjugates(values: &[Complex64]) -> Array1<Complex64> {
         let mut output = Vec::with_capacity(values.len().saturating_mul(2).saturating_sub(1));
         output.extend_from_slice(values);
-        output.extend(values.iter().skip(1).rev().map(|value| value.conj()));
+        output.extend(values.iter().skip(1).rev().map(num_complex::Complex::conj));
         Array1::from_vec(output)
     }
 
+    /// Creates the reciprocal of a network by transposing each S-matrix.
+    ///
+    /// This does not average the original with its transpose. The reciprocal
+    /// response is retained for comparison so non-reciprocity produces a
+    /// larger time-domain metric.
+    #[must_use]
     pub fn create_reciprocal(network: &Network) -> Network {
         let mut reciprocal = network.clone();
         for point in 0..network.frequency_points() {
@@ -847,9 +1144,13 @@ impl IeeeP370TimeDomainQuality {
         reciprocal
     }
 
-    /// Clips singular values above one at every frequency sample.
+    /// Creates a passivity-enforced network.
     ///
-    /// Origin: `skrf/calibration/deembedding.py::IEEEP370_TD_QM.create_passive`.
+    /// Singular values greater than one are clipped at every frequency sample.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if singular-value decomposition fails.
     pub fn create_passive(network: &Network) -> Result<Network> {
         let ports = network.ports();
         let mut passive = network.clone();
@@ -878,16 +1179,26 @@ impl IeeeP370TimeDomainQuality {
         Ok(passive)
     }
 
-    /// Extrapolates to DC on a harmonic frequency axis for TD reconstruction.
+    /// Extrapolates to DC on a harmonic frequency axis for time-domain reconstruction.
     ///
-    /// Origin: `skrf/calibration/deembedding.py::IEEEP370_TD_QM.extrapolate_to_dc`.
+    /// # Errors
+    ///
+    /// Returns an error under the conditions documented by
+    /// [`IeeeP370::extrapolate_to_dc`].
     pub fn extrapolate_to_dc(network: &Network) -> Result<Network> {
         IeeeP370::extrapolate_to_dc(network)
     }
 
-    /// Computes application-based IEEE 370 time-domain quality metrics.
+    /// Checks a single-ended network using application-based time-domain metrics.
     ///
-    /// Origin: `skrf/calibration/deembedding.py::IEEEP370_TD_QM.check_se_quality`.
+    /// The original response is compared with reconstructed causal, passive,
+    /// and reciprocal responses. Results estimate worst-case bit-sequence
+    /// distortion in millivolts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible input shape or if extrapolation,
+    /// reconstruction, response generation, or comparison fails.
     pub fn check_single_ended(&self, network: &Network) -> Result<TimeDomainQuality> {
         if network.ports() < 2 || network.frequency_points() < 2 {
             return Err(Error::IncompatibleShape(
@@ -896,22 +1207,22 @@ impl IeeeP370TimeDomainQuality {
             ));
         }
         let original = Self::extrapolate_to_dc(network)?;
-        let causal = ieee_p370_causal_model(&original)?;
+        let causal = ieee_p370_causal_model(&original);
         let passive = Self::create_passive(&original)?;
         let reciprocal = Self::create_reciprocal(&original);
-        let original_response = self.application_response(&original)?;
+        let original_response = self.application_response(&original);
         let causality = ieee_p370_response_difference(
-            &self.application_response(&causal)?,
+            &self.application_response(&causal),
             &original_response,
             self.samples_per_unit_interval,
         )?;
         let passivity = ieee_p370_response_difference(
-            &self.application_response(&passive)?,
+            &self.application_response(&passive),
             &original_response,
             self.samples_per_unit_interval,
         )?;
         let reciprocity = ieee_p370_response_difference(
-            &self.application_response(&reciprocal)?,
+            &self.application_response(&reciprocal),
             &original_response,
             self.samples_per_unit_interval,
         )?;
@@ -924,7 +1235,13 @@ impl IeeeP370TimeDomainQuality {
 
     /// Checks differential and common modes of a four-port network.
     ///
-    /// Origin: `skrf/calibration/deembedding.py::IEEEP370_TD_QM.check_mm_quality`.
+    /// The input is transformed from single-ended to mixed-mode representation
+    /// before its differential and common two-port sub-networks are evaluated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `network` is not a four-port network or conversion,
+    /// sub-network extraction, or time-domain quality evaluation fails.
     pub fn check_mixed_mode(&self, network: &Network) -> Result<MixedModeTimeDomainQuality> {
         if network.ports() != 4 {
             return Err(Error::IncompatibleShape(
@@ -938,12 +1255,12 @@ impl IeeeP370TimeDomainQuality {
         })
     }
 
-    fn application_response(&self, network: &Network) -> Result<Array3<f64>> {
+    fn application_response(&self, network: &Network) -> Array3<f64> {
         let points = network.frequency_points();
         let length = 2 * points - 1;
         let frequencies = network.frequency.values_hz();
         let step = frequencies[1] - frequencies[0];
-        let time_step = 1.0 / (2.0 * frequencies[points - 1] + step);
+        let time_step = 1.0 / 2.0f64.mul_add(frequencies[points - 1], step);
         let pulse = ieee_p370_pulse_spectrum(
             length,
             time_step,
@@ -982,25 +1299,43 @@ impl IeeeP370TimeDomainQuality {
                 }
             }
         }
-        Ok(response)
+        response
     }
 
+    /// Computes the sample shift between two otherwise identical time-domain signals.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the signals differ in length or are empty.
     pub fn align_signals(first: &[f64], second: &[f64]) -> Result<isize> {
         if first.len() != second.len() || first.is_empty() {
             return Err(Error::IncompatibleShape(
                 "IEEE 370 signal alignment requires equal non-empty arrays".to_owned(),
             ));
         }
-        let search = 1000.min(first.len().div_ceil(10));
+        let search = isize::try_from(1000.min(first.len().div_ceil(10))).map_err(|_| {
+            Error::Unsupported("signal alignment search window exceeds isize".to_owned())
+        })?;
         let mut best_shift = 0;
         let mut best_error = f64::INFINITY;
-        for shift in -(search as isize)..=search as isize {
+        for shift in -search..=search {
+            let shift_magnitude = shift.unsigned_abs() % second.len();
             let error = first
                 .iter()
                 .enumerate()
                 .map(|(index, value)| {
-                    let shifted =
-                        (index as isize - shift).rem_euclid(second.len() as isize) as usize;
+                    let shifted = if shift.is_negative() {
+                        let wrap_boundary = second.len() - shift_magnitude;
+                        if index >= wrap_boundary {
+                            index - wrap_boundary
+                        } else {
+                            index + shift_magnitude
+                        }
+                    } else if index >= shift_magnitude {
+                        index - shift_magnitude
+                    } else {
+                        second.len() - (shift_magnitude - index)
+                    };
                     (value - second[shifted]).powi(2)
                 })
                 .sum::<f64>();
@@ -1013,7 +1348,7 @@ impl IeeeP370TimeDomainQuality {
     }
 }
 
-fn ieee_p370_causal_model(network: &Network) -> Result<Network> {
+fn ieee_p370_causal_model(network: &Network) -> Network {
     let points = network.frequency_points();
     let frequencies = network.frequency.values_hz();
     let mut causal = network.clone();
@@ -1038,9 +1373,9 @@ fn ieee_p370_causal_model(network: &Network) -> Result<Network> {
             for value in magnitude_time.iter_mut().skip(points) {
                 *value = -*value;
             }
-            magnitude_time
-                .iter_mut()
-                .for_each(|value| *value *= Complex64::i());
+            for value in &mut magnitude_time {
+                *value *= Complex64::i();
+            }
             let enforced_phase = calibration_fft(&magnitude_time, false);
             let phase = crate::math::unwrap_radians(&Array1::from_iter(
                 values.iter().map(|value| -value.arg()),
@@ -1056,13 +1391,13 @@ fn ieee_p370_causal_model(network: &Network) -> Result<Network> {
             for point in 0..points {
                 causal.s[(point, output, input)] = Complex64::from_polar(
                     values[point].norm(),
-                    -enforced_phase[point].re
-                        - 2.0 * std::f64::consts::PI * frequencies[point] * delay,
+                    (2.0 * std::f64::consts::PI * frequencies[point])
+                        .mul_add(-delay, -enforced_phase[point].re),
                 );
             }
         }
     }
-    Ok(causal)
+    causal
 }
 
 fn ieee_p370_response_difference(
@@ -1107,8 +1442,10 @@ fn calibration_fft(values: &[Complex64], inverse: bool) -> Vec<Complex64> {
     let mut planner = FftPlanner::new();
     if inverse {
         planner.plan_fft_inverse(output.len()).process(&mut output);
-        let scale = output.len() as f64;
-        output.iter_mut().for_each(|value| *value /= scale);
+        let scale = output.len().to_f64().unwrap_or(f64::INFINITY);
+        for value in &mut output {
+            *value /= scale;
+        }
     } else {
         planner.plan_fft_forward(output.len()).process(&mut output);
     }
@@ -1127,22 +1464,41 @@ fn ieee_p370_pulse_spectrum(
         let half = (length - 1) / 2;
         let sigma =
             rise_time_fraction / (data_rate * ((-0.2_f64.ln()).sqrt() - (-0.8_f64.ln()).sqrt()));
-        let start = (1.5 / (data_rate * time_step)).round() as isize - 1;
+        let start = (1.5 / (data_rate * time_step))
+            .round()
+            .to_isize()
+            .unwrap_or(isize::MAX)
+            - 1;
         for (index, value) in pulse.iter_mut().enumerate() {
-            let source = (index as isize + half as isize - start).rem_euclid(length as isize);
-            let time = (source - half as isize) as f64 * time_step;
+            let source = (index.to_isize().unwrap_or(isize::MAX)
+                + half.to_isize().unwrap_or(isize::MAX)
+                - start)
+                .rem_euclid(length.to_isize().unwrap_or(isize::MAX));
+            let time = (source - half.to_isize().unwrap_or(isize::MAX))
+                .to_f64()
+                .unwrap_or(f64::NAN)
+                * time_step;
             *value = (-(time / sigma).powi(2)).exp();
         }
     } else {
-        let high = (1.0 / (data_rate * time_step)).round().max(1.0) as usize;
-        let rise = (high as f64 * 1.4 * rise_time_fraction).round().max(1.0) as usize;
+        let high = (1.0 / (data_rate * time_step))
+            .round()
+            .max(1.0)
+            .to_usize()
+            .unwrap_or(length);
+        let rise = (high.to_f64().unwrap_or(f64::INFINITY) * 1.4 * rise_time_fraction)
+            .round()
+            .max(1.0)
+            .to_usize()
+            .unwrap_or(high);
         for (index, value) in pulse.iter_mut().enumerate() {
             *value = if index < rise {
-                index as f64 / rise as f64
+                index.to_f64().unwrap_or(f64::INFINITY) / rise.to_f64().unwrap_or(f64::INFINITY)
             } else if index < high + rise {
                 1.0
             } else if index < high + 2 * rise {
-                1.0 - (index - high - rise) as f64 / rise as f64
+                1.0 - (index - high - rise).to_f64().unwrap_or(f64::INFINITY)
+                    / rise.to_f64().unwrap_or(f64::INFINITY)
             } else {
                 0.0
             };
@@ -1199,7 +1555,8 @@ fn evaluate_passivity_or_reciprocity(value: f64) -> QualityEvaluation {
 
 fn calibration_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f64 {
     let ports = scattering.dim().1;
-    let mut vector = vec![Complex64::new(1.0 / (ports as f64).sqrt(), 0.0); ports];
+    let mut vector =
+        vec![Complex64::new(1.0 / ports.to_f64().unwrap_or(f64::INFINITY).sqrt(), 0.0,); ports];
     let mut singular = 0.0;
     for _ in 0..32 {
         let transformed = (0..ports)
@@ -1211,7 +1568,7 @@ fn calibration_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f6
             .collect::<Vec<_>>();
         singular = transformed
             .iter()
-            .map(|value| value.norm_sqr())
+            .map(num_complex::Complex::norm_sqr)
             .sum::<f64>()
             .sqrt();
         let adjoint = (0..ports)
@@ -1223,7 +1580,7 @@ fn calibration_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f6
             .collect::<Vec<_>>();
         let norm = adjoint
             .iter()
-            .map(|value| value.norm_sqr())
+            .map(num_complex::Complex::norm_sqr)
             .sum::<f64>()
             .sqrt();
         if norm == 0.0 {
@@ -1238,17 +1595,55 @@ fn calibration_spectral_norm(scattering: &Array3<Complex64>, point: usize) -> f6
 
 /// IEEE 370 single-ended non-zero-crossing 2x-thru fixture extraction.
 ///
-/// This ports the upstream impedance-transform split selected by
-/// `use_z_instead_ifft`, which is deterministic and does not require a plotting backend.
+/// A single 2x-thru (FIX–FIX) measurement is split into left and right fixture
+/// error boxes. Applying [`Deembedding::deembed`] removes both error boxes from
+/// a FIX–DUT–FIX measurement.
+///
+/// The impedance-transform split is deterministic and does not require a
+/// plotting backend. [`Self::new_time_gated`] provides the IEEE 370
+/// reflection-gating alternative.
+///
+/// ```text
+///  FIX-1    DUT      FIX-2
+///  +----+   +----+   +----+
+/// -|1  2|---|1  2|---|2  1|-
+///  +----+   +----+   +----+
+/// ```
+///
+/// Fixture 2 is stored flipped to match the scikit-rf convention.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, IeeeP370SeNzc2xThru};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let two_x_thru = Network::read_touchstone("2xthru.s2p")?;
+/// let fixture_dut_fixture = Network::read_touchstone("f-dut-f.s2p")?;
+/// let method = IeeeP370SeNzc2xThru::new(two_x_thru, Some("2xthru".into()))?;
+/// let device = method.deembed(&fixture_dut_fixture)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct IeeeP370SeNzc2xThru {
+    /// Measured single-ended 2x-thru (FIX–FIX) network.
     pub two_x_thru: Network,
+    /// Extracted fixture error box on side 1.
     pub side1: Network,
+    /// Extracted fixture error box on side 2, using the scikit-rf orientation.
     pub side2: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl IeeeP370SeNzc2xThru {
+    /// Extracts NZC fixture models using the impedance-transform split.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the dummy is invalid or fixture extraction fails.
     pub fn new(two_x_thru: Network, name: Option<String>) -> Result<Self> {
         validate_two_port_dummy(&two_x_thru)?;
         let (side1, side2) = Self::split_two_x_thru(&two_x_thru)?;
@@ -1260,6 +1655,12 @@ impl IeeeP370SeNzc2xThru {
         })
     }
 
+    /// Splits a single-ended 2x-thru into side-1 and side-2 fixture models.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the dummy is invalid or impedance conversion,
+    /// network construction, or fixture flipping fails.
     pub fn split_two_x_thru(two_x_thru: &Network) -> Result<(Network, Network)> {
         validate_two_port_dummy(two_x_thru)?;
         let impedance = two_x_thru.impedance()?;
@@ -1292,7 +1693,17 @@ impl IeeeP370SeNzc2xThru {
         Ok((side1, side2))
     }
 
-    /// Builds an NZC fixture using the upstream time-gated reflection split.
+    /// Extracts NZC fixture models using the time-gated reflection split.
+    ///
+    /// `forced_split_impedance` overrides the split-plane impedance. This can
+    /// improve extraction for a 2x-thru too short to isolate the split plane
+    /// from launch reflections, although the extracted fixtures may still
+    /// contain reflections from the opposite launch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the dummy or forced impedance is invalid, or
+    /// time-gated fixture extraction fails.
     pub fn new_time_gated(
         two_x_thru: Network,
         forced_split_impedance: Option<f64>,
@@ -1309,8 +1720,18 @@ impl IeeeP370SeNzc2xThru {
         })
     }
 
-    /// Origin: `IEEEP370_SE_NZC_2xThru.split2xthru` with
-    /// `use_z_instead_ifft=False`.
+    /// Splits a 2x-thru by time-gating its reflections.
+    ///
+    /// The method gates $S_{11}$ and $S_{22}$, selects continuous roots of
+    /// transmission corrected by return loss, and remixes the terms according
+    /// to the fixture signal-flow graph. It is deliberately robust, though its
+    /// results are less refined than impedance-corrected extraction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid dummy data or split impedance, failed
+    /// interpolation or renormalization, singular transmission, or failed
+    /// fixture construction.
     pub fn split_two_x_thru_time_gated(
         two_x_thru: &Network,
         forced_split_impedance: Option<f64>,
@@ -1340,18 +1761,22 @@ impl IeeeP370SeNzc2xThru {
         let working_step = working_values[1] - working_values[0];
         let harmonic =
             (working_step - working_values[0]).abs() <= 1.0e-6 * working_values[0].abs().max(1.0);
-        let mut interpolated = false;
-        if !harmonic {
+        let interpolated = if harmonic {
+            false
+        } else {
             let projected_points = (working_values[working_values.len() - 1] / working_values[0])
                 .round()
-                .clamp(2.0, 10_000.0) as usize;
-            let step = working_values[working_values.len() - 1] / projected_points as f64;
+                .clamp(2.0, 10_000.0)
+                .to_usize()
+                .unwrap_or(10_000);
+            let step = working_values[working_values.len() - 1]
+                / projected_points.to_f64().unwrap_or(f64::INFINITY);
             let frequency = Frequency::from_hz(Array1::from_iter(
-                (1..=projected_points).map(|index| step * index as f64),
+                (1..=projected_points).map(|index| step * index.to_f64().unwrap_or(f64::INFINITY)),
             ))?;
             working = working.interpolate(&frequency)?;
-            interpolated = true;
-        }
+            true
+        };
         if has_dc || interpolated {
             let (mut side1, mut side2) =
                 Self::split_two_x_thru_time_gated(&working, forced_split_impedance)?;
@@ -1364,10 +1789,16 @@ impl IeeeP370SeNzc2xThru {
                 side2.interpolate(&original_frequency)?,
             ));
         }
-        let frequencies = working.frequency.values_hz();
+        Self::split_harmonic_two_x_thru_time_gated(&working, forced_split_impedance)
+    }
+
+    fn split_harmonic_two_x_thru_time_gated(
+        two_x_thru: &Network,
+        forced_split_impedance: Option<f64>,
+    ) -> Result<(Network, Network)> {
+        let frequencies = two_x_thru.frequency.values_hz();
         let step = frequencies[1] - frequencies[0];
         debug_assert!((step - frequencies[0]).abs() <= 1.0e-6 * frequencies[0].abs().max(1.0));
-        let two_x_thru = &working;
         let with_dc = IeeeP370::extrapolate_to_dc(two_x_thru)?;
         let transmission = (0..with_dc.frequency_points())
             .map(|point| with_dc.s[(point, 1, 0)])
@@ -1377,8 +1808,7 @@ impl IeeeP370SeNzc2xThru {
             .iter()
             .enumerate()
             .max_by(|(_, left), (_, right)| left.total_cmp(right))
-            .map(|(index, _)| index)
-            .unwrap_or(0);
+            .map_or(0, |(index, _)| index);
         let impedance_profile = ieee_p370_impedance_profile(two_x_thru, 0)?;
         let split_impedance = if let Some(impedance) = forced_split_impedance {
             if !impedance.is_finite() || impedance <= 0.0 {
@@ -1397,12 +1827,14 @@ impl IeeeP370SeNzc2xThru {
             Array2::from_elem(two_x_thru.z0.dim(), Complex64::new(split_impedance, 0.0));
         let mut renormalized = two_x_thru.clone();
         renormalized.renormalize(split_reference.clone(), two_x_thru.s_definition)?;
-        let e001 = ieee_p370_gate_reflection(&renormalized, 0, midpoint)?;
+        // Upstream scikit-rf variable: `e001`.
+        let fixture1_input_reflection = ieee_p370_gate_reflection(&renormalized, 0, midpoint)?;
         let e002 = ieee_p370_gate_reflection(&renormalized, 1, midpoint)?;
         let points = two_x_thru.frequency_points();
         let mut e111 = Array1::zeros(points);
         let mut e112 = Array1::zeros(points);
-        let mut e01 = Array1::zeros(points);
+        // Upstream scikit-rf variable: `e01`.
+        let mut fixture1_transmission = Array1::zeros(points);
         let mut e10 = Array1::zeros(points);
         for point in 0..points {
             let s11 = renormalized.s[(point, 0, 0)];
@@ -1412,13 +1844,15 @@ impl IeeeP370SeNzc2xThru {
             ensure_nonzero(s12, "time-gated NZC reverse transmission is zero")?;
             ensure_nonzero(s21, "time-gated NZC forward transmission is zero")?;
             e111[point] = (s22 - e002[point]) / s12;
-            e112[point] = (s11 - e001[point]) / s21;
+            e112[point] = (s11 - fixture1_input_reflection[point]) / s21;
             let coupling = Complex64::new(1.0, 0.0) - e111[point] * e112[point];
-            e01[point] = (s21 * coupling).sqrt();
+            fixture1_transmission[point] = (s21 * coupling).sqrt();
             e10[point] = (s12 * coupling).sqrt();
             if point > 0 {
-                if (-e01[point] - e01[point - 1]).norm() < (e01[point] - e01[point - 1]).norm() {
-                    e01[point] = -e01[point];
+                if (-fixture1_transmission[point] - fixture1_transmission[point - 1]).norm()
+                    < (fixture1_transmission[point] - fixture1_transmission[point - 1]).norm()
+                {
+                    fixture1_transmission[point] = -fixture1_transmission[point];
                 }
                 if (-e10[point] - e10[point - 1]).norm() < (e10[point] - e10[point - 1]).norm() {
                     e10[point] = -e10[point];
@@ -1428,9 +1862,9 @@ impl IeeeP370SeNzc2xThru {
         let mut left = Array3::zeros((points, 2, 2));
         let mut right = Array3::zeros((points, 2, 2));
         for point in 0..points {
-            left[(point, 0, 0)] = e001[point];
-            left[(point, 0, 1)] = e01[point];
-            left[(point, 1, 0)] = e01[point];
+            left[(point, 0, 0)] = fixture1_input_reflection[point];
+            left[(point, 0, 1)] = fixture1_transmission[point];
+            left[(point, 1, 0)] = fixture1_transmission[point];
             left[(point, 1, 1)] = e111[point];
             right[(point, 0, 0)] = e112[point];
             right[(point, 0, 1)] = e10[point];
@@ -1518,6 +1952,7 @@ fn ieee_p370_gate_reflection(
 }
 
 impl Deembedding for IeeeP370SeNzc2xThru {
+    /// Removes the extracted side-1 and side-2 fixtures from a FIX–DUT–FIX network.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let target = if network.frequency == self.two_x_thru.frequency {
             network.clone()
@@ -1533,20 +1968,59 @@ impl Deembedding for IeeeP370SeNzc2xThru {
 
 /// IEEE 370 single-ended impedance-corrected 2x-thru fixture extraction.
 ///
-/// Origin: `skrf/calibration/deembedding.py::IEEEP370_SE_ZC_2xThru`.
+/// A 2x-thru and a FIX–DUT–FIX measurement are used to correct impedance
+/// differences between the two structures. The fixture length and propagation
+/// constant are derived from the 2x-thru, then each fixture is peeled from the
+/// time-domain impedance profile one sample at a time.
+///
+/// Fixture 2 is stored flipped to match the scikit-rf convention.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, IeeeP370SeZc2xThru};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let two_x_thru = Network::read_touchstone("2xthru.s2p")?;
+/// let fixture_dut_fixture = Network::read_touchstone("f-dut-f.s2p")?;
+/// let method = IeeeP370SeZc2xThru::with_pullbacks(
+///     two_x_thru,
+///     fixture_dut_fixture.clone(),
+///     0,
+///     0,
+///     Some("zc-2xthru".into()),
+/// )?;
+/// let device = method.deembed(&fixture_dut_fixture)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct IeeeP370SeZc2xThru {
+    /// Measured single-ended 2x-thru (FIX–FIX) network.
     pub two_x_thru: Network,
+    /// Measured FIX–DUT–FIX network used for impedance correction.
     pub fixture_dut_fixture: Network,
+    /// Extracted fixture error box on side 1.
     pub side1: Network,
+    /// Extracted fixture error box on side 2, using the scikit-rf orientation.
     pub side2: Network,
+    /// Frequency-dependent propagation constant recovered from the 2x-thru.
     pub propagation: Array1<Complex64>,
+    /// Number of discrete points left in the side-1 fixture.
     pub pullback1: usize,
+    /// Number of discrete points left in the side-2 fixture.
     pub pullback2: usize,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl IeeeP370SeZc2xThru {
+    /// Extracts both impedance-corrected fixtures without pullback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either input is invalid or fixture extraction fails.
     pub fn new(
         two_x_thru: Network,
         fixture_dut_fixture: Network,
@@ -1555,6 +2029,15 @@ impl IeeeP370SeZc2xThru {
         Self::with_pullbacks(two_x_thru, fixture_dut_fixture, 0, 0, name)
     }
 
+    /// Extracts impedance-corrected fixtures with independent pullbacks.
+    ///
+    /// `pullback1` and `pullback2` specify how many discrete points remain in
+    /// the fixture on side 1 and side 2, respectively.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs or pullbacks, or if impedance-
+    /// corrected fixture extraction fails.
     pub fn with_pullbacks(
         two_x_thru: Network,
         fixture_dut_fixture: Network,
@@ -1599,19 +2082,23 @@ impl IeeeP370SeZc2xThru {
         let working_step = working_values[1] - working_values[0];
         let harmonic =
             (working_step - working_values[0]).abs() <= 1.0e-6 * working_values[0].abs().max(1.0);
-        let mut interpolated = false;
-        if !harmonic {
+        let interpolated = if harmonic {
+            false
+        } else {
             let projected_points = (working_values[working_values.len() - 1] / working_values[0])
                 .round()
-                .clamp(2.0, 10_000.0) as usize;
-            let step = working_values[working_values.len() - 1] / projected_points as f64;
+                .clamp(2.0, 10_000.0)
+                .to_usize()
+                .unwrap_or(10_000);
+            let step = working_values[working_values.len() - 1]
+                / projected_points.to_f64().unwrap_or(f64::INFINITY);
             let frequency = Frequency::from_hz(Array1::from_iter(
-                (1..=projected_points).map(|index| step * index as f64),
+                (1..=projected_points).map(|index| step * index.to_f64().unwrap_or(f64::INFINITY)),
             ))?;
             working_two_x_thru = working_two_x_thru.interpolate(&frequency)?;
             working_fixture = working_fixture.interpolate(&frequency)?;
-            interpolated = true;
-        }
+            true
+        };
         if has_dc || interpolated {
             let extracted = Self::with_pullbacks(
                 working_two_x_thru,
@@ -1661,6 +2148,7 @@ impl IeeeP370SeZc2xThru {
 }
 
 impl Deembedding for IeeeP370SeZc2xThru {
+    /// Removes the extracted side-1 and side-2 fixtures from a FIX–DUT–FIX network.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let target = if network.frequency == self.two_x_thru.frequency {
             network.clone()
@@ -1717,11 +2205,10 @@ fn ieee_p370_zc_split(
         .iter()
         .enumerate()
         .max_by(|(_, left), (_, right)| left.abs().total_cmp(&right.abs()))
-        .map(|(index, _)| index)
-        .unwrap_or(0);
+        .map_or(0, |(index, _)| index);
     let side1_segments = midpoint.saturating_sub(pullback1).saturating_add(1);
     let side2_segments = midpoint.saturating_sub(pullback2).saturating_add(1);
-    let segment_length = 1.0 / (2.0 * (midpoint + 1) as f64);
+    let segment_length = 1.0 / (2.0 * (midpoint + 1).to_f64().unwrap_or(f64::INFINITY));
     let reference_impedance = fixture_dut_fixture.z0[(0, 0)].re;
     if !reference_impedance.is_finite() || reference_impedance <= 0.0 {
         return Err(Error::Unsupported(
@@ -1858,13 +2345,43 @@ pub enum IeeeP370PortOrder {
 /// modal error boxes are recombined. De-embedding uses balanced multiport
 /// connections, preserving differential/common conversion terms in the DUT.
 ///
-/// Origin: `skrf/calibration/deembedding.py::IEEEP370_MM_NZC_2xThru`.
+/// ```text
+///  FIX-1_2  DUT      FIX-3_4
+///  +----+   +----+   +----+
+/// -|1  3|---|1  3|---|3  1|-
+/// -|2  4|---|2  4|---|4  2|-
+///  +----+   +----+   +----+
+/// ```
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, IeeeP370MmNzc2xThru, IeeeP370PortOrder};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let two_x_thru = Network::read_touchstone("2xthru.s4p")?;
+/// let fixture_dut_fixture = Network::read_touchstone("f-dut-f.s4p")?;
+/// let method = IeeeP370MmNzc2xThru::new(
+///     two_x_thru,
+///     IeeeP370PortOrder::Second,
+///     Some("2xthru".into()),
+/// )?;
+/// let device = method.deembed(&fixture_dut_fixture)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct IeeeP370MmNzc2xThru {
+    /// Measured four-port 2x-thru (FIX–FIX) network.
     pub two_x_thru: Network,
+    /// Extracted combined fixture error box on side 1.
     pub side1: Network,
+    /// Extracted combined fixture error box on side 2.
     pub side2: Network,
+    /// Port-numbering scheme used by the input and returned networks.
     pub port_order: IeeeP370PortOrder,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
     differential_side1: Network,
     differential_side2: Network,
@@ -1873,6 +2390,12 @@ pub struct IeeeP370MmNzc2xThru {
 }
 
 impl IeeeP370MmNzc2xThru {
+    /// Extracts mixed-mode NZC fixtures using the impedance-transform split.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid port count or if port-order conversion,
+    /// mode conversion, fixture extraction, or recombination fails.
     pub fn new(
         two_x_thru: Network,
         port_order: IeeeP370PortOrder,
@@ -1916,6 +2439,16 @@ impl IeeeP370MmNzc2xThru {
         })
     }
 
+    /// Extracts mixed-mode NZC fixtures using time-gated reflection splits.
+    ///
+    /// The differential and common split-plane impedances can be forced
+    /// independently when the 2x-thru is too short for reliable automatic
+    /// determination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs or if port-order conversion, mode
+    /// conversion, time-gated extraction, or recombination fails.
     pub fn new_time_gated(
         two_x_thru: Network,
         port_order: IeeeP370PortOrder,
@@ -1965,6 +2498,7 @@ impl IeeeP370MmNzc2xThru {
 }
 
 impl Deembedding for IeeeP370MmNzc2xThru {
+    /// Removes the extracted four-port fixtures from a FIX–DUT–FIX network.
     fn deembed(&self, network: &Network) -> Result<Network> {
         if network.ports() != 4 {
             return Err(Error::IncompatibleShape(
@@ -1997,20 +2531,59 @@ impl Deembedding for IeeeP370MmNzc2xThru {
 
 /// IEEE 370 mixed-mode impedance-corrected 2x-thru fixture extraction.
 ///
-/// Origin: `skrf/calibration/deembedding.py::IEEEP370_MM_ZC_2xThru`.
+/// A four-port 2x-thru and FIX–DUT–FIX measurement are transformed to
+/// differential and common modes. Each modal pair is processed by the
+/// single-ended impedance-corrected algorithm and recombined into four-port
+/// fixture error boxes.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, IeeeP370MmZc2xThru, IeeeP370PortOrder};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let two_x_thru = Network::read_touchstone("2xthru.s4p")?;
+/// let fixture_dut_fixture = Network::read_touchstone("f-dut-f.s4p")?;
+/// let method = IeeeP370MmZc2xThru::new(
+///     two_x_thru,
+///     fixture_dut_fixture.clone(),
+///     IeeeP370PortOrder::Second,
+///     Some("zc-2xthru".into()),
+/// )?;
+/// let device = method.deembed(&fixture_dut_fixture)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct IeeeP370MmZc2xThru {
+    /// Measured four-port 2x-thru (FIX–FIX) network.
     pub two_x_thru: Network,
+    /// Measured four-port FIX–DUT–FIX network used for impedance correction.
     pub fixture_dut_fixture: Network,
+    /// Extracted combined fixture error box on side 1.
     pub side1: Network,
+    /// Extracted combined fixture error box on side 2.
     pub side2: Network,
+    /// Port-numbering scheme used by the input and returned networks.
     pub port_order: IeeeP370PortOrder,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
     differential: IeeeP370SeZc2xThru,
     common: IeeeP370SeZc2xThru,
 }
 
 impl IeeeP370MmZc2xThru {
+    /// Extracts mixed-mode impedance-corrected fixture models.
+    ///
+    /// Both inputs must be four-port networks. Their differential and common
+    /// sub-networks are extracted independently before the fixture models are
+    /// converted back to the requested [`IeeeP370PortOrder`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs or if port-order conversion, mode
+    /// conversion, modal extraction, or fixture recombination fails.
     pub fn new(
         two_x_thru: Network,
         fixture_dut_fixture: Network,
@@ -2065,6 +2638,7 @@ impl IeeeP370MmZc2xThru {
 }
 
 impl Deembedding for IeeeP370MmZc2xThru {
+    /// Removes the extracted four-port fixtures from a FIX–DUT–FIX network.
     fn deembed(&self, network: &Network) -> Result<Network> {
         if network.ports() != 4 {
             return Err(Error::IncompatibleShape(
@@ -2143,59 +2717,144 @@ fn ieee_p370_from_second_port_order(
     ieee_p370_to_second_port_order(network, port_order)
 }
 
-/// Origin: `skrf/calibration/deembedding.py::Open`.
+/// Removes parallel parasitics measured with an open dummy.
+///
+/// The open dummy's Y-parameters are subtracted from the device measurement.
+/// Use this method when series parasitics are negligible and only unwanted
+/// parallel parasitics need to be removed.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, Open};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let open = Network::read_touchstone("open_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = Open::new(open, Some("test-open".into()));
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct Open {
+    /// Measurement of the dummy open structure.
     pub open: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl Open {
-    pub fn new(open: Network, name: Option<String>) -> Self {
+    /// Creates an open de-embedding model from `open`.
+    #[must_use]
+    pub const fn new(open: Network, name: Option<String>) -> Self {
         Self { open, name }
     }
 }
 
 impl Deembedding for Open {
+    /// Removes the open dummy's parallel admittance from `network`.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let open = align_dummy(&self.open, network)?;
         let corrected = s_to_y(&network.s, &network.z0, network.s_definition)?
             - s_to_y(&open.s, &open.z0, open.s_definition)?;
-        network_from_y(network, corrected)
+        network_from_y(network, &corrected)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::Short`.
+/// Removes series parasitics measured with a short dummy.
+///
+/// The short dummy's Z-parameters are subtracted from the device measurement.
+/// This is useful for removing pad contact resistance while retaining other
+/// parasitics.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, Short};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let short = Network::read_touchstone("short_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = Short::new(short, Some("test-short".into()));
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct Short {
+    /// Measurement of the dummy short structure.
     pub short: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl Short {
-    pub fn new(short: Network, name: Option<String>) -> Self {
+    /// Creates a short de-embedding model from `short`.
+    #[must_use]
+    pub const fn new(short: Network, name: Option<String>) -> Self {
         Self { short, name }
     }
 }
 
 impl Deembedding for Short {
+    /// Removes the short dummy's series impedance from `network`.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let short = align_dummy(&self.short, network)?;
         let corrected = s_to_z(&network.s, &network.z0, network.s_definition)?
             - s_to_z(&short.s, &short.z0, short.s_definition)?;
-        network_from_z(network, corrected)
+        network_from_z(network, &corrected)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::OpenShort`.
+/// Removes open parasitics followed by short parasitics.
+///
+/// Open de-embedding is first applied to the short dummy because that
+/// measurement also contains parallel parasitics. The open dummy's
+/// Y-parameters are then removed from the device, followed by the corrected
+/// short dummy's Z-parameters. This model assumes the series parasitics are
+/// closest to the device, followed by parallel parasitics.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, OpenShort};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let open = Network::read_touchstone("open_ckt.s2p")?;
+/// let short = Network::read_touchstone("short_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = OpenShort::new(open, short, Some("test-open-short".into()))?;
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Reference
+///
+/// M. C. A. M. Koolen, J. A. M. Geelen, and M. P. J. G. Versleijen,
+/// "An improved de-embedding technique for on-wafer high frequency
+/// characterization," *IEEE 1991 Bipolar Circuits and Technology Meeting*,
+/// pp. 188–191, September 1991.
 #[derive(Clone, Debug)]
 pub struct OpenShort {
+    /// Measurement of the dummy open structure.
     pub open: Network,
+    /// Measurement of the dummy short structure.
     pub short: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl OpenShort {
+    /// Creates an open-short model from matching open and short dummies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the dummy networks are incompatible.
     pub fn new(open: Network, short: Network, name: Option<String>) -> Result<Self> {
         validate_dummy_pair(&open, &short)?;
         Ok(Self { open, short, name })
@@ -2203,6 +2862,7 @@ impl OpenShort {
 }
 
 impl Deembedding for OpenShort {
+    /// Removes parallel open parasitics, then series short parasitics.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let open = align_dummy(&self.open, network)?;
         let short = align_dummy(&self.short, network)?;
@@ -2211,19 +2871,49 @@ impl Deembedding for OpenShort {
         let deembedded_short_z = y_to_z(&deembedded_short_y)?;
         let parallel_corrected_y = s_to_y(&network.s, &network.z0, network.s_definition)? - open_y;
         let corrected_z = y_to_z(&parallel_corrected_y)? - deembedded_short_z;
-        network_from_z(network, corrected_z)
+        network_from_z(network, &corrected_z)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::ShortOpen`.
+/// Removes short parasitics followed by open parasitics.
+///
+/// Short de-embedding is first applied to the open dummy because that
+/// measurement also contains series parasitics. The short dummy's Z-parameters
+/// are then removed from the device, followed by the corrected open dummy's
+/// Y-parameters. This model assumes parallel parasitics are closest to the
+/// device, followed by series parasitics.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, ShortOpen};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let short = Network::read_touchstone("short_ckt.s2p")?;
+/// let open = Network::read_touchstone("open_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = ShortOpen::new(short, open, Some("test-short-open".into()))?;
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct ShortOpen {
+    /// Measurement of the dummy short structure.
     pub short: Network,
+    /// Measurement of the dummy open structure.
     pub open: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl ShortOpen {
+    /// Creates a short-open model from matching short and open dummies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the dummy networks are incompatible.
     pub fn new(short: Network, open: Network, name: Option<String>) -> Result<Self> {
         validate_dummy_pair(&short, &open)?;
         Ok(Self { short, open, name })
@@ -2231,6 +2921,7 @@ impl ShortOpen {
 }
 
 impl Deembedding for ShortOpen {
+    /// Removes series short parasitics, then parallel open parasitics.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let short = align_dummy(&self.short, network)?;
         let open = align_dummy(&self.open, network)?;
@@ -2239,18 +2930,50 @@ impl Deembedding for ShortOpen {
         let deembedded_open_y = z_to_y(&deembedded_open_z)?;
         let series_corrected_z = s_to_z(&network.s, &network.z0, network.s_definition)? - short_z;
         let corrected_y = z_to_y(&series_corrected_z)? - deembedded_open_y;
-        network_from_y(network, corrected_y)
+        network_from_y(network, &corrected_y)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::SplitPi`.
+/// Removes shunt and series parasitics using a pi-type embedding model.
+///
+/// A direct thru measurement between the left and right test pads is split
+/// into fixture models. This method assumes series parasitics are closest to
+/// the device, followed by shunt parasitics.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, SplitPi};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let thru = Network::read_touchstone("thru_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = SplitPi::new(thru, Some("test-thru".into()))?;
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Reference
+///
+/// L. Nan et al., "Experimental Characterization of the Effect of Metal Dummy
+/// Fills on Spiral Inductors," *2007 IEEE Radio Frequency Integrated Circuits
+/// Symposium*, pp. 307–310.
 #[derive(Clone, Debug)]
 pub struct SplitPi {
+    /// Measurement of the dummy thru structure.
     pub thru: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl SplitPi {
+    /// Creates a split-pi model from a two-port thru dummy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `thru` is not a valid two-port dummy.
     pub fn new(thru: Network, name: Option<String>) -> Result<Self> {
         validate_two_port_dummy(&thru)?;
         Ok(Self { thru, name })
@@ -2258,6 +2981,7 @@ impl SplitPi {
 }
 
 impl Deembedding for SplitPi {
+    /// Removes the thru dummy's pi-type shunt and series parasitics.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let thru = align_dummy(&self.thru, network)?;
         validate_two_port_dummy(&thru)?;
@@ -2270,20 +2994,52 @@ impl Deembedding for SplitPi {
             left_y[(point, 1, 0)] = left_y[(point, 0, 1)];
             left_y[(point, 1, 1)] = -left_y[(point, 0, 1)];
         }
-        let left = network_from_y(&thru, left_y)?;
+        let left = network_from_y(&thru, &left_y)?;
         let right = left.flipped()?;
         left.inverse()?.cascade(network)?.cascade(&right.inverse()?)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::SplitTee`.
+/// Removes series and shunt parasitics using a tee-type embedding model.
+///
+/// A direct thru measurement between the left and right test pads is split
+/// into fixture models. This method assumes shunt parasitics are closest to
+/// the device, followed by series parasitics.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, SplitTee};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let thru = Network::read_touchstone("thru_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = SplitTee::new(thru, Some("test-thru".into()))?;
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Reference
+///
+/// M. J. Kobrinsky et al., "Experimental validation of crosstalk simulations
+/// for on-chip interconnects using S-parameters," *IEEE Transactions on
+/// Advanced Packaging*, vol. 28, no. 1, pp. 57–62, February 2005.
 #[derive(Clone, Debug)]
 pub struct SplitTee {
+    /// Measurement of the dummy thru structure.
     pub thru: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl SplitTee {
+    /// Creates a split-tee model from a two-port thru dummy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `thru` is not a valid two-port dummy.
     pub fn new(thru: Network, name: Option<String>) -> Result<Self> {
         validate_two_port_dummy(&thru)?;
         Ok(Self { thru, name })
@@ -2291,6 +3047,7 @@ impl SplitTee {
 }
 
 impl Deembedding for SplitTee {
+    /// Removes the thru dummy's tee-type series and shunt parasitics.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let thru = align_dummy(&self.thru, network)?;
         validate_two_port_dummy(&thru)?;
@@ -2303,20 +3060,52 @@ impl Deembedding for SplitTee {
             left_z[(point, 1, 0)] = left_z[(point, 0, 1)];
             left_z[(point, 1, 1)] = left_z[(point, 0, 1)];
         }
-        let left = network_from_z(&thru, left_z)?;
+        let left = network_from_z(&thru, &left_z)?;
         let right = left.flipped()?;
         left.inverse()?.cascade(network)?.cascade(&right.inverse()?)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::AdmittanceCancel`.
+/// Cancels shunt admittance by left-right mirroring (Mangan's method).
+///
+/// This method uses one thru dummy and applies only to symmetric two-port
+/// devices, where $S_{11}=S_{22}$ and $S_{12}=S_{21}$. It is suited to
+/// transmission-line characterization at millimeter-wave frequencies.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{AdmittanceCancel, Deembedding};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let thru = Network::read_touchstone("thru_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = AdmittanceCancel::new(thru, Some("test-thru".into()))?;
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Reference
+///
+/// A. M. Mangan et al., "De-embedding transmission line measurements for
+/// accurate modeling of IC designs," *IEEE Transactions on Electron Devices*,
+/// vol. 53, no. 2, pp. 235–241, February 2006.
 #[derive(Clone, Debug)]
 pub struct AdmittanceCancel {
+    /// Measurement of the dummy thru structure.
     pub thru: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl AdmittanceCancel {
+    /// Creates an admittance-cancellation model from a two-port thru dummy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `thru` is not a valid two-port dummy.
     pub fn new(thru: Network, name: Option<String>) -> Result<Self> {
         validate_two_port_dummy(&thru)?;
         Ok(Self { thru, name })
@@ -2324,6 +3113,7 @@ impl AdmittanceCancel {
 }
 
 impl Deembedding for AdmittanceCancel {
+    /// Cancels the thru dummy's shunt admittance by mirroring.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let thru = align_dummy(&self.thru, network)?;
         let half = network.cascade(&thru.inverse()?)?;
@@ -2331,18 +3121,50 @@ impl Deembedding for AdmittanceCancel {
         let average = (s_to_y(&half.s, &half.z0, half.s_definition)?
             + s_to_y(&flipped.s, &flipped.z0, flipped.s_definition)?)
             / 2.0;
-        network_from_y(network, average)
+        network_from_y(network, &average)
     }
 }
 
-/// Origin: `skrf/calibration/deembedding.py::ImpedanceCancel`.
+/// Cancels series impedance by left-right mirroring.
+///
+/// This method uses one thru dummy and applies only to symmetric two-port
+/// devices, where $S_{11}=S_{22}$ and $S_{12}=S_{21}$. It is suited to
+/// transmission-line characterization at millimeter-wave frequencies.
+///
+/// # Example
+///
+/// ```no_run
+/// use rust_rf::Network;
+/// use rust_rf::calibration::{Deembedding, ImpedanceCancel};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let thru = Network::read_touchstone("thru_ckt.s2p")?;
+/// let measured = Network::read_touchstone("full_ckt.s2p")?;
+/// let method = ImpedanceCancel::new(thru, Some("test-thru".into()))?;
+/// let device = method.deembed(&measured)?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Reference
+///
+/// S. Amakawa et al., "Comparative analysis of on-chip transmission line
+/// de-embedding techniques," *2015 IEEE International Symposium on
+/// Radio-Frequency Integration Technology*, pp. 91–93.
 #[derive(Clone, Debug)]
 pub struct ImpedanceCancel {
+    /// Measurement of the dummy thru structure.
     pub thru: Network,
+    /// Optional name used to identify the de-embedding instance.
     pub name: Option<String>,
 }
 
 impl ImpedanceCancel {
+    /// Creates an impedance-cancellation model from a two-port thru dummy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `thru` is not a valid two-port dummy.
     pub fn new(thru: Network, name: Option<String>) -> Result<Self> {
         validate_two_port_dummy(&thru)?;
         Ok(Self { thru, name })
@@ -2350,6 +3172,7 @@ impl ImpedanceCancel {
 }
 
 impl Deembedding for ImpedanceCancel {
+    /// Cancels the thru dummy's series impedance by mirroring.
     fn deembed(&self, network: &Network) -> Result<Network> {
         let thru = align_dummy(&self.thru, network)?;
         let half = network.cascade(&thru.inverse()?)?;
@@ -2357,7 +3180,7 @@ impl Deembedding for ImpedanceCancel {
         let average = (s_to_z(&half.s, &half.z0, half.s_definition)?
             + s_to_z(&flipped.s, &flipped.z0, flipped.s_definition)?)
             / 2.0;
-        network_from_z(network, average)
+        network_from_z(network, &average)
     }
 }
 
@@ -2399,14 +3222,14 @@ fn validate_two_port_dummy(dummy: &Network) -> Result<()> {
     Ok(())
 }
 
-fn network_from_y(template: &Network, admittance: Array3<Complex64>) -> Result<Network> {
+fn network_from_y(template: &Network, admittance: &Array3<Complex64>) -> Result<Network> {
     let mut corrected = template.clone();
-    corrected.s = y_to_s(&admittance, &corrected.z0, corrected.s_definition)?;
+    corrected.s = y_to_s(admittance, &corrected.z0, corrected.s_definition)?;
     Ok(corrected)
 }
 
-fn network_from_z(template: &Network, impedance: Array3<Complex64>) -> Result<Network> {
+fn network_from_z(template: &Network, impedance: &Array3<Complex64>) -> Result<Network> {
     let mut corrected = template.clone();
-    corrected.s = z_to_s(&impedance, &corrected.z0, corrected.s_definition)?;
+    corrected.s = z_to_s(impedance, &corrected.z0, corrected.s_definition)?;
     Ok(corrected)
 }

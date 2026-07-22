@@ -1,5 +1,12 @@
+//! Resonator quality-factor extraction using the MAT 58 nonlinear models.
+//!
+//! [`QFactor`] fits one-port resonance data with NLQFIT6, NLQFIT7, or NLQFIT8
+//! and derives loaded/unloaded Q, resonance frequency, bandwidth, fitted
+//! networks, angular weights, and the resonance circle.
+
 use ndarray::{Array2, Array3};
 use num_complex::Complex64;
+use num_traits::ToPrimitive;
 
 use crate::{Error, Frequency, Network, Result};
 
@@ -10,60 +17,94 @@ const FIT_TOLERANCE: f64 = 1.0e-10;
 /// Origin: `skrf/qfactor.py::OptimizedResult` for the NLQFIT6 model.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OptimizedResult {
+    /// Whether the optimizer met its convergence criterion.
     pub success: bool,
+    /// Number of optimizer iterations performed.
     pub iterations: usize,
+    /// Final sum-of-squares objective.
     pub objective: f64,
+    /// Raw fitted model parameters.
     pub parameters: Vec<f64>,
+    /// Real part of the detuned response.
     pub m1: f64,
+    /// Imaginary part of the detuned response.
     pub m2: f64,
+    /// Real resonance-circle displacement.
     pub m3: f64,
+    /// Imaginary resonance-circle displacement.
     pub m4: f64,
+    /// Fitted loaded quality factor $Q_{L}$.
     pub loaded_q: f64,
+    /// Fitted resonant frequency in hertz.
     pub resonant_frequency_hz: f64,
+    /// Root-mean-square complex residual error.
     pub rms_error: f64,
+    /// Nonlinear model used for the fit.
     pub method: QFitMethod,
+    /// Optional NLQFIT7/8 phase-delay slope in radians per hertz.
     pub phase_slope_radians_per_hz: Option<f64>,
+    /// Optional NLQFIT8 complex leakage slope.
     pub leakage_slope: Option<Complex64>,
+    /// Ratio used by angular reweighting, when enabled.
     pub weighting_ratio: Option<f64>,
+    /// MAT 58 loop-plan string applied by the fit.
     pub loop_plan: String,
 }
 
 /// MAT 58 nonlinear resonator model.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum QFitMethod {
+    /// Six-parameter resonance-circle model.
     #[default]
     Nlqfit6,
+    /// Seven-parameter model including phase delay.
     Nlqfit7,
+    /// Eight-parameter model including phase delay and leakage.
     Nlqfit8,
 }
 
 /// Origin: `skrf/qfactor.py::Qfactor.Q_circle`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QCircle {
+    /// Diameter of the fitted resonance circle.
     pub diameter: f64,
+    /// Complex response far from resonance.
     pub detuned: Complex64,
+    /// Complex response at resonance.
     pub tuned: Complex64,
 }
 
 /// Origin: `skrf/qfactor.py::Qfactor`.
 #[derive(Clone, Debug)]
 pub struct QFactor {
+    /// One-port network containing the measured resonance.
     pub network: Network,
+    /// Measurement configuration used to interpret the circle.
     pub resonance_type: ResonanceType,
     initial_loaded_q: f64,
     initial_resonant_frequency_hz: f64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Resonator measurement configuration.
 pub enum ResonanceType {
+    /// Transmission-mode resonance.
     Transmission,
+    /// Reflection-mode resonance using the primary correction.
     Reflection,
+    /// Reflection-mode resonance using the alternate correction.
     ReflectionMethod2,
+    /// Absorption-mode resonance.
     Absorption,
 }
 
 impl QFactor {
     /// Port of `skrf.qfactor.Qfactor.__init__` and its resonance seed selection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the network is not a valid one-port resonance data
+    /// set or either supplied initial estimate is invalid.
     pub fn new(
         network: Network,
         resonance_type: ResonanceType,
@@ -142,16 +183,33 @@ impl QFactor {
     }
 
     /// Fits the six-parameter MAT 58 resonator response used by NLQFIT6.
+    ///
+    /// See the [NPL MAT 58 report](https://eprintspublications.npl.co.uk/9304/).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fitting fails or produces an invalid result.
     pub fn fit(&self) -> Result<OptimizedResult> {
         self.fit_method(QFitMethod::Nlqfit6)
     }
 
     /// Fits one of the NLQFIT6, NLQFIT7, or NLQFIT8 MAT 58 models.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fitting fails or produces an invalid result.
     pub fn fit_method(&self, method: QFitMethod) -> Result<OptimizedResult> {
         self.fit_with_loop_plan(method, "fwfwc")
     }
 
     /// Fits with the MAT 58 loop-plan language (`f`, `w`, and `c`).
+    ///
+    /// `f` performs one fit, `w` recalculates angular weights from the previous
+    /// fit, and `c` repeats fitting until convergence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the loop plan is invalid or fitting fails.
     pub fn fit_with_loop_plan(
         &self,
         method: QFitMethod,
@@ -170,12 +228,12 @@ impl QFactor {
         };
         if method == QFitMethod::Nlqfit6 && !weighted {
             let mut result = six_parameter;
-            result.loop_plan = loop_plan.to_owned();
+            loop_plan.clone_into(&mut result.loop_plan);
             return Ok(result);
         }
         let mut result =
             self.fit_extended(method, &six_parameter, weighted, maximum_iterations.max(1))?;
-        result.loop_plan = loop_plan.to_owned();
+        loop_plan.clone_into(&mut result.loop_plan);
         Ok(result)
     }
 
@@ -188,13 +246,14 @@ impl QFactor {
             .map(|matrix| matrix[(0, 0)])
             .collect::<Vec<_>>();
         let endpoint_count = (measured.len() / 10).max(1);
+        let endpoint_sample_count = (2 * endpoint_count).to_f64().unwrap_or(f64::NAN);
         let detuned = measured
             .iter()
             .take(endpoint_count)
             .chain(measured.iter().rev().take(endpoint_count))
             .copied()
             .sum::<Complex64>()
-            / (2 * endpoint_count) as f64;
+            / endpoint_sample_count;
         let resonance_index = frequencies
             .iter()
             .enumerate()
@@ -231,9 +290,11 @@ impl QFactor {
             let mut gradient = [0.0; PARAMETER_COUNT];
             for row in 0..residuals.len() {
                 for column in 0..PARAMETER_COUNT {
-                    gradient[column] += jacobian[row][column] * residuals[row];
+                    gradient[column] =
+                        jacobian[row][column].mul_add(residuals[row], gradient[column]);
                     for other in 0..PARAMETER_COUNT {
-                        normal[column][other] += jacobian[row][column] * jacobian[row][other];
+                        normal[column][other] = jacobian[row][column]
+                            .mul_add(jacobian[row][other], normal[column][other]);
                     }
                 }
             }
@@ -276,9 +337,20 @@ impl QFactor {
             }
         }
 
+        Self::six_parameter_result(parameters, success, iterations, objective, measured.len())
+    }
+
+    fn six_parameter_result(
+        parameters: [f64; PARAMETER_COUNT],
+        success: bool,
+        iterations: usize,
+        objective: f64,
+        measured_count: usize,
+    ) -> Result<OptimizedResult> {
         let loaded_q = parameters[4].exp();
         let resonant_frequency_hz = parameters[5].exp();
-        let rms_error = (objective / measured.len() as f64).sqrt();
+        let measured_count = measured_count.to_f64().unwrap_or(f64::NAN);
+        let rms_error = (objective / measured_count).sqrt();
         if !loaded_q.is_finite() || !resonant_frequency_hz.is_finite() || !rms_error.is_finite() {
             return Err(Error::Unsupported(
                 "Q-factor optimization produced a non-finite solution".to_owned(),
@@ -351,16 +423,8 @@ impl QFactor {
                 span,
                 weighted,
             );
-            let mut normal = vec![vec![0.0; parameter_count]; parameter_count];
-            let mut gradient = vec![0.0; parameter_count];
-            for row in 0..residuals.len() {
-                for column in 0..parameter_count {
-                    gradient[column] += jacobian[row][column] * residuals[row];
-                    for other in 0..parameter_count {
-                        normal[column][other] += jacobian[row][column] * jacobian[row][other];
-                    }
-                }
-            }
+            let (mut normal, mut gradient) =
+                dense_normal_equations(&jacobian, &residuals, parameter_count);
             for diagonal in 0..parameter_count {
                 normal[diagonal][diagonal] += damping * normal[diagonal][diagonal].abs().max(1.0);
                 gradient[diagonal] = -gradient[diagonal];
@@ -408,17 +472,33 @@ impl QFactor {
 
         let loaded_q = parameters[4].exp();
         let resonant_frequency_hz = parameters[5].exp();
-        let weights = if weighted {
-            Self::angular_weights(&frequencies, resonant_frequency_hz, loaded_q)
-        } else {
-            vec![1.0; frequencies.len()]
-        };
-        let weighting_ratio = weighted.then(|| {
-            let maximum = weights.iter().copied().reduce(f64::max).unwrap_or(1.0);
-            let minimum = weights.iter().copied().reduce(f64::min).unwrap_or(1.0);
-            maximum / minimum
-        });
-        let rms_error = (objective / weights.iter().sum::<f64>()).sqrt();
+        let (weighting_ratio, rms_error) = extended_fit_metrics(
+            &frequencies,
+            resonant_frequency_hz,
+            loaded_q,
+            objective,
+            weighted,
+        );
+        Self::extended_result(
+            method,
+            &parameters,
+            (success, iterations, objective),
+            span,
+            (weighting_ratio, rms_error),
+        )
+    }
+
+    fn extended_result(
+        method: QFitMethod,
+        parameters: &[f64],
+        optimizer: (bool, usize, f64),
+        span: f64,
+        metrics: (Option<f64>, f64),
+    ) -> Result<OptimizedResult> {
+        let (success, iterations, objective) = optimizer;
+        let (weighting_ratio, rms_error) = metrics;
+        let loaded_q = parameters[4].exp();
+        let resonant_frequency_hz = parameters[5].exp();
         if !loaded_q.is_finite() || !resonant_frequency_hz.is_finite() || !rms_error.is_finite() {
             return Err(Error::Unsupported(
                 "Q-factor optimization produced a non-finite solution".to_owned(),
@@ -428,7 +508,7 @@ impl QFactor {
             success,
             iterations,
             objective,
-            parameters: parameters.clone(),
+            parameters: parameters.to_vec(),
             m1: parameters[0],
             m2: parameters[1],
             m3: parameters[2],
@@ -446,7 +526,13 @@ impl QFactor {
         })
     }
 
-    /// Port of `skrf.qfactor.Qfactor.angular_weights`.
+    /// Returns the diagonal MAT 58 angular weights.
+    ///
+    /// $$W_{i}=\frac{1}{\left[2Q_{L}(f_{i}-f_{L})/f_{L}\right]^2+1}.$$
+    ///
+    /// These weights reduce systematic error when frequency samples are evenly
+    /// spaced rather than evenly distributed around the Q circle.
+    #[must_use]
     pub fn angular_weights(
         frequencies_hz: &[f64],
         resonant_frequency_hz: f64,
@@ -462,7 +548,15 @@ impl QFactor {
             .collect()
     }
 
-    /// Port of `skrf.qfactor.Qfactor.fitted_s`.
+    /// Evaluates the fitted resonator response.
+    ///
+    /// For NLQFIT6,
+    /// $$S=m_{1}+jm_{2}+\frac{m_{3}+jm_{4}}{1+jQ_{L}t},\qquad
+    /// t=\frac{f}{f_{L}}-\frac{f_{L}}{f}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the optimized result or frequency axis is invalid.
     pub fn fitted_s(
         &self,
         result: &OptimizedResult,
@@ -482,7 +576,11 @@ impl QFactor {
             .collect())
     }
 
-    /// Port of `skrf.qfactor.Qfactor.fitted_network`.
+    /// Returns a one-port [`Network`] containing the fitted response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response evaluation or network construction fails.
     pub fn fitted_network(&self, result: &OptimizedResult) -> Result<Network> {
         let response = self.fitted_s(result, None)?;
         let s = Array3::from_shape_vec((response.len(), 1, 1), response)
@@ -500,6 +598,10 @@ impl QFactor {
     }
 
     /// Equivalent to `fitted_network`, sampled on another frequency axis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response evaluation or network construction fails.
     pub fn fitted_network_at(
         &self,
         result: &OptimizedResult,
@@ -513,7 +615,11 @@ impl QFactor {
         Network::new(frequency, s, Array2::from_elem((points, 1), reference))
     }
 
-    /// Port of `skrf.qfactor.Qfactor.Q_circle`.
+    /// Returns the scaled Q-circle diameter and detuned/tuned points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the fitted result or requested scaling is invalid.
     pub fn q_circle(&self, result: &OptimizedResult, scaling: Option<f64>) -> Result<QCircle> {
         validate_result(result)?;
         let detuned = Complex64::new(result.m1, result.m2);
@@ -532,7 +638,11 @@ impl QFactor {
         })
     }
 
-    /// Port of `skrf.qfactor.Qfactor.Q_unloaded`.
+    /// Estimates unloaded quality factor $Q_{0}$ from loaded $Q_{L}$ and coupling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if circle scaling or coupling yields an invalid estimate.
     pub fn unloaded_q(&self, result: &OptimizedResult, scaling: Option<f64>) -> Result<f64> {
         let circle = match self.resonance_type {
             ResonanceType::Transmission | ResonanceType::ReflectionMethod2 if scaling.is_none() => {
@@ -551,10 +661,13 @@ impl QFactor {
             ResonanceType::ReflectionMethod2 => {
                 let detuned = circle.detuned.norm();
                 let tuned = circle.tuned.norm();
-                let cosine = (detuned * detuned + circle.diameter * circle.diameter
-                    - tuned * tuned)
-                    / (2.0 * detuned * circle.diameter);
-                let touching_diameter = (1.0 - detuned * detuned) / (1.0 - detuned * cosine);
+                let circle_numerator = tuned.mul_add(
+                    -tuned,
+                    circle.diameter.mul_add(circle.diameter, detuned * detuned),
+                );
+                let cosine = circle_numerator / (2.0 * detuned * circle.diameter);
+                let touching_diameter =
+                    detuned.mul_add(-detuned, 1.0) / detuned.mul_add(-cosine, 1.0);
                 let coupling = touching_diameter / circle.diameter - 1.0;
                 1.0 / (1.0 + 1.0 / coupling)
             }
@@ -571,7 +684,13 @@ impl QFactor {
         Ok(result.loaded_q / denominator)
     }
 
-    /// Port of `skrf.qfactor.Qfactor.BW`.
+    /// Returns the half-power (3-dB) bandwidth.
+    ///
+    /// $$BW=\frac{f_{L}}{Q_{L}}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the optimized result is invalid.
     pub fn bandwidth_hz(result: &OptimizedResult) -> Result<f64> {
         validate_result(result)?;
         Ok(result.resonant_frequency_hz / result.loaded_q)
@@ -580,6 +699,10 @@ impl QFactor {
     /// Resonant frequency expressed in the input network's display unit.
     ///
     /// Origin: `skrf.qfactor.Qfactor.f_L_scaled`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the optimized result is invalid.
     pub fn resonant_frequency_scaled(&self, result: &OptimizedResult) -> Result<f64> {
         validate_result(result)?;
         Ok(result.resonant_frequency_hz / self.network.frequency.unit().multiplier())
@@ -588,6 +711,10 @@ impl QFactor {
     /// Three-decibel bandwidth expressed in the input network's display unit.
     ///
     /// Origin: `skrf.qfactor.Qfactor.BW_scaled`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the optimized result is invalid.
     pub fn bandwidth_scaled(&self, result: &OptimizedResult) -> Result<f64> {
         Ok(Self::bandwidth_hz(result)? / self.network.frequency.unit().multiplier())
     }
@@ -601,6 +728,46 @@ impl fmt::Display for QFactor {
             self.network.name.as_deref().unwrap_or("<unnamed>")
         )
     }
+}
+
+fn dense_normal_equations(
+    jacobian: &[Vec<f64>],
+    residuals: &[f64],
+    parameter_count: usize,
+) -> (Vec<Vec<f64>>, Vec<f64>) {
+    let mut normal = vec![vec![0.0; parameter_count]; parameter_count];
+    let mut gradient = vec![0.0; parameter_count];
+    for row in 0..residuals.len() {
+        for column in 0..parameter_count {
+            gradient[column] = jacobian[row][column].mul_add(residuals[row], gradient[column]);
+            for other in 0..parameter_count {
+                normal[column][other] =
+                    jacobian[row][column].mul_add(jacobian[row][other], normal[column][other]);
+            }
+        }
+    }
+    (normal, gradient)
+}
+
+fn extended_fit_metrics(
+    frequencies: &[f64],
+    resonant_frequency_hz: f64,
+    loaded_q: f64,
+    objective: f64,
+    weighted: bool,
+) -> (Option<f64>, f64) {
+    let weights = if weighted {
+        QFactor::angular_weights(frequencies, resonant_frequency_hz, loaded_q)
+    } else {
+        vec![1.0; frequencies.len()]
+    };
+    let weighting_ratio = weighted.then(|| {
+        let maximum = weights.iter().copied().reduce(f64::max).unwrap_or(1.0);
+        let minimum = weights.iter().copied().reduce(f64::min).unwrap_or(1.0);
+        maximum / minimum
+    });
+    let rms_error = (objective / weights.iter().sum::<f64>()).sqrt();
+    (weighting_ratio, rms_error)
 }
 
 fn validate_loop_plan(loop_plan: &str) -> Result<()> {
@@ -831,7 +998,7 @@ fn solve_six_by_six(
             {
                 *value -= multiplier * pivot_value;
             }
-            right[row] -= multiplier * right[pivot];
+            right[row] = multiplier.mul_add(-right[pivot], right[row]);
         }
     }
 
@@ -839,7 +1006,7 @@ fn solve_six_by_six(
     for row in (0..PARAMETER_COUNT).rev() {
         let mut value = right[row];
         for column in row + 1..PARAMETER_COUNT {
-            value -= matrix[row][column] * solution[column];
+            value = matrix[row][column].mul_add(-solution[column], value);
         }
         solution[row] = value / matrix[row][row];
     }
@@ -868,7 +1035,7 @@ fn solve_dense_system(mut matrix: Vec<Vec<f64>>, mut right: Vec<f64>) -> Option<
             for (value, pivot_value) in matrix[row][pivot..].iter_mut().zip(&pivot_row[pivot..]) {
                 *value -= multiplier * pivot_value;
             }
-            right[row] -= multiplier * right[pivot];
+            right[row] = multiplier.mul_add(-right[pivot], right[row]);
         }
     }
     let mut solution = vec![0.0; size];

@@ -1,23 +1,56 @@
-use super::media::*;
-use super::*;
+//! Homogeneously filled circular-waveguide media.
+
+use super::media::{DefinedGammaZ0, LengthUnit, Media};
+use super::{
+    Array1, Complex64, Error, FREE_SPACE_PERMEABILITY, FREE_SPACE_PERMITTIVITY, Frequency, Network,
+    Result, WaveguideMode, bessel_j_zero, fmt,
+};
 /// A single mode of a homogeneously filled circular waveguide.
 ///
-/// Origin: `skrf/media/circularWaveguide.py::CircularWaveguide`.
+/// The cross-sectional area is $\pi r^2$. [`WaveguideMode`] and the azimuthal
+/// and radial indices select a TE or TM mode; corrugated-waveguide HE modes are
+/// not supported.
+///
+/// | Quantity | Symbol | Method |
+/// | --- | --- | --- |
+/// | Characteristic wavenumber | $k_0$ | [`Self::characteristic_wavenumber`] |
+/// | Cutoff wavenumber | $k_c$ | [`Self::cutoff_wavenumber`] |
+/// | Longitudinal wavenumber | $k_z$ | [`Media::propagation_constant`] |
+/// | Characteristic impedance | $Z_0$ | [`Media::characteristic_impedance`] |
 #[derive(Clone, Debug)]
 pub struct CircularWaveguide {
+    /// Frequency band of the medium.
     pub frequency: Frequency,
+    /// Waveguide radius in meters at every frequency point.
     pub radius: Array1<f64>,
+    /// Transverse-electric or transverse-magnetic mode family.
     pub mode: WaveguideMode,
+    /// Azimuthal mode index $m$.
     pub azimuthal_mode_index: usize,
+    /// One-based radial mode index $n$.
     pub radial_mode_index: usize,
+    /// Filling material relative permittivity `$\varepsilon_r$`.
     pub relative_permittivity: Array1<f64>,
+    /// Filling material relative permeability `$\mu_r$`.
     pub relative_permeability: Array1<f64>,
+    /// Sidewall resistivity in ohm-meters; `None` models perfect conductors.
     pub resistivity: Option<Array1<f64>>,
+    /// Optional port impedance used to renormalize generated networks.
     pub port_z0: Option<Array1<Complex64>>,
+    /// Optional override for the calculated characteristic impedance.
     pub characteristic_impedance_override: Option<Array1<Complex64>>,
 }
 
 impl CircularWaveguide {
+    /// Construct a circular-waveguide mode from frequency-dependent properties.
+    ///
+    /// All property arrays must match the frequency length. The radial index is
+    /// one-based, and radius, material properties, and resistivity must be
+    /// positive and finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid indices, incompatible arrays, or non-positive properties.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         frequency: Frequency,
@@ -101,6 +134,14 @@ impl CircularWaveguide {
         })
     }
 
+    /// Construct the fundamental air-filled TE11 mode at a constant radius.
+    ///
+    /// With no resistivity, the walls are treated as perfect electric
+    /// conductors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `radius` is invalid or the medium cannot be constructed.
     pub fn dominant_mode(frequency: Frequency, radius: f64) -> Result<Self> {
         let points = frequency.points();
         Self::new(
@@ -117,7 +158,11 @@ impl CircularWaveguide {
         )
     }
 
-    /// Resolves a sidewall conductor name or alias through `skrf.data.materials`.
+    /// Set sidewall resistivity from a named material or alias.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the material is unknown or has no resistivity value.
     pub fn set_resistivity_material(&mut self, material: &str) -> Result<()> {
         let properties = crate::data::MATERIALS
             .get(material.to_ascii_lowercase().as_str())
@@ -129,6 +174,14 @@ impl CircularWaveguide {
         Ok(())
     }
 
+    /// Construct a fundamental TE11 guide from a specified impedance.
+    ///
+    /// `characteristic_impedance` is imposed at `specification_frequency_hz`;
+    /// the radius is derived for the supplied filling-material properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs, a non-propagating solution, or construction failure.
     pub fn from_characteristic_impedance(
         frequency: Frequency,
         characteristic_impedance: f64,
@@ -174,14 +227,22 @@ impl CircularWaveguide {
         )
     }
 
+    /// Return absolute filling-material permittivity `$\varepsilon_r\varepsilon_0$`.
+    #[must_use]
     pub fn permittivity(&self) -> Array1<f64> {
         &self.relative_permittivity * FREE_SPACE_PERMITTIVITY
     }
 
+    /// Return absolute filling-material permeability `$\mu_r\mu_0$`.
+    #[must_use]
     pub fn permeability(&self) -> Array1<f64> {
         &self.relative_permeability * FREE_SPACE_PERMEABILITY
     }
 
+    /// Return the characteristic wavenumber.
+    ///
+    /// `k_0 = \omega\sqrt{\varepsilon\mu}`
+    #[must_use]
     pub fn characteristic_wavenumber(&self) -> Array1<f64> {
         let permittivity = self.permittivity();
         let permeability = self.permeability();
@@ -191,6 +252,13 @@ impl CircularWaveguide {
         })
     }
 
+    /// Return the Bessel root `$u_{mn}$` for the selected mode.
+    ///
+    /// TM modes use zeros of `$J_m$`; TE modes use zeros of $J'_m$.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the requested Bessel root cannot be evaluated.
     pub fn modal_root(&self) -> Result<f64> {
         bessel_j_zero(
             self.azimuthal_mode_index,
@@ -199,11 +267,25 @@ impl CircularWaveguide {
         )
     }
 
+    /// Return the cutoff wavenumber.
+    ///
+    /// `k_c = \frac{u_{mn}}{r}`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the modal root cannot be evaluated.
     pub fn cutoff_wavenumber(&self) -> Result<Array1<f64>> {
         let root = self.modal_root()?;
         Ok(self.radius.mapv(|radius| root / radius))
     }
 
+    /// Return the cutoff frequency for the selected mode.
+    ///
+    /// `f_c = \frac{u_{mn}}{2\pi r\sqrt{\varepsilon\mu}}`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cutoff wavenumber cannot be evaluated.
     pub fn cutoff_frequency(&self) -> Result<Array1<f64>> {
         let cutoff = self.cutoff_wavenumber()?;
         let permittivity = self.permittivity();
@@ -214,6 +296,11 @@ impl CircularWaveguide {
         }))
     }
 
+    /// Return frequency normalized to cutoff, `$f/f_c$`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cutoff frequency cannot be evaluated.
     pub fn normalized_frequency(&self) -> Result<Array1<f64>> {
         let cutoff = self.cutoff_frequency()?;
         Ok(Array1::from_shape_fn(self.frequency.points(), |point| {
@@ -221,12 +308,24 @@ impl CircularWaveguide {
         }))
     }
 
+    /// Return guide wavelength.
+    ///
+    /// With propagation constant $\gamma$, `$\lambda_g=j2\pi/\gamma$`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the propagation constant cannot be evaluated.
     pub fn guide_wavelength(&self) -> Result<Array1<Complex64>> {
         Ok(self
             .propagation_constant()?
             .mapv(|value| Complex64::new(0.0, std::f64::consts::TAU) / value))
     }
 
+    /// Return cutoff wavelength `$\lambda_c=v/f_c$`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cutoff frequency cannot be evaluated.
     pub fn cutoff_wavelength(&self) -> Result<Array1<f64>> {
         let cutoff = self.cutoff_frequency()?;
         let permittivity = self.permittivity();
@@ -236,6 +335,17 @@ impl CircularWaveguide {
         }))
     }
 
+    /// Return TE11 sidewall-conductor attenuation in nepers per meter.
+    ///
+    /// Higher modes and surface roughness are not implemented. Without
+    /// resistivity, attenuation is zero.
+    ///
+    /// See Pozar, *Microwave Engineering*, Eq. 3.133, and Orfanidis,
+    /// [Electromagnetic Waves and Antennas](http://eceweb1.rutgers.edu/~orfanidi/ewa/), Eq. 9.8.1.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported modes, operation below cutoff, or unavailable mode data.
     pub fn conductor_attenuation(&self) -> Result<Array1<f64>> {
         let Some(resistivity) = &self.resistivity else {
             return Ok(Array1::zeros(self.frequency.points()));
@@ -261,7 +371,7 @@ impl CircularWaveguide {
             let inverse_normalized_squared = normalized[point].powi(-2);
             1.0 / self.radius[point]
                 * (angular[point] * permittivity[point] * resistivity[point] / 2.0).sqrt()
-                * (inverse_normalized_squared + 1.0 / (root.powi(2) - 1.0))
+                * (inverse_normalized_squared + 1.0 / root.mul_add(root, -1.0))
                 / (1.0 - inverse_normalized_squared).sqrt()
         }))
     }
@@ -281,6 +391,14 @@ impl Media for CircularWaveguide {
         &self.frequency
     }
 
+    /// Return the longitudinal propagation constant.
+    ///
+    /// $$\gamma=\begin{cases}
+    /// \alpha_c+j\sqrt{k_0^2-k_c^2}, & `k_0>k_c`\\
+    /// \sqrt{k_c^2-k_0^2}, & `k_0`<`k_c`
+    /// \end{cases}$$
+    ///
+    /// It is imaginary for ideal propagating modes and real below cutoff.
     fn propagation_constant(&self) -> Result<Array1<Complex64>> {
         let k0 = self.characteristic_wavenumber();
         let cutoff = self.cutoff_wavenumber()?;
@@ -289,16 +407,25 @@ impl Media for CircularWaveguide {
             if k0[point] > cutoff[point] {
                 Complex64::new(
                     attenuation[point],
-                    (k0[point].powi(2) - cutoff[point].powi(2)).sqrt(),
+                    k0[point].mul_add(k0[point], -cutoff[point].powi(2)).sqrt(),
                 )
             } else if k0[point] < cutoff[point] {
-                Complex64::new((cutoff[point].powi(2) - k0[point].powi(2)).sqrt(), 0.0)
+                Complex64::new(
+                    cutoff[point]
+                        .mul_add(cutoff[point], -k0[point].powi(2))
+                        .sqrt(),
+                    0.0,
+                )
             } else {
                 Complex64::new(attenuation[point], 0.0)
             }
         }))
     }
 
+    /// Return the TE or TM modal characteristic impedance in ohms.
+    ///
+    /// An explicit [`Self::characteristic_impedance_override`] takes
+    /// precedence over the calculated value.
     fn characteristic_impedance(&self) -> Result<Array1<Complex64>> {
         if let Some(impedance) = &self.characteristic_impedance_override {
             return Ok(impedance.clone());
@@ -357,7 +484,9 @@ impl Media for CircularWaveguide {
 impl fmt::Display for CircularWaveguide {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let radius = match (self.radius.first(), self.radius.last()) {
-            (Some(first), Some(last)) if self.radius.len() > 1 && first != last => {
+            (Some(first), Some(last))
+                if self.radius.len() > 1 && (first - last).abs() > f64::EPSILON =>
+            {
                 format!("{first:.2e}, ..., {last:.2e}")
             }
             (Some(value), _) => format!("{value:.2e}"),

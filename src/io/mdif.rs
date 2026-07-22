@@ -1,4 +1,11 @@
+//! Read and write Generalized MDIF N-port data.
+//!
+//! MDIF files store networks that vary with frequency and with one or more
+//! named parameters. [`Mdif`] preserves those parameter coordinates and can
+//! expose the collection as a [`crate::NetworkSet`].
+
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -15,17 +22,18 @@ use crate::{Error, Frequency, FrequencyUnit, Network, NetworkSet, Result, SParam
 /// Origin: `skrf/io/mdif.py::Mdif._parse_mdif`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MdifValue {
+    /// A numeric parameter coordinate.
     Number(f64),
+    /// A textual parameter coordinate.
     Text(String),
 }
 
 impl MdifValue {
     fn parse(value: &str) -> Self {
-        value
-            .trim()
-            .parse::<f64>()
-            .map(Self::Number)
-            .unwrap_or_else(|_| Self::Text(value.trim().trim_matches('"').to_owned()))
+        value.trim().parse::<f64>().map_or_else(
+            |_| Self::Text(value.trim().trim_matches('"').to_owned()),
+            Self::Number,
+        )
     }
 }
 
@@ -59,20 +67,36 @@ impl MdifFormat {
     }
 }
 
-/// Reader and writer for Generalized MDIF files.
+/// Reader and writer for Generalized MDIF N-port files.
 ///
-/// Origin: `skrf/io/mdif.py::Mdif`.
+/// MDIF files store network parameters that vary with frequency and with one
+/// or more named variables. Parsed data can be converted to a [`NetworkSet`]
+/// for selection and interpolation by those variables.
+///
+/// The supported syntax follows the [AWR Generalized MDIF format].
+///
+/// [AWR Generalized MDIF format]: https://awrcorp.com/download/faq/english/docs/Users_Guide/data_file_formats.html#generalized_mdif
 #[derive(Clone, Debug, Default)]
 pub struct Mdif {
+    /// Source file path, or `None` for input parsed from a reader or string.
     pub filename: Option<PathBuf>,
+    /// File-level comments found before the first data block.
     pub comments: Vec<String>,
+    /// Named variables declared by `VAR` records.
     pub parameters: Vec<String>,
+    /// Parameter values associated with each network.
     pub parameter_values: Vec<BTreeMap<String, MdifValue>>,
+    /// Networks stored in the MDIF data blocks.
     pub networks: Vec<Network>,
 }
 
 impl Mdif {
-    /// Port of `Mdif.__init__` for a filesystem path.
+    /// Load an MDIF document from a filesystem path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or contains invalid or
+    /// unsupported MDIF data.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let text = fs::read_to_string(path)?;
@@ -81,13 +105,28 @@ impl Mdif {
         Ok(mdif)
     }
 
-    /// Port of `Mdif.__init__` for a file-like object.
+    /// Load an MDIF document from a reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader fails or supplies invalid or unsupported
+    /// MDIF data.
     pub fn from_reader(mut reader: impl Read) -> Result<Self> {
         let mut text = String::new();
         reader.read_to_string(&mut text)?;
         Self::parse(&text)
     }
 
+    /// Parse an MDIF document from text.
+    ///
+    /// `ACDATA` blocks are decoded as S, Z, or Y parameters in RI, MA, or DB
+    /// form. Z and Y data are converted to scattering parameters. Associated
+    /// `NDATA` blocks populate the network noise parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if declarations or data blocks are malformed,
+    /// unsupported, incomplete, or inconsistent with the network dimensions.
     pub fn parse(text: &str) -> Result<Self> {
         let mut mdif = Self::default();
         let mut current_parameters = BTreeMap::new();
@@ -176,7 +215,15 @@ impl Mdif {
         Ok(mdif)
     }
 
-    /// Port of `Mdif.to_networkset` for numeric parameter coordinates.
+    /// Return the parsed MDIF data as a network set.
+    ///
+    /// Named variables are copied to the network set as numeric or textual
+    /// parameters. A parameter that mixes both kinds is rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the networks cannot form a set, a parameter value
+    /// is missing, or a parameter mixes numeric and textual values.
     pub fn to_network_set(&self) -> Result<NetworkSet> {
         let mut set = NetworkSet::new(self.networks.clone(), None)?;
         for name in &self.parameters {
@@ -226,7 +273,16 @@ impl Mdif {
         Ok(set)
     }
 
-    /// Port of `Mdif.write` using an explicit, round-trippable RI layout.
+    /// Write a network set to an MDIF file.
+    ///
+    /// Numeric and textual parameters come from the [`NetworkSet`]. Each item
+    /// in `comments` becomes a separate file-level comment. Network data uses
+    /// an explicit, round-trippable real/imaginary layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output file cannot be created or written, or
+    /// the network-set parameters have inconsistent lengths.
     pub fn write_to_path(
         network_set: &NetworkSet,
         path: impl AsRef<Path>,
@@ -236,6 +292,16 @@ impl Mdif {
         Self::write(network_set, file, comments)
     }
 
+    /// Write a network set as MDIF to an arbitrary writer.
+    ///
+    /// Each network receives its numeric and textual `VAR` declarations, an
+    /// `ACDATA` block, and an optional `NDATA` noise block. Network data is
+    /// written in hertz with real and imaginary components.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing fails or a network-set parameter does not
+    /// contain exactly one value per network.
     pub fn write(
         network_set: &NetworkSet,
         mut writer: impl Write,
@@ -312,7 +378,12 @@ impl Mdif {
         Ok(())
     }
 
-    /// Port of `Mdif.__create_optionstring`.
+    /// Create the MDIF field-description string for `ports` ports.
+    ///
+    /// Two-port fields use the conventional $S_{11}, S_{21}, S_{12}, S_{22}$
+    /// ordering. Ports above nine are separated with an underscore, and long
+    /// records are wrapped after the field counts permitted by Touchstone.
+    #[must_use]
     pub fn option_string(ports: usize) -> String {
         let mut output = "%F ".to_owned();
         let coordinates = if ports == 2 {
@@ -324,9 +395,9 @@ impl Mdif {
         };
         for (index, (row, column)) in coordinates.into_iter().enumerate() {
             if ports > 9 {
-                output.push_str(&format!("n{row}_{column}x n{row}_{column}y"));
+                let _ = write!(&mut output, "n{row}_{column}x n{row}_{column}y");
             } else {
-                output.push_str(&format!("n{row}{column}x n{row}{column}y"));
+                let _ = write!(&mut output, "n{row}{column}x n{row}{column}y");
             }
             if index + 1 < ports * ports {
                 output.push(' ');

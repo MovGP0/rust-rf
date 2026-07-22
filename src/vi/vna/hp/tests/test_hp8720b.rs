@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::io::{Read, Write};
 
+use approx::assert_relative_eq;
 use rust_rf::Result;
 use rust_rf::vi::vna::hp::{Hp8510C, Hp8720B};
 use rust_rf::vi::vna::{InstrumentSession, Vna};
@@ -76,7 +77,7 @@ fn hp8720_controls_bandwidth_averaging_and_sweep_modes() {
     session.push_text("AVERFACT?", "16");
     session.push_text("TRIG?", "0");
     let mut hp = hp8720(session);
-    assert_eq!(hp.if_bandwidth().unwrap(), 3_000.0);
+    assert_relative_eq!(hp.if_bandwidth().unwrap(), 3_000.0, epsilon = 1.0e-12);
     assert_eq!(hp.averaging().unwrap(), 16);
     assert!(hp.is_continuous().unwrap());
     hp.set_if_bandwidth(100).unwrap();

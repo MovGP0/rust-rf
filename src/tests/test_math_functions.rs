@@ -1,3 +1,5 @@
+//! Mathematical conversion, linear algebra, interpolation, FFT, and random tests.
+
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3, array};
 use num_complex::Complex64;
@@ -21,6 +23,7 @@ use rust_rf::time::Window;
 
 const TOLERANCE: f64 = 1.0e-6;
 
+/// Checks magnitude, phase, quadrature, real, and imaginary complex projections.
 #[test]
 fn converts_complex_components() {
     assert_relative_eq!(complex_magnitude(Complex64::new(3.0, 4.0)), 5.0);
@@ -40,12 +43,14 @@ fn converts_complex_components() {
     assert_relative_eq!(components.4, std::f64::consts::PI);
 }
 
+/// Checks linear magnitude, dB, dB10, and inverse conversions.
 #[test]
 fn converts_logarithmic_magnitudes() {
     assert_relative_eq!(magnitude_to_db(10.0, true), 20.0);
     assert_relative_eq!(magnitude_to_db10(10.0, true), 10.0);
-    assert_eq!(magnitude_to_db(0.0, true), f64::NEG_INFINITY);
-    assert_eq!(magnitude_to_db(-1.0, true), LOG_OF_NEGATIVE);
+    let zero_magnitude_db = magnitude_to_db(0.0, true);
+    assert!(zero_magnitude_db.is_infinite() && zero_magnitude_db.is_sign_negative());
+    assert_relative_eq!(magnitude_to_db(-1.0, true), LOG_OF_NEGATIVE);
     assert!(magnitude_to_db(-1.0, false).is_nan());
 
     let complex = db10_to_complex_magnitude(Complex64::new(3.0, 4.0));
@@ -53,6 +58,7 @@ fn converts_logarithmic_magnitudes() {
     assert_complex_close(complex, expected);
 }
 
+/// Checks reconstruction of complex values from magnitude and phase.
 #[test]
 fn converts_magnitude_and_phase_to_complex() {
     assert_complex_close(
@@ -62,32 +68,35 @@ fn converts_magnitude_and_phase_to_complex() {
     assert_complex_close(db_degrees_to_complex(20.0, 90.0), Complex64::new(0.0, 10.0));
 }
 
+/// Checks nepers/decibels, radians/degrees, and feet/meters conversions.
 #[test]
 fn converts_physical_and_logarithmic_units() {
     assert_relative_eq!(nepers_to_db(1.0), 20.0 / std::f64::consts::LN_10);
     assert_relative_eq!(db_to_nepers(1.0), std::f64::consts::LN_10 / 20.0);
     assert_relative_eq!(radians_to_degrees(std::f64::consts::PI), 180.0);
-    assert_relative_eq!(feet_to_meters(0.01), 0.003048);
+    assert_relative_eq!(feet_to_meters(0.01), 0.003_048);
     assert_relative_eq!(feet_to_meters(1.0), 0.3048);
-    assert_relative_eq!(meters_to_feet(0.01), 0.0328084);
+    assert_relative_eq!(meters_to_feet(0.01), 0.032_808_4);
     assert_relative_eq!(meters_to_feet(1.0), 3.28084);
     assert_relative_eq!(
         db_per_100_feet_to_db_per_100_meters(2.5),
-        8.2020997375,
+        8.202_099_737_5,
         epsilon = 1.0e-8
     );
 }
 
+/// Checks replacement of infinities with the scikit-rf finite sentinel.
 #[test]
 fn replaces_infinities_with_skrf_sentinel() {
-    assert_eq!(infinity_to_number(f64::INFINITY), NUMERICAL_INFINITY);
-    assert_eq!(infinity_to_number(f64::NEG_INFINITY), -NUMERICAL_INFINITY);
+    assert_relative_eq!(infinity_to_number(f64::INFINITY), NUMERICAL_INFINITY);
+    assert_relative_eq!(infinity_to_number(f64::NEG_INFINITY), -NUMERICAL_INFINITY);
     assert_eq!(
         infinities_to_numbers(&array![0.0, f64::INFINITY, 0.0, f64::NEG_INFINITY]),
         array![0.0, NUMERICAL_INFINITY, 0.0, -NUMERICAL_INFINITY]
     );
 }
 
+/// Checks the right-side matrix solve $XA=B$.
 #[test]
 fn right_solve_satisfies_x_times_a_equals_b() {
     let coefficients = Array3::from_shape_vec(
@@ -123,6 +132,7 @@ fn right_solve_satisfies_x_times_a_equals_b() {
     }
 }
 
+/// Checks integer-order Bessel zeros.
 #[test]
 fn finds_integer_order_bessel_zeros() {
     assert_relative_eq!(
@@ -138,6 +148,7 @@ fn finds_integer_order_bessel_zeros() {
     assert!(bessel_j_zero(0, 0, false).is_err());
 }
 
+/// Checks complete elliptic integrals of the first kind.
 #[test]
 fn calculates_complete_elliptic_integrals() {
     assert_relative_eq!(
@@ -153,6 +164,7 @@ fn calculates_complete_elliptic_integrals() {
     assert!(complete_elliptic_integral_first_kind(1.0).is_err());
 }
 
+/// Checks the modified Bessel function `$I_1$`.
 #[test]
 fn calculates_modified_bessel_i1() {
     assert_relative_eq!(
@@ -167,6 +179,7 @@ fn calculates_modified_bessel_i1() {
     );
 }
 
+/// Checks reproducibility of seeded complex random values.
 #[test]
 fn seeded_complex_random_values_are_repeatable() {
     set_random_seed(42);
@@ -188,6 +201,7 @@ fn seeded_complex_random_values_are_repeatable() {
     );
 }
 
+/// Checks reproducibility of seeded Gaussian polar noise.
 #[test]
 fn seeded_gaussian_polar_values_are_repeatable() {
     set_random_seed(123);
@@ -206,6 +220,7 @@ fn seeded_gaussian_polar_values_are_repeatable() {
     assert!(random_gaussian_polar(1, 1, -1.0, 0.1).is_err());
 }
 
+/// Checks phase unwrapping and selection among complex roots.
 #[test]
 fn unwraps_phase_and_selects_complex_roots() {
     let unwrapped = unwrap_radians(&array![
@@ -249,12 +264,13 @@ fn unwraps_phase_and_selects_complex_roots() {
     let roots = sqrt_phase_unwrap(&values);
     assert_relative_eq!(roots[0].arg().to_degrees(), 85.0, epsilon = TOLERANCE);
     assert_relative_eq!(roots[1].arg().to_degrees(), 95.0, epsilon = TOLERANCE);
-    assert_eq!(dirac_delta(0.0), 1.0);
-    assert_eq!(dirac_delta(1.0), 0.0);
-    assert_eq!(neumann_number(0.0), 1.0);
-    assert_eq!(neumann_number(1.0), 2.0);
+    assert_relative_eq!(dirac_delta(0.0), 1.0);
+    assert_relative_eq!(dirac_delta(1.0), 0.0);
+    assert_relative_eq!(neumann_number(0.0), 1.0);
+    assert_relative_eq!(neumann_number(1.0), 2.0);
 }
 
+/// Checks complex-matrix serialization in Fortran column-major order.
 #[test]
 fn serializes_complex_matrices_in_fortran_order() {
     let values = [Complex64::new(1.0, 2.0), Complex64::new(3.0, 4.0)];
@@ -283,6 +299,7 @@ fn serializes_complex_matrices_in_fortran_order() {
     );
 }
 
+/// Checks Hermitian, unitary, positive-definite, and semidefinite predicates.
 #[test]
 fn evaluates_complex_matrix_predicates() {
     let swap = array![
@@ -314,6 +331,7 @@ fn evaluates_complex_matrix_predicates() {
     assert!(!is_positive_semidefinite(&indefinite, 1.0e-12));
 }
 
+/// Checks complex null spaces and real-to-complex function lifting.
 #[test]
 fn calculates_null_spaces_and_complexified_functions() {
     let matrix = array![
@@ -331,10 +349,11 @@ fn calculates_null_spaces_and_complexified_functions() {
     );
 }
 
+/// Checks rational interpolation of complex samples.
 #[test]
 fn performs_rational_interpolation() {
     let x = array![3.0, 0.0, 2.0, 1.0, 4.0];
-    let y = x.mapv(|value| Complex64::new(value * value + 2.0 * value + 1.0, -value));
+    let y = x.mapv(|value| Complex64::new(2.0_f64.mul_add(value, value * value) + 1.0, -value));
     let interpolator =
         RationalInterpolator::new(&x, &y, 2, 1.0e-12, false).expect("interpolator should build");
     let target = array![0.0, 0.5, 2.0, 3.5];
@@ -342,13 +361,14 @@ fn performs_rational_interpolation() {
     for (actual, target) in values.iter().zip(target) {
         assert_relative_eq!(
             actual.re,
-            target * target + 2.0 * target + 1.0,
+            2.0_f64.mul_add(target, target * target) + 1.0,
             epsilon = 1.0e-10
         );
         assert_relative_eq!(actual.im, -target, epsilon = 1.0e-10);
     }
 }
 
+/// Checks interpolation of multidimensional values along axis zero.
 #[test]
 fn interpolates_multidimensional_values_along_axis_zero() {
     let x = array![2.0, 0.0, 1.0];
@@ -368,6 +388,7 @@ fn interpolates_multidimensional_values_along_axis_zero() {
     assert_relative_eq!(values[[1, 1]].re, 4.0, epsilon = 1.0e-12);
 }
 
+/// Checks centered inverse FFT conversion from spectra to time domain.
 #[test]
 fn converts_spectra_to_centered_time_domain() {
     let spectrum = Array1::from_elem(5, Complex64::new(1.0, 0.0));
@@ -410,10 +431,12 @@ fn converts_spectra_to_centered_time_domain() {
     assert_relative_eq!(time[4], 0.5, epsilon = 1.0e-12);
 }
 
+/// Checks multidimensional spectral transforms along axis zero.
 #[test]
 fn transforms_multidimensional_spectra_along_axis_zero() {
     let spectrum = Array2::from_shape_fn((5, 2), |(_, column)| {
-        Complex64::new((column + 1) as f64, 0.0)
+        let one_based_column = u32::try_from(column + 1).expect("column index should fit in u32");
+        Complex64::new(f64::from(one_based_column), 0.0)
     })
     .into_dyn();
     let transformed = inverse_fft_centered_axis0(&spectrum).expect("axis-zero FFT should succeed");
@@ -426,7 +449,8 @@ fn transforms_multidimensional_spectra_along_axis_zero() {
     }
 
     let real_spectrum = Array2::from_shape_fn((3, 2), |(_, column)| {
-        Complex64::new((column + 1) as f64, 0.0)
+        let one_based_column = u32::try_from(column + 1).expect("column index should fit in u32");
+        Complex64::new(f64::from(one_based_column), 0.0)
     })
     .into_dyn();
     let real = inverse_real_fft_centered_axis0(&real_spectrum, Some(4))
@@ -436,6 +460,7 @@ fn transforms_multidimensional_spectra_along_axis_zero() {
     assert_relative_eq!(real[[2, 1]], 2.0, epsilon = 1.0e-12);
 }
 
+/// Checks controlled nudging of eigenvalues below a numerical threshold.
 #[test]
 fn nudges_small_eigenvalues() {
     let zero = Array3::zeros((3, 2, 2));

@@ -1,5 +1,11 @@
 ﻿#![allow(unused_imports)]
 
+//! Coaxial-media regression tests.
+//!
+//! These tests cover the Python suite's distributed-parameter identity,
+//! frequency-dependent attenuation conversions, conductor loss, and line
+//! construction, plus the Rust geometry constructor.
+
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
@@ -16,6 +22,7 @@ use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
 
 const TOLERANCE: f64 = 1.0e-10;
 
+/// Verifies $LC=\mu\varepsilon'$ and constructs the corresponding lossy line.
 #[test]
 fn calculates_coaxial_distributed_parameters() {
     let frequency = Frequency::new(1.0, 10.0, 5, FrequencyUnit::GHz, SweepType::Linear)
@@ -47,6 +54,7 @@ fn calculates_coaxial_distributed_parameters() {
     assert_eq!(line.z0[(0, 0)], Complex64::new(50.0, 0.0));
 }
 
+/// Verifies every supported dB/Np and meter/foot attenuation conversion.
 #[test]
 fn converts_coaxial_attenuation_units() {
     let frequency = Frequency::new(1.0, 2.0, 2, FrequencyUnit::GHz, SweepType::Linear)
@@ -85,6 +93,7 @@ fn converts_coaxial_attenuation_units() {
     }
 }
 
+/// Verifies that a requested impedance and outer diameter produce valid geometry.
 #[test]
 fn derives_coaxial_geometry_from_impedance() {
     let frequency = Frequency::new(1.0, 2.0, 2, FrequencyUnit::GHz, SweepType::Linear)

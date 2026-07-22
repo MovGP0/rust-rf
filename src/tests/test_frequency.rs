@@ -1,9 +1,12 @@
+//! Frequency-axis construction, slicing, arithmetic, and derived-value tests.
+
 use approx::assert_relative_eq;
 use ndarray::{Array1, array};
 use rust_rf::{Frequency, FrequencyUnit, SweepType};
 
 const TOLERANCE: f64 = 1.0e-12;
 
+/// Checks an evenly spaced linear sweep.
 #[test]
 fn creates_linear_sweep() {
     let frequency = Frequency::new(1.0, 10.0, 10, FrequencyUnit::GHz, SweepType::Linear)
@@ -16,6 +19,7 @@ fn creates_linear_sweep() {
     }
 }
 
+/// Checks a logarithmically spaced sweep.
 #[test]
 fn creates_logarithmic_sweep() {
     let frequency = Frequency::new(1.0, 10.0, 10, FrequencyUnit::GHz, SweepType::Logarithmic)
@@ -37,6 +41,7 @@ fn creates_logarithmic_sweep() {
     }
 }
 
+/// Checks an arbitrary sweep and unit-to-hertz conversion.
 #[test]
 fn creates_arbitrary_sweep_in_requested_unit() {
     let frequency = Frequency::from_values(array![1.0, 5.0, 200.0], FrequencyUnit::KHz)
@@ -47,6 +52,7 @@ fn creates_arbitrary_sweep_in_requested_unit() {
     assert_eq!(frequency.sweep_type(), SweepType::Arbitrary);
 }
 
+/// Checks inclusive slicing by frequency values.
 #[test]
 fn slices_frequency_by_inclusive_value_range() {
     let frequency = Frequency::from_values(array![1.0, 2.0, 4.0, 5.0, 6.0], FrequencyUnit::GHz)
@@ -60,6 +66,7 @@ fn slices_frequency_by_inclusive_value_range() {
     assert_eq!(sliced.unit(), FrequencyUnit::GHz);
 }
 
+/// Checks detection and removal of non-monotonic frequency values.
 #[test]
 fn detects_and_drops_non_monotonic_values() {
     let mut frequency = Frequency::from_values(array![1.0, 2.0, 2.0], FrequencyUnit::Hz)
@@ -71,6 +78,7 @@ fn detects_and_drops_non_monotonic_values() {
     assert!(frequency.is_monotonic_increasing());
 }
 
+/// Checks frequency arithmetic and scalar broadcasting without mutating the source.
 #[test]
 fn performs_frequency_arithmetic_with_broadcasting() {
     let frequency = Frequency::new(1.0, 10.0, 10, FrequencyUnit::GHz, SweepType::Linear)
@@ -81,14 +89,14 @@ fn performs_frequency_arithmetic_with_broadcasting() {
         .try_add(&scalar)
         .expect("single-point axes should broadcast");
     for (actual, original) in added.values_hz().iter().zip(frequency.values_hz()) {
-        assert_eq!(*actual, original + 10.0);
+        assert_relative_eq!(*actual, original + 10.0, max_relative = TOLERANCE);
     }
 
     let multiplied = frequency
         .map_values(|value| value * 5.31)
         .expect("finite mapped values should be valid");
     for (actual, original) in multiplied.values_hz().iter().zip(frequency.values_hz()) {
-        assert_eq!(*actual, original * 5.31);
+        assert_relative_eq!(*actual, original * 5.31, max_relative = TOLERANCE);
     }
 
     let incompatible = Frequency::from_hz(Array1::linspace(10.0, 100.0, 20))
@@ -121,6 +129,10 @@ fn performs_frequency_arithmetic_with_broadcasting() {
     );
 }
 
+/// Checks that changing display units does not mutate stored hertz values.
+///
+/// Rust keeps the point array private, avoiding the direct-mutation corner cases
+/// tested by the upstream Python suite.
 #[test]
 fn changes_display_units_without_mutating_hertz() {
     let mut frequency = Frequency::from_hz(array![1.0e9, 2.0e9]).expect("frequency");
@@ -131,6 +143,7 @@ fn changes_display_units_without_mutating_hertz() {
     assert_eq!(frequency.to_string(), "1-2 GHz, 2 pts");
 }
 
+/// Checks overlap using the first frequency axis as the output grid.
 #[test]
 fn calculates_overlap_on_the_left_axis_grid() {
     let left = Frequency::new(1.0, 10.0, 10, FrequencyUnit::GHz, SweepType::Linear)
@@ -144,6 +157,7 @@ fn calculates_overlap_on_the_left_axis_grid() {
     assert_eq!(overlap.unit(), FrequencyUnit::GHz);
 }
 
+/// Checks angular frequency, gradients, span, center, and display scaling.
 #[test]
 fn exposes_derived_frequency_properties() {
     let frequency = Frequency::new(1.0, 5.0, 5, FrequencyUnit::GHz, SweepType::Linear)
@@ -159,6 +173,7 @@ fn exposes_derived_frequency_properties() {
     );
 }
 
+/// Checks the centered time axis derived from frequency spacing.
 #[test]
 fn creates_centered_time_axis() {
     let frequency = Frequency::new(1.0, 5.0, 5, FrequencyUnit::GHz, SweepType::Linear)
@@ -178,6 +193,7 @@ fn creates_centered_time_axis() {
     );
 }
 
+/// Checks invalid construction and disjoint-overlap errors.
 #[test]
 fn rejects_invalid_construction_and_disjoint_overlap() {
     assert!(Frequency::new(0.0, 10.0, 10, FrequencyUnit::GHz, SweepType::Logarithmic,).is_err());

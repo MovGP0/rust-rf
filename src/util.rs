@@ -1,3 +1,9 @@
+//! General-purpose utilities.
+//!
+//! This module contains sortable timestamps, numeric search and smoothing,
+//! filename helpers, structured records, homogeneous collections, recursive
+//! text replacement, unique-name generation, and a deterministic progress bar.
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
@@ -7,10 +13,16 @@ use std::process::Command;
 
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike};
 use ndarray::Array1;
+use num_traits::ToPrimitive;
 
 use crate::{Error, Result};
 
-/// Current local timestamp in the sortable format used by `skrf.util.now_string`.
+/// Returns the current local time as a sortable timestamp string.
+///
+/// The format is `YYYY.MM.DD.hh.mm.ss.ffffff`, which is convenient for
+/// date-stamped filenames. Use [`parse_now_string`] to convert it back to a
+/// date-time value.
+#[must_use]
 pub fn now_string() -> String {
     let now = Local::now().naive_local();
     format!(
@@ -27,7 +39,13 @@ pub fn now_string() -> String {
 
 /// Parses a timestamp produced by [`now_string`].
 ///
-/// Origin: `skrf.util.now_string_2_dt`.
+/// Both timestamps with microseconds (`YYYY.MM.DD.hh.mm.ss.ffffff`) and the
+/// shorter second-resolution form are accepted.
+///
+/// # Errors
+///
+/// Returns an error if the timestamp contains non-numeric fields, has the wrong
+/// number of fields, or does not represent a valid date and time.
 pub fn parse_now_string(value: &str) -> Result<NaiveDateTime> {
     let fields = value
         .split('.')
@@ -42,7 +60,10 @@ pub fn parse_now_string(value: &str) -> Result<NaiveDateTime> {
             "timestamp must contain year through seconds and optional microseconds".to_owned(),
         ));
     }
-    let date = NaiveDate::from_ymd_opt(fields[0] as i32, fields[1], fields[2])
+    let year = i32::try_from(fields[0]).map_err(|error| {
+        Error::Parse(format!("timestamp year is outside the i32 range: {error}"))
+    })?;
+    let date = NaiveDate::from_ymd_opt(year, fields[1], fields[2])
         .ok_or_else(|| Error::Parse("timestamp contains an invalid date".to_owned()))?;
     date.and_hms_micro_opt(
         fields[3],
@@ -53,7 +74,11 @@ pub fn parse_now_string(value: &str) -> Result<NaiveDateTime> {
     .ok_or_else(|| Error::Parse("timestamp contains an invalid time".to_owned()))
 }
 
-/// Port of `skrf.util.find_nearest_index`.
+/// Finds the index of the value numerically closest to `target`.
+///
+/// # Errors
+///
+/// Returns an error when `values` is empty.
 pub fn find_nearest_index(values: &Array1<f64>, target: f64) -> Result<usize> {
     values
         .iter()
@@ -63,17 +88,27 @@ pub fn find_nearest_index(values: &Array1<f64>, target: f64) -> Result<usize> {
         .ok_or_else(|| Error::IncompatibleShape("cannot search an empty array".to_owned()))
 }
 
-/// Port of `skrf.util.find_nearest`.
+/// Finds the value numerically closest to `target`.
+///
+/// # Errors
+///
+/// Returns an error when `values` is empty.
 pub fn find_nearest(values: &Array1<f64>, target: f64) -> Result<f64> {
     Ok(values[find_nearest_index(values, target)?])
 }
 
-/// Port of `skrf.util.slice_domain` using an inclusive Rust range.
+/// Returns the inclusive index range closest to the requested domain endpoints.
+///
+/// # Errors
+///
+/// Returns an error when `values` is empty.
 pub fn slice_domain(values: &Array1<f64>, domain: (f64, f64)) -> Result<RangeInclusive<usize>> {
     Ok(find_nearest_index(values, domain.0)?..=find_nearest_index(values, domain.1)?)
 }
 
-/// Port of `skrf.util.get_extn`.
+/// Returns the final extension of a path, without the leading period.
+///
+/// Returns `None` when the path has no non-empty UTF-8 extension.
 pub fn extension(path: impl AsRef<Path>) -> Option<String> {
     path.as_ref()
         .extension()
@@ -82,7 +117,9 @@ pub fn extension(path: impl AsRef<Path>) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Port of `skrf.util.basename_noext`.
+/// Returns a path's basename without its final extension.
+///
+/// Returns `None` when the file stem is not valid UTF-8.
 pub fn basename_without_extension(path: impl AsRef<Path>) -> Option<String> {
     path.as_ref()
         .file_stem()
@@ -92,7 +129,10 @@ pub fn basename_without_extension(path: impl AsRef<Path>) -> Option<String> {
 
 /// Runs `git describe` in a repository, returning `None` when no description exists.
 ///
-/// Origin: the deprecated `skrf.util.git_version`.
+/// # Errors
+///
+/// Returns an error if Git cannot be started or its successful output is not
+/// valid UTF-8.
 pub fn git_version(repository: impl AsRef<Path>) -> Result<Option<String>> {
     let output = Command::new("git")
         .arg("describe")
@@ -108,16 +148,24 @@ pub fn git_version(repository: impl AsRef<Path>) -> Result<Option<String>> {
     Ok((!description.is_empty()).then_some(description))
 }
 
-/// Typed record corresponding to one structured dictionary key.
+/// A value and the fields parsed from its structured dictionary key.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructuredRecord<T> {
+    /// Fields obtained by splitting the original key.
     pub fields: Vec<String>,
+    /// Value associated with the original key.
     pub value: T,
 }
 
-/// Splits structured keys while preserving values in typed Rust records.
+/// Converts dictionary entries with delimited keys into typed records.
 ///
-/// Origin: the deprecated `skrf.util.dict_2_recarray`.
+/// This supports file naming conventions used as a lightweight database: each
+/// key is split by `delimiter`, while its associated value is retained in the
+/// resulting [`StructuredRecord`].
+///
+/// # Errors
+///
+/// Returns an error when `delimiter` is empty.
 pub fn dictionary_to_records<T: Clone>(
     values: &BTreeMap<String, T>,
     delimiter: &str,
@@ -138,7 +186,16 @@ pub fn dictionary_to_records<T: Clone>(
 
 /// Recursively replaces text in UTF-8 files matching `*`, `*.extension`, or an exact name.
 ///
-/// Origin: the deprecated `skrf.util.findReplace`.
+/// Returns the paths of files whose contents changed.
+///
+/// # Errors
+///
+/// Returns an error when `find` is empty, `directory` is not a directory, a
+/// matching file is not UTF-8, or a filesystem operation fails.
+///
+/// # Reference
+///
+/// Adapted from [this recursive find-and-replace approach](https://stackoverflow.com/questions/4205854/python-way-to-recursively-find-and-replace-string-in-text-files).
 pub fn replace_in_files(
     directory: impl AsRef<Path>,
     find: &str,
@@ -194,7 +251,11 @@ fn matches_file_pattern(path: &Path, pattern: &str) -> bool {
     path.file_name().and_then(|value| value.to_str()) == Some(pattern)
 }
 
-/// Port of `skrf.util.has_duplicate_value`.
+/// Finds another occurrence of `value` in a slice.
+///
+/// `exclude` identifies an index that must not be considered, allowing callers
+/// to search for duplicates of an item already present in the slice. Returns the
+/// first matching index or `None`.
 pub fn duplicate_index<T: PartialEq>(
     value: &T,
     values: &[T],
@@ -205,7 +266,10 @@ pub fn duplicate_index<T: PartialEq>(
     })
 }
 
-/// Port of `skrf.util.unique_name`.
+/// Adds or increments a `_NN` suffix until `name` is unique in `names`.
+///
+/// The optional `exclude` index is ignored when checking for duplicates. This
+/// is useful when renaming an existing item in place.
 pub fn unique_name(name: &str, names: &[String], exclude: Option<usize>) -> String {
     let candidate = name.to_owned();
     if duplicate_index(&candidate, names, exclude).is_none() {
@@ -232,17 +296,36 @@ pub fn unique_name(name: &str, names: &[String], exclude: Option<usize>) -> Stri
     format!("{base}_99")
 }
 
+/// Window used to smooth a one-dimensional signal.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SmoothingWindow {
+    /// A flat window, producing a moving average.
     #[default]
     Flat,
+    /// A Hanning window.
     Hanning,
+    /// A Hamming window.
     Hamming,
+    /// A Bartlett window.
     Bartlett,
+    /// A Blackman window.
     Blackman,
 }
 
-/// Port of `skrf.util.smooth`.
+/// Smooths a one-dimensional signal with a window of the requested length.
+///
+/// The normalized window is convolved with reflected copies of the signal at
+/// both ends, reducing boundary transients. A [`SmoothingWindow::Flat`] window
+/// produces moving-average smoothing.
+///
+/// # Errors
+///
+/// Returns an error when the smoothing window is longer than the input signal.
+/// Window lengths below three return an unchanged copy.
+///
+/// # Reference
+///
+/// Based on the [SciPy Cookbook signal-smoothing recipe](https://scipy-cookbook.readthedocs.io/items/SignalSmooth.html).
 pub fn smooth(
     values: &Array1<f64>,
     window_length: usize,
@@ -266,14 +349,16 @@ pub fn smooth(
     );
     let mut weights = (0..window_length)
         .map(|index| window_weight(window, index, window_length))
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
     let total = weights.iter().sum::<f64>();
-    weights.iter_mut().for_each(|weight| *weight /= total);
+    for weight in &mut weights {
+        *weight /= total;
+    }
 
     let mut full = vec![0.0; reflected.len() + window_length - 1];
     for (input, value) in reflected.iter().copied().enumerate() {
         for (weight, coefficient) in weights.iter().copied().enumerate() {
-            full[input + weight] += value * coefficient;
+            full[input + weight] = value.mul_add(coefficient, full[input + weight]);
         }
     }
     let same_start = (window_length - 1) / 2;
@@ -283,41 +368,67 @@ pub fn smooth(
     ))
 }
 
-fn window_weight(window: SmoothingWindow, index: usize, length: usize) -> f64 {
-    let phase = std::f64::consts::TAU * index as f64 / (length - 1) as f64;
-    match window {
+fn window_weight(window: SmoothingWindow, index: usize, length: usize) -> Result<f64> {
+    let index = index
+        .to_f64()
+        .ok_or_else(|| Error::Unsupported("smoothing index cannot be represented as f64".into()))?;
+    let length_minus_one = (length - 1).to_f64().ok_or_else(|| {
+        Error::Unsupported("smoothing window length cannot be represented as f64".into())
+    })?;
+    let phase = std::f64::consts::TAU * index / length_minus_one;
+    Ok(match window {
         SmoothingWindow::Flat => 1.0,
-        SmoothingWindow::Hanning => 0.5 - 0.5 * phase.cos(),
-        SmoothingWindow::Hamming => 0.54 - 0.46 * phase.cos(),
+        SmoothingWindow::Hanning => 0.5f64.mul_add(-phase.cos(), 0.5),
+        SmoothingWindow::Hamming => 0.46f64.mul_add(-phase.cos(), 0.54),
         SmoothingWindow::Bartlett => {
-            let middle = (length - 1) as f64 / 2.0;
-            2.0 / (length - 1) as f64 * (middle - (index as f64 - middle).abs())
+            let middle = length_minus_one / 2.0;
+            2.0 / length_minus_one * (middle - (index - middle).abs())
         }
-        SmoothingWindow::Blackman => 0.42 - 0.5 * phase.cos() + 0.08 * (2.0 * phase).cos(),
-    }
+        SmoothingWindow::Blackman => {
+            let base = 0.5f64.mul_add(-phase.cos(), 0.42);
+            0.08f64.mul_add((2.0 * phase).cos(), base)
+        }
+    })
 }
 
-/// Typed Rust counterpart of the deprecated dynamic `skrf.util.HomoList`.
+/// A homogeneous sequence with bulk mapping and predicate-based selection.
+///
+/// Unlike the dynamic Python `HomoList`, Rust operations are expressed through
+/// typed closures: [`map`](Self::map) applies an operation to every value,
+/// [`matching_indexes`](Self::matching_indexes) searches values, and
+/// [`select`](Self::select) builds a subset.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct HomoList<T> {
+    /// Values in the homogeneous sequence.
     pub values: Vec<T>,
 }
 
 impl<T> HomoList<T> {
+    /// Creates a homogeneous list from an iterator of values.
+    #[must_use]
     pub fn new(values: impl IntoIterator<Item = T>) -> Self {
         Self {
             values: values.into_iter().collect(),
         }
     }
 
+    /// Returns the number of values.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.values.len()
     }
 
+    /// Returns `true` when the list contains no values.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
 
+    /// Clones values at the requested indexes into a new homogeneous list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an index is outside the list.
     pub fn select(&self, indexes: &[usize]) -> Result<Self>
     where
         T: Clone,
@@ -334,6 +445,7 @@ impl<T> HomoList<T> {
             .map(Self::new)
     }
 
+    /// Returns the indexes of values for which `predicate` is `true`.
     pub fn matching_indexes(&self, predicate: impl Fn(&T) -> bool) -> Vec<usize> {
         self.values
             .iter()
@@ -342,6 +454,7 @@ impl<T> HomoList<T> {
             .collect()
     }
 
+    /// Applies `operation` to every value and returns the mapped homogeneous list.
     pub fn map<U>(&self, operation: impl Fn(&T) -> U) -> HomoList<U> {
         HomoList::new(self.values.iter().map(operation))
     }
@@ -361,27 +474,40 @@ impl<T> IndexMut<usize> for HomoList<T> {
     }
 }
 
-/// Typed Rust counterpart of the deprecated dynamic `skrf.util.HomoDict`.
+/// A homogeneous ordered mapping with bulk mapping and predicate-based selection.
+///
+/// Unlike the dynamic Python `HomoDict`, Rust operations are expressed through
+/// typed closures: [`map_values`](Self::map_values) applies an operation to each
+/// value, [`matching_keys`](Self::matching_keys) searches values, and
+/// [`select`](Self::select) builds a subset.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct HomoDict<K, V> {
+    /// Ordered key-value storage.
     pub values: BTreeMap<K, V>,
 }
 
 impl<K: Ord, V> HomoDict<K, V> {
+    /// Creates a homogeneous dictionary from key-value pairs.
+    #[must_use]
     pub fn new(values: impl IntoIterator<Item = (K, V)>) -> Self {
         Self {
             values: values.into_iter().collect(),
         }
     }
 
+    /// Returns the number of entries.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.values.len()
     }
 
+    /// Returns `true` when the dictionary contains no entries.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
 
+    /// Returns keys whose values satisfy `predicate`.
     pub fn matching_keys(&self, predicate: impl Fn(&V) -> bool) -> Vec<&K> {
         self.values
             .iter()
@@ -389,6 +515,11 @@ impl<K: Ord, V> HomoDict<K, V> {
             .collect()
     }
 
+    /// Clones the requested entries into a new homogeneous dictionary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a requested key does not exist.
     pub fn select(&self, keys: &[K]) -> Result<Self>
     where
         K: Clone,
@@ -406,6 +537,7 @@ impl<K: Ord, V> HomoDict<K, V> {
             .map(Self::new)
     }
 
+    /// Applies `operation` to every value while preserving the keys.
     pub fn map_values<U>(&self, operation: impl Fn(&V) -> U) -> HomoDict<K, U>
     where
         K: Clone,
@@ -426,9 +558,11 @@ impl<K: Ord, V> Index<&K> for HomoDict<K, V> {
     }
 }
 
-/// Deterministic text progress bar replacing the deprecated printing helper.
+/// A deterministic text progress bar for long-running operations.
 ///
-/// Origin: `skrf.util.ProgressBar`.
+/// This is useful for operations such as collecting many VNA measurements. It
+/// renders progress without writing directly to a terminal, so the caller can
+/// choose where and when to display it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProgressBar {
     iterations: usize,
@@ -438,6 +572,11 @@ pub struct ProgressBar {
 }
 
 impl ProgressBar {
+    /// Creates a progress bar for `iterations` expected items and a label.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `iterations` is zero.
     pub fn new(iterations: usize, label: impl Into<String>) -> Result<Self> {
         if iterations == 0 {
             return Err(Error::Unsupported(
@@ -452,18 +591,26 @@ impl ProgressBar {
         })
     }
 
+    /// Sets the completed item count, clamped to the configured total.
     pub fn update(&mut self, elapsed: usize) {
         self.elapsed = elapsed.min(self.iterations);
     }
 
+    /// Advances the completed item count by one.
     pub fn advance(&mut self) {
         self.update(self.elapsed + 1);
     }
 
+    /// Renders the current progress bar and completion summary.
+    #[must_use]
     pub fn render(&self) -> String {
         let interior = self.width - 2;
-        let percent = (100.0 * self.elapsed as f64 / self.iterations as f64).round() as usize;
-        let filled = (interior as f64 * percent as f64 / 100.0).round() as usize;
+        let percent = self
+            .elapsed
+            .saturating_mul(100)
+            .saturating_add(self.iterations / 2)
+            / self.iterations;
+        let filled = interior.saturating_mul(percent).saturating_add(50) / 100;
         let mut bar = format!("[{}{}]", "*".repeat(filled), " ".repeat(interior - filled));
         let percent_text = format!("{percent}%");
         let start = bar.len() / 2 - percent_text.len();

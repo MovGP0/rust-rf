@@ -1,3 +1,10 @@
+//! General input and output for rust-rf objects.
+//!
+//! The object functions provide Rust-native, data-only persistence through
+//! JSON rather than Python pickle. The module also reads collections of RF
+//! objects, creates spreadsheet-style tables, and converts statistical data
+//! to Touchstone.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -14,12 +21,23 @@ use crate::{Error, Frequency, Network, NetworkSet, Result};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum StoredObject {
+    /// A frequency axis, conventionally stored with the `.freq` extension.
     Frequency(Frequency),
+    /// A network, conventionally stored with the `.ntwk` extension.
     Network(Box<Network>),
+    /// A network set, conventionally stored with the `.ns` extension.
     NetworkSet(NetworkSet),
 }
 
 impl StoredObject {
+    /// Return the conventional file extension for this object type.
+    ///
+    /// | Object | Extension |
+    /// | --- | --- |
+    /// | [`Frequency`](StoredObject::Frequency) | `.freq` |
+    /// | [`Network`](StoredObject::Network) | `.ntwk` |
+    /// | [`NetworkSet`](StoredObject::NetworkSet) | `.ns` |
+    #[must_use]
     pub const fn extension(&self) -> &'static str {
         match self {
             Self::Frequency(_) => "freq",
@@ -29,6 +47,18 @@ impl StoredObject {
     }
 }
 
+/// Write a supported rust-rf object to a JSON file.
+///
+/// If `path` has no extension, [`StoredObject::extension`] supplies one. An
+/// existing file is replaced only when `overwrite` is `true`.
+///
+/// Unlike the Python implementation, this format is data-only and does not
+/// deserialize executable pickle content.
+///
+/// # Errors
+///
+/// Returns an error when the destination exists without overwrite permission, the object cannot
+/// be serialized, or the file cannot be written.
 pub fn write_object(
     path: impl AsRef<Path>,
     object: &StoredObject,
@@ -50,25 +80,51 @@ pub fn write_object(
     Ok(path)
 }
 
+/// Read a rust-rf object previously written by [`write_object`].
+///
+/// # Errors
+///
+/// Returns an error when the file cannot be read or its contents are not a valid stored object.
 pub fn read_object(path: impl AsRef<Path>) -> Result<StoredObject> {
     let bytes = fs::read(path)?;
     serde_json::from_slice(&bytes)
         .map_err(|error| Error::Parse(format!("object deserialization failed: {error}")))
 }
 
-/// Safe JSON serialization counterpart to `to_json_string`.
+/// Serialize a network as a JSON string.
+///
+/// This representation is generally faster than writing Touchstone and safer
+/// to load than Python pickle because it cannot encode arbitrary code.
+///
+/// # Errors
+///
+/// Returns an error when the network cannot be serialized as JSON.
 pub fn to_json_string(network: &Network) -> Result<String> {
     serde_json::to_string(network)
         .map_err(|error| Error::Parse(format!("Network JSON serialization failed: {error}")))
 }
 
-/// Safe JSON deserialization counterpart to `from_json_string`.
+/// Rebuild a network from the JSON representation produced by
+/// [`to_json_string`].
+///
+/// # Errors
+///
+/// Returns an error when `text` is not a valid serialized network.
 pub fn from_json_string(text: &str) -> Result<Network> {
     serde_json::from_str(text)
         .map_err(|error| Error::Parse(format!("Network JSON deserialization failed: {error}")))
 }
 
-/// Port of `read_all_networks` for Touchstone and Rust JSON Network files.
+/// Read all supported networks in a directory.
+///
+/// Touchstone files and `.ntwk` JSON files are considered. Unreadable or
+/// unsupported files are skipped. `contains` filters by file-name substring,
+/// and `recursive` includes nested directories. Returned keys are file stems.
+///
+/// # Errors
+///
+/// Returns an error when the directory or one of its recursively visited subdirectories cannot
+/// be read.
 pub fn read_all_networks(
     directory: impl AsRef<Path>,
     contains: Option<&str>,
@@ -105,7 +161,16 @@ pub fn read_all_networks(
     Ok(networks)
 }
 
-/// Typed counterpart to `read_all`, retaining mixed supported RF objects.
+/// Read all supported rust-rf objects in a directory.
+///
+/// This is the mixed-object counterpart to [`read_all_networks`]. It accepts
+/// Touchstone networks and `.freq`, `.ntwk`, and `.ns` JSON object files.
+/// Unreadable files are skipped, and returned keys are file stems.
+///
+/// # Errors
+///
+/// Returns an error when the directory or one of its recursively visited subdirectories cannot
+/// be read.
 pub fn read_all_objects(
     directory: impl AsRef<Path>,
     contains: Option<&str>,
@@ -144,6 +209,15 @@ pub fn read_all_objects(
     Ok(objects)
 }
 
+/// Write each network in a map to an individual `.ntwk` file.
+///
+/// File names come from the map keys. The destination directory must already
+/// exist; individual files are overwritten.
+///
+/// # Errors
+///
+/// Returns an error when the destination is not a directory, a network cannot be serialized, or
+/// an output file cannot be written.
 pub fn write_all_networks(
     networks: &BTreeMap<String, Network>,
     directory: impl AsRef<Path>,
@@ -168,6 +242,16 @@ pub fn write_all_networks(
     Ok(paths)
 }
 
+/// Write each supported object in a map to an individual file.
+///
+/// File names come from the map keys. When a key has no extension, the
+/// object's conventional extension is appended. See [`write_object`] for
+/// overwrite behavior.
+///
+/// # Errors
+///
+/// Returns an error when the destination is not a directory, an object cannot be serialized, an
+/// output file cannot be written, or an existing file cannot be overwritten.
 pub fn write_all_objects(
     objects: &BTreeMap<String, StoredObject>,
     directory: impl AsRef<Path>,
@@ -186,6 +270,15 @@ pub fn write_all_objects(
         .collect()
 }
 
+/// Convert a Statistical/Dylan Williams data file to Touchstone.
+///
+/// The source contents are copied after `header`. When no header is supplied,
+/// `# GHz S RI R 50.0` is written.
+///
+/// # Errors
+///
+/// Returns an error when the source cannot be read or the destination cannot be created or
+/// written.
 pub fn statistical_to_touchstone(
     source: impl AsRef<Path>,
     destination: impl AsRef<Path>,
@@ -198,14 +291,22 @@ pub fn statistical_to_touchstone(
     Ok(())
 }
 
+/// Representation used for complex network data in tabular output.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NetworkDataFormat {
+    /// Logarithmic magnitude in decibels and phase in degrees.
     DecibelAngle,
+    /// Linear magnitude and phase in degrees.
     MagnitudeAngle,
+    /// Real and imaginary components.
     RealImaginary,
 }
 
 /// Build the numeric table used by spreadsheet writers.
+///
+/// The first column contains frequency in the network's display unit. Each
+/// $S_{mn}$ trace contributes two columns in the selected [`NetworkDataFormat`].
+#[must_use]
 pub fn network_table(network: &Network, format: NetworkDataFormat) -> (Vec<String>, Array2<f64>) {
     let columns = 1 + 2 * network.ports() * network.ports();
     let mut names = Vec::with_capacity(columns);
@@ -248,6 +349,14 @@ pub fn network_table(network: &Network, format: NetworkDataFormat) -> (Vec<Strin
     (names, data)
 }
 
+/// Write a network's scattering parameters to a CSV spreadsheet.
+///
+/// Frequency uses the network's current display unit; scattering data uses
+/// the requested [`NetworkDataFormat`].
+///
+/// # Errors
+///
+/// Returns an error when the output file cannot be created, written, or flushed.
 pub fn write_network_csv(
     network: &Network,
     path: impl AsRef<Path>,
@@ -270,6 +379,14 @@ pub fn write_network_csv(
     Ok(())
 }
 
+/// Write a network's scattering parameters as an HTML table.
+///
+/// Column headings are HTML-escaped and numeric values use the requested
+/// [`NetworkDataFormat`].
+///
+/// # Errors
+///
+/// Returns an error when the output file cannot be created or written.
 pub fn write_network_html(
     network: &Network,
     path: impl AsRef<Path>,
@@ -295,6 +412,17 @@ pub fn write_network_html(
 }
 
 #[cfg(feature = "dataframe")]
+/// Convert selected network attributes to a Polars data frame.
+///
+/// Supported attributes are `s_db`, `s_deg`, `s_mag`, `s_re`, and `s_im`.
+/// `ports` contains zero-based `(output, input)` pairs; by default every port
+/// pair is included. When `port_separator` is omitted, an underscore is used
+/// for networks with more than ten ports to avoid ambiguous column names.
+///
+/// # Errors
+///
+/// Returns an error for an out-of-range port, an unsupported attribute, or a failure to construct
+/// the Polars data frame.
 pub fn network_to_dataframe(
     network: &Network,
     attributes: &[&str],
@@ -307,7 +435,7 @@ pub fn network_to_dataframe(
         .flat_map(|input| (0..network.ports()).map(move |output| (output, input)))
         .collect::<Vec<_>>();
     let ports = ports.unwrap_or(&default_ports);
-    let separator = port_separator.unwrap_or(if network.ports() > 10 { "_" } else { "" });
+    let separator = port_separator.unwrap_or_else(|| if network.ports() > 10 { "_" } else { "" });
     let mut columns = Vec::with_capacity(attributes.len() * ports.len());
     for attribute in attributes {
         for (output, input) in ports {
@@ -343,6 +471,14 @@ pub fn network_to_dataframe(
 }
 
 #[cfg(feature = "xlsx")]
+/// Write a network's scattering parameters to an Excel workbook.
+///
+/// This function is available with the `xlsx` crate feature. Frequency uses
+/// the network's current display unit.
+///
+/// # Errors
+///
+/// Returns an error when a worksheet value cannot be written or the workbook cannot be saved.
 pub fn write_network_xlsx(
     network: &Network,
     path: impl AsRef<Path>,
@@ -352,14 +488,20 @@ pub fn write_network_xlsx(
     let mut workbook = rust_xlsxwriter::Workbook::new();
     let worksheet = workbook.add_worksheet();
     for (column, name) in names.iter().enumerate() {
+        let column = u16::try_from(column)
+            .map_err(|_| Error::Unsupported("XLSX column index exceeds u16::MAX".to_owned()))?;
         worksheet
-            .write_string(0, column as u16, name)
+            .write_string(0, column, name)
             .map_err(|error| Error::Unsupported(format!("XLSX write failed: {error}")))?;
     }
     for (row, values) in data.rows().into_iter().enumerate() {
+        let row = u32::try_from(row + 1)
+            .map_err(|_| Error::Unsupported("XLSX row index exceeds u32::MAX".to_owned()))?;
         for (column, value) in values.iter().enumerate() {
+            let column = u16::try_from(column)
+                .map_err(|_| Error::Unsupported("XLSX column index exceeds u16::MAX".to_owned()))?;
             worksheet
-                .write_number((row + 1) as u32, column as u16, *value)
+                .write_number(row, column, *value)
                 .map_err(|error| Error::Unsupported(format!("XLSX write failed: {error}")))?;
         }
     }
@@ -369,6 +511,15 @@ pub fn write_network_xlsx(
 }
 
 #[cfg(feature = "xlsx")]
+/// Write every network in a network set to its own Excel worksheet.
+///
+/// Worksheet names come from [`Network::name`] and fall back to `NetworkN`.
+/// This function is available with the `xlsx` crate feature.
+///
+/// # Errors
+///
+/// Returns an error for an empty network set, an invalid worksheet name or index, a worksheet
+/// write failure, or a workbook save failure.
 pub fn write_network_set_xlsx(
     network_set: &NetworkSet,
     path: impl AsRef<Path>,
@@ -389,14 +540,21 @@ pub fn write_network_set_xlsx(
             .set_name(sheet_name)
             .map_err(|error| Error::Unsupported(format!("XLSX sheet name failed: {error}")))?;
         for (column, name) in names.iter().enumerate() {
+            let column = u16::try_from(column)
+                .map_err(|_| Error::Unsupported("XLSX column index exceeds u16::MAX".to_owned()))?;
             worksheet
-                .write_string(0, column as u16, name)
+                .write_string(0, column, name)
                 .map_err(|error| Error::Unsupported(format!("XLSX write failed: {error}")))?;
         }
         for (row, values) in data.rows().into_iter().enumerate() {
+            let row = u32::try_from(row + 1)
+                .map_err(|_| Error::Unsupported("XLSX row index exceeds u32::MAX".to_owned()))?;
             for (column, value) in values.iter().enumerate() {
+                let column = u16::try_from(column).map_err(|_| {
+                    Error::Unsupported("XLSX column index exceeds u16::MAX".to_owned())
+                })?;
                 worksheet
-                    .write_number((row + 1) as u32, column as u16, *value)
+                    .write_number(row, column, *value)
                     .map_err(|error| Error::Unsupported(format!("XLSX write failed: {error}")))?;
             }
         }

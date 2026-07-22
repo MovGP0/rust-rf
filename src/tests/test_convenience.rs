@@ -1,3 +1,5 @@
+//! Convenience import regressions for HFSS and other Touchstone exporters.
+
 use std::path::PathBuf;
 
 use approx::assert_relative_eq;
@@ -15,6 +17,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Checks per-port HFSS propagation constants and impedances above two ports.
 #[test]
 fn reads_hfss_gamma_and_impedance_for_high_port_counts() {
     for (name, ports) in [
@@ -45,6 +48,7 @@ fn reads_hfss_gamma_and_impedance_for_high_port_counts() {
     );
 }
 
+/// Checks conversion of each HFSS port's $\gamma$ and `Z_0` into a medium.
 #[test]
 fn creates_media_for_each_hfss_port() {
     let one_port =
@@ -56,6 +60,7 @@ fn creates_media_for_each_hfss_port() {
     assert_eq!(one_port[0].gamma.len(), one_port[0].frequency.points());
 }
 
+/// Checks renormalization of HFSS complex port impedances to 50-ohm exports.
 #[test]
 fn renormalizes_hfss_networks_to_their_fifty_ohm_exports() {
     for (source, expected) in [
@@ -85,6 +90,7 @@ fn renormalizes_hfss_networks_to_their_fifty_ohm_exports() {
     }
 }
 
+/// Checks CST, Agilent, Rohde & Schwarz, and Helic Touchstone variants.
 #[test]
 fn reads_cst_agilent_rohde_schwarz_and_helic_exports() {
     for (name, ports) in [
@@ -103,8 +109,10 @@ fn reads_cst_agilent_rohde_schwarz_and_helic_exports() {
 
     let agilent =
         Network::read_touchstone(fixture("Agilent_E5071B.s4p")).expect("Agilent file should parse");
-    assert!(agilent.z0.iter().all(|value| value.re == 75.0));
-    let expected_db = [-52.52684, -0.2278388, -44.35702, -82.35984];
+    for value in &agilent.z0 {
+        assert_relative_eq!(value.re, 75.0, epsilon = 1e-12);
+    }
+    let expected_db = [-52.52684, -0.227_838_8, -44.35702, -82.35984];
     for (column, expected) in expected_db.into_iter().enumerate() {
         assert_relative_eq!(
             20.0 * agilent.s[(0, 1, column)].norm().log10(),
@@ -125,6 +133,7 @@ fn reads_cst_agilent_rohde_schwarz_and_helic_exports() {
     assert_eq!(helic_ts.s, helic_sp.s);
 }
 
+/// Checks loading a ZIP archive of Touchstone files as a [`NetworkSet`].
 #[test]
 fn loads_touchstone_archives_as_network_sets() {
     let set = NetworkSet::from_zip(fixture("ntwks.zip")).expect("archive should load");
@@ -133,13 +142,14 @@ fn loads_touchstone_archives_as_network_sets() {
     assert!(set.networks.iter().all(|network| network.ports() == 2));
 }
 
+/// Checks the shared fixture's extrapolation to a DC frequency point.
 #[test]
 fn creates_the_shared_dc_extrapolated_network_fixture() {
     let network = Network::read_touchstone(fixture("ntwk1.s2p")).expect("fixture should load");
     let extrapolated = network
         .extrapolate_to_dc(None, None)
         .expect("network should extrapolate to DC");
-    assert_eq!(extrapolated.frequency.values_hz()[0], 0.0);
+    assert_relative_eq!(extrapolated.frequency.values_hz()[0], 0.0, epsilon = 1e-12);
     assert!(
         extrapolated
             .s

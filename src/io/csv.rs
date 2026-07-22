@@ -1,3 +1,9 @@
+//! Read instrument data stored in comma-delimited text files.
+//!
+//! This module supports Agilent/Keysight PNA CSV exports, Rohde & Schwarz ZVA
+//! DAT exports, and Anritsu VectorStar CSV exports. It converts scalar traces
+//! and real/imaginary or dB/degree column pairs into [`Network`] values.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,13 +18,26 @@ use crate::{Error, Frequency, FrequencyUnit, Network, Result};
 /// Origin: `skrf/io/csv.py::read_pna_csv` and `AgilentCSV.read`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CsvTable {
+    /// Column headings from the line immediately before the numeric data.
     pub header: String,
+    /// Concatenated instrument comment lines, without their comment marker.
     pub comments: String,
+    /// Numeric rows arranged as `(sample, column)`.
     pub data: Array2<f64>,
 }
 
-/// Read the first `BEGIN`/`END` PNA data block and normalize its frequency
-/// column to hertz.
+/// Read data from a CSV file written by an Agilent/Keysight PNA.
+///
+/// The first `BEGIN`/`END` data block is returned as its header, comments, and
+/// numeric data. The frequency column is converted from the unit named in the
+/// header to hertz.
+///
+/// See [`pna_csv_to_networks`] to convert the extracted traces into networks.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, the data block cannot be
+/// parsed, or its frequency unit is missing or unsupported.
 pub fn read_pna_csv(path: impl AsRef<Path>) -> Result<CsvTable> {
     let text = fs::read_to_string(path)?;
     let mut table = parse_begin_end_table(&text, true)?;
@@ -36,13 +55,29 @@ pub fn read_pna_csv(path: impl AsRef<Path>) -> Result<CsvTable> {
     Ok(table)
 }
 
-/// Parse a PNA CSV into one-port traces, combining real/imaginary or
-/// dB/degree column pairs where possible.
+/// Read a PNA CSV file and return one-port networks for its trace columns.
+///
+/// Adjacent real/imaginary or dB/degree columns are combined into complex
+/// scattering data. Scalar files are handled by [`AgilentCsv::scalar_networks`].
+///
+/// # Errors
+///
+/// Returns an error if the CSV file cannot be read or converted into valid
+/// one-port networks.
 pub fn pna_csv_to_networks(path: impl AsRef<Path>) -> Result<Vec<Network>> {
     AgilentCsv::from_path(path)?.networks()
 }
 
-/// Parse a four-trace PNA dB/degree export as one two-port network.
+/// Read an Agilent/Keysight PNA dB/degree export as a two-port network.
+///
+/// The file must contain complete dB and degree columns for $S_{11}$,
+/// $S_{12}$, $S_{21}$, and $S_{22}$. The resulting reference impedance is
+/// 50 ohms and its name is the source file stem.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be parsed, lacks a complete two-port
+/// dB/degree matrix, or produces invalid network data.
 pub fn pna_csv_to_two_port(path: impl AsRef<Path>) -> Result<Network> {
     let path = path.as_ref();
     let table = read_pna_csv(path)?;
@@ -88,6 +123,16 @@ pub fn pna_csv_to_two_port(path: impl AsRef<Path>) -> Result<Network> {
     Ok(network)
 }
 
+/// Read all compatible PNA CSV files in a directory.
+///
+/// When `contains` is present, only file names containing that substring are
+/// considered. Keys are file stems and values are the parsed two-port
+/// networks. Files that cannot be converted are skipped.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read or one of its entries
+/// cannot be inspected.
 pub fn read_all_csv(
     directory: impl AsRef<Path>,
     contains: Option<&str>,
@@ -119,13 +164,26 @@ pub fn read_all_csv(
 /// Origin: `skrf/io/csv.py::AgilentCSV`.
 #[derive(Clone, Debug)]
 pub struct AgilentCsv {
+    /// Source path, or `None` when parsed from an in-memory string.
     pub filename: Option<PathBuf>,
+    /// Column headings from the instrument export.
     pub header: String,
+    /// Concatenated lines that began with `!` in the source.
     pub comments: String,
+    /// Numeric data, with frequency in the first column.
     pub data: Array2<f64>,
 }
 
 impl AgilentCsv {
+    /// Read an Agilent-style CSV file.
+    ///
+    /// The last `BEGIN`/`END` block is used, matching the original
+    /// `AgilentCSV` reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or its final data block
+    /// cannot be parsed.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let text = fs::read_to_string(path)?;
@@ -138,6 +196,12 @@ impl AgilentCsv {
         })
     }
 
+    /// Parse Agilent-style CSV text from memory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the final `BEGIN`/`END` data block is missing,
+    /// malformed, or contains invalid numeric data.
     pub fn parse(text: &str) -> Result<Self> {
         let table = parse_begin_end_table(text, false)?;
         Ok(Self {
@@ -148,20 +212,48 @@ impl AgilentCsv {
         })
     }
 
+    /// Return the CSV column names.
+    ///
+    /// Agilent headings may themselves contain commas. If ordinary comma
+    /// splitting does not yield the expected number of columns, this method
+    /// tries `),` boundaries. As a last resort it creates names such as
+    /// `Freq(?)`, `filename-0`, and `filename-1`.
+    #[must_use]
     pub fn columns(&self) -> Vec<String> {
         split_header(&self.header, self.data.ncols(), self.filename.as_deref())
     }
 
+    /// Return the frequency axis described by the first column.
+    ///
+    /// The unit is read from a heading such as `Freq(GHz)` and defaults to
+    /// hertz when the heading does not contain a recognized unit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency column contains invalid values.
     pub fn frequency(&self) -> Result<Frequency> {
         let columns = self.columns();
         let unit = frequency_unit_from_column(&columns[0]).unwrap_or(FrequencyUnit::Hz);
         Frequency::from_values(self.data.column(0).to_owned(), unit)
     }
 
+    /// Return the number of data traces, excluding the frequency column.
+    #[must_use]
     pub fn trace_count(&self) -> usize {
         self.data.ncols().saturating_sub(1)
     }
 
+    /// Return one scalar one-port network for each data column.
+    ///
+    /// Values whose column name contains `db` are converted to linear
+    /// magnitude before being stored in the network's scattering parameter.
+    /// Other values are stored as real-valued scattering data, so their
+    /// physical interpretation remains the caller's responsibility.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency axis or any generated one-port
+    /// network is invalid.
     pub fn scalar_networks(&self) -> Result<Vec<Network>> {
         let frequency = self.frequency()?;
         let columns = self.columns();
@@ -174,11 +266,21 @@ impl AgilentCsv {
                         Complex64::new(value, 0.0)
                     }
                 });
-                self.one_port_network(frequency.clone(), values, columns[column].clone())
+                self.one_port_network(frequency.clone(), &values, columns[column].clone())
             })
             .collect()
     }
 
+    /// Return one-port networks represented by adjacent column pairs.
+    ///
+    /// dB/degree pairs are converted to complex values; other pairs are
+    /// interpreted as real/imaginary values. A table with fewer than two
+    /// traces is delegated to [`Self::scalar_networks`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frequency axis or any generated one-port
+    /// network is invalid.
     pub fn networks(&self) -> Result<Vec<Network>> {
         if self.trace_count() < 2 {
             return self.scalar_networks();
@@ -203,13 +305,15 @@ impl AgilentCsv {
             }));
             networks.push(self.one_port_network(
                 frequency.clone(),
-                values,
+                &values,
                 columns[first].clone(),
             )?);
         }
         Ok(networks)
     }
 
+    /// Return a map from every column name to its numeric values.
+    #[must_use]
     pub fn as_columns(&self) -> BTreeMap<String, Array1<f64>> {
         self.columns()
             .into_iter()
@@ -219,6 +323,14 @@ impl AgilentCsv {
     }
 
     #[cfg(feature = "dataframe")]
+    /// Return the CSV table as a Polars data frame.
+    ///
+    /// This method is available with the `dataframe` crate feature.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Polars cannot construct a data frame from the CSV
+    /// columns.
     pub fn to_dataframe(&self) -> Result<polars::frame::DataFrame> {
         use polars::prelude::Column;
 
@@ -235,7 +347,7 @@ impl AgilentCsv {
     fn one_port_network(
         &self,
         frequency: Frequency,
-        values: Array1<Complex64>,
+        values: &Array1<Complex64>,
         name: String,
     ) -> Result<Network> {
         let points = values.len();
@@ -250,7 +362,17 @@ impl AgilentCsv {
     }
 }
 
-/// Read a Rohde & Schwarz ZVA comma-delimited data file.
+/// Read data from a comma-delimited file written by a Rohde & Schwarz ZVA.
+///
+/// ZVA comment and header lines begin with `%`. The returned table contains
+/// the last such header, all comment text, and the following numeric rows.
+/// Both dB/degree and real/imaginary exports can subsequently be converted by
+/// [`zva_dat_to_network`].
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, its header is missing, or its
+/// numeric rows are invalid or inconsistently shaped.
 pub fn read_zva_dat(path: impl AsRef<Path>) -> Result<CsvTable> {
     let text = fs::read_to_string(path)?;
     let mut header = None;
@@ -274,6 +396,16 @@ pub fn read_zva_dat(path: impl AsRef<Path>) -> Result<CsvTable> {
     )
 }
 
+/// Read a Rohde & Schwarz ZVA DAT export as a two-port network.
+///
+/// The parser accepts complete real/imaginary or dB/degree columns for
+/// $S_{11}$, $S_{12}$, $S_{21}$, and $S_{22}$. The reference impedance is
+/// 50 ohms and the network name is the source file stem.
+///
+/// # Errors
+///
+/// Returns an error if the DAT file cannot be parsed, lacks a complete
+/// two-port matrix, or produces invalid network data.
 pub fn zva_dat_to_network(path: impl AsRef<Path>) -> Result<Network> {
     let path = path.as_ref();
     let table = read_zva_dat(path)?;
@@ -321,7 +453,16 @@ pub fn zva_dat_to_network(path: impl AsRef<Path>) -> Result<Network> {
     Ok(network)
 }
 
-/// Read an Anritsu VectorStar CSV into one-port traces.
+/// Read an Anritsu `VectorStar` CSV file into one-port networks.
+///
+/// Parameter names are taken from the `PARAMETER` comment. Each trace is read
+/// from a frequency/real/imaginary triple and assigned a 50-ohm reference
+/// impedance. This corresponds to real/imaginary `VectorStar` exports.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, required metadata or numeric
+/// rows are missing, trace triples are malformed, or a network is invalid.
 pub fn vectorstar_csv_to_networks(path: impl AsRef<Path>) -> Result<Vec<Network>> {
     let text = fs::read_to_string(path)?;
     let comments = text
@@ -374,7 +515,7 @@ pub fn vectorstar_csv_to_networks(path: impl AsRef<Path>) -> Result<Vec<Network>
                 comments: comments.clone(),
                 data: Array2::zeros((0, 0)),
             };
-            helper.one_port_network(frequency, values, names[trace].to_owned())
+            helper.one_port_network(frequency, &values, names[trace].to_owned())
         })
         .collect()
 }

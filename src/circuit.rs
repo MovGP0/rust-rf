@@ -1,3 +1,10 @@
+//! Arbitrary-topology RF circuits assembled from N-port networks.
+//!
+//! A [`Circuit`] connects any number of N-port [`Network`] objects at shared
+//! intersections. One or more explicitly marked external ports define the
+//! M-port network returned by [`Circuit::network`]. The module also exposes
+//! graph, active-parameter, wave, voltage, current, and reduction operations.
+
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -10,22 +17,69 @@ use crate::math::left_solve;
 use crate::network::{abcd_to_s, active_s, active_vswr, active_y, active_z};
 use crate::{Error, Frequency, Network, Result};
 
-/// Origin: `skrf/circuit.py::Circuit`.
+/// A circuit assembled from N-port networks with arbitrary topology.
+///
+/// The resultant M-port network has one port for every
+/// [`CircuitConnection::external`] entry, in order of appearance.
+///
+/// # Example
+///
+/// ```
+/// use std::sync::Arc;
+///
+/// use ndarray::array;
+/// use rust_rf::{Complex64, Frequency};
+/// use rust_rf::circuit::{Circuit, CircuitConnection};
+///
+/// # fn main() -> rust_rf::Result<()> {
+/// let frequency = Frequency::from_hz(array![1.0e9])?;
+/// let port1 = Circuit::port(frequency.clone(), "Port 1", Complex64::new(50.0, 0.0))?;
+/// let port2 = Circuit::port(frequency.clone(), "Port 2", Complex64::new(50.0, 0.0))?;
+/// let series = Arc::new(Circuit::series_impedance(
+///     frequency,
+///     &array![Complex64::new(10.0, 0.0)],
+///     "R1",
+///     Complex64::new(50.0, 0.0),
+/// )?);
+/// let circuit = Circuit::new(vec![
+///     vec![port1, CircuitConnection::new(Arc::clone(&series), 0)],
+///     vec![CircuitConnection::new(series, 1), port2],
+/// ])?;
+/// let network = circuit.network()?;
+/// # assert_eq!(network.ports(), 2);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Reference
+///
+/// P. Hallbjörner, *Microwave and Optical Technology Letters*, vol. 38,
+/// p. 99, 2003.
 #[derive(Clone, Debug, Default)]
 pub struct Circuit {
+    /// Circuit intersections and their participating network ports.
+    ///
+    /// Each inner vector describes one electrical intersection.
     pub connections: Vec<Vec<CircuitConnection>>,
+    /// Optional name copied to the network produced by [`Self::network`].
     pub name: Option<String>,
 }
 
+/// One network port participating in a circuit intersection.
 #[derive(Clone, Debug)]
 pub struct CircuitConnection {
+    /// Shared network instance containing the connected port.
     pub network: Arc<Network>,
+    /// Zero-based port index within [`Self::network`].
     pub port: usize,
+    /// Whether this one-port network represents an external circuit port.
     pub external: bool,
 }
 
 impl CircuitConnection {
-    pub fn new(network: Arc<Network>, port: usize) -> Self {
+    /// Creates an internal circuit connection.
+    #[must_use]
+    pub const fn new(network: Arc<Network>, port: usize) -> Self {
         Self {
             network,
             port,
@@ -33,7 +87,11 @@ impl CircuitConnection {
         }
     }
 
-    pub fn external(network: Arc<Network>, port: usize) -> Self {
+    /// Creates an explicitly marked external circuit connection.
+    ///
+    /// External connections must use port `0` of a one-port network.
+    #[must_use]
+    pub const fn external(network: Arc<Network>, port: usize) -> Self {
         Self {
             network,
             port,
@@ -43,6 +101,15 @@ impl CircuitConnection {
 }
 
 impl Circuit {
+    /// Creates and validates a circuit connection map.
+    ///
+    /// Every inner vector is one intersection. Each network must be named, all
+    /// networks must share a frequency axis, and a `(network, port)` pair may
+    /// appear only once. At least one connection must be explicitly external.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the topology, network names, ports, or frequency axes are invalid.
     pub fn new(connections: Vec<Vec<CircuitConnection>>) -> Result<Self> {
         if connections.is_empty() || connections.iter().any(Vec::is_empty) {
             return Err(Error::IncompatibleShape(
@@ -111,7 +178,14 @@ impl Circuit {
         })
     }
 
-    /// Port of `skrf.circuit.Circuit.Port`, returned as an external connection.
+    /// Creates a one-port matched network marked as an external circuit port.
+    ///
+    /// The port's characteristic impedance is `z0`. External port numbering in
+    /// the resulting network follows order of appearance in [`Self::connections`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `z0` is invalid or the one-port network cannot be constructed.
     pub fn port(
         frequency: Frequency,
         name: impl Into<String>,
@@ -132,7 +206,17 @@ impl Circuit {
         Ok(CircuitConnection::external(Arc::new(network), 0))
     }
 
-    /// Port of `skrf.circuit.Circuit.SeriesImpedance`.
+    /// Creates a two-port series impedance network.
+    ///
+    /// ```text
+    /// (Port 1)-----[Z]-----(Port 2)
+    /// ```
+    ///
+    /// `impedance` supplies one complex value per frequency point.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the component data or reference impedance is invalid.
     pub fn series_impedance(
         frequency: Frequency,
         impedance: &Array1<Complex64>,
@@ -147,10 +231,24 @@ impl Circuit {
                 (0, 1) => impedance[point],
                 _ => Complex64::new(0.0, 0.0),
             });
-        component_from_abcd(frequency, abcd, name, z0)
+        component_from_abcd(frequency, &abcd, name, z0)
     }
 
-    /// Port of `skrf.circuit.Circuit.ShuntAdmittance`.
+    /// Creates a two-port shunt admittance network.
+    ///
+    /// ```text
+    /// (Port 1)-----(Port 2)
+    ///            |
+    ///           [Y]
+    ///            |
+    ///           Gnd
+    /// ```
+    ///
+    /// `admittance` supplies one complex value per frequency point.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the component data or reference impedance is invalid.
     pub fn shunt_admittance(
         frequency: Frequency,
         admittance: &Array1<Complex64>,
@@ -165,19 +263,40 @@ impl Circuit {
                 (1, 0) => admittance[point],
                 _ => Complex64::new(0.0, 0.0),
             });
-        component_from_abcd(frequency, abcd, name, z0)
+        component_from_abcd(frequency, &abcd, name, z0)
     }
 
-    /// Port of `skrf.circuit.Circuit.Ground`.
+    /// Creates a grounded one-port network with reflection coefficient $-1$.
+    ///
+    /// ```text
+    /// (Port)-----Gnd
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reference impedance or resulting network is invalid.
     pub fn ground(frequency: Frequency, name: impl Into<String>, z0: Complex64) -> Result<Network> {
         one_port_termination(frequency, name, z0, Complex64::new(-1.0, 0.0))
     }
 
-    /// Port of `skrf.circuit.Circuit.Open`.
+    /// Creates an open one-port network with reflection coefficient $+1$.
+    ///
+    /// ```text
+    /// (Port)-----Open
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reference impedance or resulting network is invalid.
     pub fn open(frequency: Frequency, name: impl Into<String>, z0: Complex64) -> Result<Network> {
         one_port_termination(frequency, name, z0, Complex64::new(1.0, 0.0))
     }
 
+    /// Generates an undirected graph of networks and intersections.
+    ///
+    /// Network names and synthetic intersection names (`X0`, `X1`, …) are
+    /// nodes. Edge weights are zero-based network port indices.
+    #[must_use]
     pub fn graph(&self) -> UnGraph<String, usize> {
         let mut graph = UnGraph::new_undirected();
         let mut network_nodes = HashMap::<usize, NodeIndex>::new();
@@ -203,22 +322,35 @@ impl Circuit {
         graph
     }
 
+    /// Returns the frequency axis shared by all circuit networks.
+    #[must_use]
     pub fn frequency(&self) -> &Frequency {
         &self.connections[0][0].network.frequency
     }
 
+    /// Returns the number of flattened `(network, port)` connections.
+    #[must_use]
     pub fn connection_count(&self) -> usize {
         self.connections.iter().map(Vec::len).sum()
     }
 
+    /// Returns the number of circuit intersections.
+    #[must_use]
     pub fn intersection_count(&self) -> usize {
         self.connections.len()
     }
 
+    /// Returns the dimension of the global circuit matrices.
+    ///
+    /// This is the sum of the number of ports participating in all
+    /// intersections.
+    #[must_use]
     pub fn dimension(&self) -> usize {
         self.connection_count()
     }
 
+    /// Returns unique networks in connection order.
+    #[must_use]
     pub fn networks(&self) -> Vec<Arc<Network>> {
         let mut seen = HashSet::new();
         self.connections
@@ -232,6 +364,8 @@ impl Circuit {
             .collect()
     }
 
+    /// Returns the circuit networks keyed by their unique names.
+    #[must_use]
     pub fn networks_by_name(&self) -> HashMap<String, Arc<Network>> {
         self.networks()
             .into_iter()
@@ -239,14 +373,22 @@ impl Circuit {
             .collect()
     }
 
+    /// Returns the number of unique connected networks, including port networks.
+    #[must_use]
     pub fn network_count(&self) -> usize {
         self.networks().len()
     }
 
+    /// Returns global-matrix indexes of external circuit ports.
+    #[must_use]
     pub fn port_indexes(&self) -> Vec<usize> {
         self.external_indexes()
     }
 
+    /// Returns external-port characteristic impedances.
+    ///
+    /// The array shape is `(frequency points, external ports)`.
+    #[must_use]
     pub fn port_z0(&self) -> Array2<Complex64> {
         let external = self.external_connections();
         Array2::from_shape_fn(
@@ -255,10 +397,14 @@ impl Circuit {
         )
     }
 
+    /// Returns `true` if every pair of vertices in the circuit graph is connected.
+    #[must_use]
     pub fn is_connected(&self) -> bool {
         petgraph::algo::connected_components(&self.graph()) == 1
     }
 
+    /// Returns every intersection with its network names and port indices.
+    #[must_use]
     pub fn intersections_by_name(&self) -> HashMap<usize, Vec<(String, usize)>> {
         self.connections
             .iter()
@@ -281,6 +427,8 @@ impl Circuit {
             .collect()
     }
 
+    /// Returns graph edges as `(node, node, network_port)` tuples.
+    #[must_use]
     pub fn edges(&self) -> Vec<(String, String, usize)> {
         let graph = self.graph();
         graph
@@ -295,7 +443,14 @@ impl Circuit {
             .collect()
     }
 
-    /// Port of `Circuit.update_networks`, returning a newly validated circuit.
+    /// Returns a newly validated circuit with networks replaced by name.
+    ///
+    /// Names absent from `replacements` retain their existing network. The
+    /// original circuit is not modified.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a replacement makes the circuit topology invalid.
     pub fn updated_networks(&self, replacements: &HashMap<String, Arc<Network>>) -> Result<Self> {
         let connections = self
             .connections
@@ -327,6 +482,15 @@ impl Circuit {
     }
 
     /// Condenses the solved circuit to one internal N-port connected to the original ports.
+    ///
+    /// The equivalent circuit produces the same external S-parameters with
+    /// fewer components, which makes repeated network calculations faster.
+    /// Internal voltage and current distributions no longer represent the
+    /// original topology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit cannot be solved or the reduced topology is invalid.
     pub fn reduced(&self) -> Result<Self> {
         let external = self.external_connections();
         let mut assembled = self.network()?;
@@ -352,6 +516,14 @@ impl Circuit {
         Ok(reduced)
     }
 
+    /// Returns the M-port [`Network`] associated with the external ports.
+    ///
+    /// M is the number of explicitly external connections. Port names and
+    /// reference impedances are inherited from their external port networks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit cannot be solved or the network cannot be constructed.
     pub fn network(&self) -> Result<Network> {
         let scattering = self.external_s()?;
         let external = self.external_connections();
@@ -375,6 +547,13 @@ impl Circuit {
         Ok(network)
     }
 
+    /// Returns scattering parameters for the external circuit ports.
+    ///
+    /// The array shape is `(frequency points, external ports, external ports)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the global circuit system cannot be solved.
     pub fn external_s(&self) -> Result<Array3<Complex64>> {
         let global_scattering = self.global_s()?;
         let flattened = self.flattened_connections();
@@ -392,8 +571,19 @@ impl Circuit {
         Ok(external)
     }
 
-    /// Global circuit scattering matrix used by the wave and voltage/current
-    /// observables in `skrf.circuit.Circuit`.
+    /// Returns the global scattering matrix for internal and external connections.
+    ///
+    /// If $X$ is the block-diagonal intersection matrix and $C$ is the global
+    /// component scattering matrix, the circuit scattering matrix is
+    ///
+    /// $$S = \left(X^{-1} - C\right)^{-1}.$$
+    ///
+    /// The result is used by the wave, voltage, and current observables. Its
+    /// shape is `(frequency points, dimension, dimension)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an intersection is singular or the global system cannot be solved.
     pub fn global_s(&self) -> Result<Array3<Complex64>> {
         let flattened = self.flattened_connections();
         let dimension = flattened.len();
@@ -455,27 +645,81 @@ impl Circuit {
         left_solve(&system, &identity)
     }
 
+    /// Returns active S-parameters for the external-port excitation vector.
+    ///
+    /// The active reflection coefficient at port $m$ is
+    ///
+    /// $$\operatorname{active}(S)_m = \sum_{i} S_{m i}\frac{a_{i}}{a_{m}}.$$
+    ///
+    /// Active parameters are important for active phased-array antennas.
+    ///
+    /// # References
+    ///
+    /// - D. M. Pozar, *IEEE Transactions on Antennas and Propagation*, vol. 42,
+    ///   p. 1176, 1994.
+    /// - D. Williams, *IEEE Microwave Magazine*, vol. 14, p. 38, 2013.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit network or excitation vector is invalid.
     pub fn active_s(&self, excitation: &Array1<Complex64>) -> Result<Array2<Complex64>> {
         let network = self.network()?;
         active_s(&network.s, excitation)
     }
 
+    /// Returns active impedances for the external-port excitation vector.
+    ///
+    /// $$\operatorname{active}(Z)_m = Z_{0,m}
+    /// \frac{1 + \operatorname{active}(S)_m}
+    /// {1 - \operatorname{active}(S)_m}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit network or excitation vector is invalid.
     pub fn active_z(&self, excitation: &Array1<Complex64>) -> Result<Array2<Complex64>> {
         let network = self.network()?;
         active_z(&network.s, &network.z0, excitation)
     }
 
+    /// Returns active admittances for the external-port excitation vector.
+    ///
+    /// $$\operatorname{active}(Y)_m = Y_{0,m}
+    /// \frac{1 - \operatorname{active}(S)_m}
+    /// {1 + \operatorname{active}(S)_m}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit network or excitation vector is invalid.
     pub fn active_y(&self, excitation: &Array1<Complex64>) -> Result<Array2<Complex64>> {
         let network = self.network()?;
         active_y(&network.s, &network.z0, excitation)
     }
 
+    /// Returns active voltage standing-wave ratios for the excitation vector.
+    ///
+    /// $$\operatorname{active}(\mathrm{VSWR})_m =
+    /// \frac{1 + |\operatorname{active}(S)_m|}
+    /// {1 - |\operatorname{active}(S)_m|}.$$
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit network or excitation vector is invalid.
     pub fn active_vswr(&self, excitation: &Array1<Complex64>) -> Result<Array2<f64>> {
         let network = self.network()?;
         active_vswr(&network.s, excitation)
     }
 
-    /// Port of `Circuit._a_external` followed by `Circuit._a`.
+    /// Builds the global incident-wave vector from external powers and phases.
+    ///
+    /// Each external-port wave is
+    ///
+    /// $$a = \sqrt{2P_{\mathrm{in}}}\,e^{j\phi},$$
+    ///
+    /// where the factor of two produces peak values. Internal entries are zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the power and phase vectors do not match the external ports or contain invalid values.
     pub fn incident_waves(
         &self,
         power_watts: &Array1<f64>,
@@ -510,7 +754,14 @@ impl Circuit {
         Ok(incident)
     }
 
-    /// Port of `Circuit._b`.
+    /// Calculates outgoing waves at every flattened circuit connection.
+    ///
+    /// `incident` must contain one entry per global circuit dimension. The
+    /// result has shape `(frequency points, dimension)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circuit cannot be solved or `incident` has the wrong length.
     pub fn outgoing_waves(&self, incident: &Array1<Complex64>) -> Result<Array2<Complex64>> {
         let scattering = self.global_s()?;
         if incident.len() != scattering.dim().1 {
@@ -530,7 +781,15 @@ impl Circuit {
         ))
     }
 
-    /// Ports of `Circuit.voltages_external` and `Circuit.currents_external`.
+    /// Returns peak voltages and currents at the external ports.
+    ///
+    /// Power is specified in watts and phase in radians. External current is
+    /// positive when entering the circuit port. Both returned arrays have shape
+    /// `(frequency points, external ports)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the excitation is invalid or the circuit cannot be solved.
     pub fn external_voltages_currents(
         &self,
         power_watts: &Array1<f64>,
@@ -556,8 +815,15 @@ impl Circuit {
         Ok((voltages, currents))
     }
 
-    /// Ports of `Circuit.voltages` and `Circuit.currents` for every flattened
-    /// circuit connection. Current is positive when entering an intersection.
+    /// Returns peak voltages and currents at every flattened circuit connection.
+    ///
+    /// Power is specified in watts and phase in radians. Voltage is common to
+    /// every port at an intersection; current is positive when entering that
+    /// intersection. Both arrays have shape `(frequency points, dimension)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the excitation is invalid or the circuit cannot be solved.
     pub fn internal_voltages_currents(
         &self,
         power_watts: &Array1<f64>,
@@ -663,12 +929,12 @@ fn validate_component_values(
 
 fn component_from_abcd(
     frequency: Frequency,
-    abcd: Array3<Complex64>,
+    abcd: &Array3<Complex64>,
     name: impl Into<String>,
     z0: Complex64,
 ) -> Result<Network> {
     let reference = Array2::from_elem((frequency.points(), 2), z0);
-    let scattering = abcd_to_s(&abcd, &reference)?;
+    let scattering = abcd_to_s(abcd, &reference)?;
     let mut network = Network::new(frequency, scattering, reference)?;
     network.name = Some(name.into());
     Ok(network)

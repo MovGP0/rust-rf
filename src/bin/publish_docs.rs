@@ -6,11 +6,19 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+/// Local checkout of the GitHub Pages repository.
 const PAGES_DIRECTORY: &str = "gh-pages";
+/// Generated HTML documentation directory.
 const HTML_DIRECTORY: &str = "build/html";
+/// Generated PDF documentation path.
 const PDF_PATH: &str = "build/latex/scikit-rf.pdf";
+/// SSH URL of the documentation repository.
 const PAGES_REPOSITORY: &str = "git@github.com:scikit-rf/doc.git";
 
+/// Publishes a generated documentation build into the GitHub Pages checkout.
+///
+/// The optional positional argument selects the destination tag. Without one, the command uses
+/// `git describe --exact-match` and falls back to `dev`.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = env::current_dir()?;
     let tag = env::args().nth(1).unwrap_or_else(|| {
@@ -54,6 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Ensures a documentation tag is one safe path component.
 fn validate_component(value: &str) -> Result<(), Box<dyn std::error::Error>> {
     if value.is_empty()
         || value == "."
@@ -66,6 +75,7 @@ fn validate_component(value: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Ensures `child` resolves beneath `parent` before any replacement occurs.
 fn ensure_child(parent: &Path, child: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let parent = parent.canonicalize()?;
     let candidate = child
@@ -83,6 +93,7 @@ fn ensure_child(parent: &Path, child: &Path) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+/// Recursively copies the generated documentation tree.
 fn copy_directory(source: &Path, destination: &Path) -> io::Result<()> {
     if !source.is_dir() {
         return Err(io::Error::new(
@@ -106,6 +117,7 @@ fn copy_directory(source: &Path, destination: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Executes a command and forwards its standard output and standard error.
 fn run(
     directory: &Path,
     program: &str,
@@ -120,6 +132,7 @@ fn run(
     Ok(())
 }
 
+/// Executes a command and returns its trimmed standard output.
 fn command_output(
     directory: &Path,
     program: &str,
@@ -132,6 +145,7 @@ fn command_output(
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
 
+/// Executes `program` with `arguments` in `directory`.
 fn command(directory: &Path, program: &str, arguments: &[&str]) -> io::Result<Output> {
     Command::new(program)
         .args(arguments)
@@ -139,6 +153,7 @@ fn command(directory: &Path, program: &str, arguments: &[&str]) -> io::Result<Ou
         .output()
 }
 
+/// Formats a failed command and its captured error output.
 fn command_error(program: &str, arguments: &[&str], output: &Output) -> String {
     format!(
         "{} {} failed with {}: {}",
@@ -150,6 +165,7 @@ fn command_error(program: &str, arguments: &[&str], output: &Output) -> String {
 }
 
 #[allow(dead_code)]
+/// Returns the publication destination for `tag`.
 fn destination_for(root: &Path, tag: &str) -> PathBuf {
     root.join(PAGES_DIRECTORY).join(tag)
 }

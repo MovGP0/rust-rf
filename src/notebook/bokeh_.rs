@@ -10,9 +10,13 @@ use crate::{Network, Result};
 /// Rust representation of the meaningful `default_kwargs` fields.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BokehPlotOptions {
+    /// Network parameter representation to plot.
     pub parameter: Parameter,
+    /// Component such as magnitude, decibels, phase, real, or imaginary.
     pub component: Component,
+    /// Optional `(output, input)` port pair; `None` plots every trace.
     pub ports: Option<(usize, usize)>,
+    /// Whether an integrating frontend should display the result immediately.
     pub show: bool,
 }
 
@@ -27,12 +31,23 @@ impl Default for BokehPlotOptions {
     }
 }
 
-/// Port of `plot_rectangular`.
+/// Builds rectangular plot data for a network.
+///
+/// This is the backend-neutral Rust analogue of the Python function returning
+/// a Bokeh `Figure`.
+///
+/// # Errors
+///
+/// Returns an error if the requested network plot cannot be constructed.
 pub fn plot_rectangular(network: &Network, options: BokehPlotOptions) -> Result<Plot> {
     network_plot(network, options.parameter, options.component, options.ports)
 }
 
 /// Compatibility wrapper for the initial Rust port's public name.
+///
+/// # Errors
+///
+/// Returns an error if the rectangular plot cannot be constructed.
 pub fn rectangular_plot(network: &Network, component: Component) -> Result<Plot> {
     plot_rectangular(
         network,
@@ -44,6 +59,10 @@ pub fn rectangular_plot(network: &Network, component: Component) -> Result<Plot>
 }
 
 /// Backend-neutral polar plot data corresponding to the upstream placeholder.
+///
+/// # Errors
+///
+/// Returns an error if the polar plot cannot be constructed.
 pub fn plot_polar(
     network: &Network,
     parameter: Parameter,
@@ -64,6 +83,7 @@ pub const BOKEH_NETWORK_METHODS: [&str; 7] = [
 ];
 
 /// Rust has no runtime monkey-patching; this exposes the methods available to adapters.
+#[must_use]
 pub const fn use_bokeh() -> &'static [&'static str] {
     &BOKEH_NETWORK_METHODS
 }

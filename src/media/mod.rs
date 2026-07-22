@@ -1,3 +1,11 @@
+//! Transmission-line media and network constructors.
+//!
+//! [`Media`] defines propagation constant $\gamma$ and characteristic
+//! impedance $`Z_0`$, then supplies generic constructors such as [`Media::line`]
+//! and [`Media::delay_short`]. Concrete media—including [`Freespace`] and
+//! [`RectangularWaveguide`]—provide the physical quantities while reusing
+//! those network-building operations.
+
 use std::fmt;
 use std::path::Path;
 
@@ -11,19 +19,29 @@ use crate::math::{
 };
 use crate::{Error, Frequency, Network, Result, SParameterDefinition};
 
+/// Circular-waveguide transmission media.
 pub mod circular_waveguide;
+/// Coaxial transmission media.
 pub mod coaxial;
+/// Coplanar-waveguide transmission media.
 pub mod cpw;
+/// Media defined by attenuation, permittivity, loss tangent, and impedance.
 pub mod defined_a_ep_tand_z0;
+/// Idealized couplers and multiport devices.
 pub mod device;
+/// Distributed-circuit transmission media.
 pub mod distributed_circuit;
+/// Free-space transmission media.
 pub mod freespace;
 #[allow(
     clippy::module_inception,
     reason = "the nested module preserves the upstream skrf/media/media.py path"
 )]
+/// Base media types and shared network constructors.
 pub mod media;
+/// Microstrip transmission media.
 pub mod mline;
+/// Rectangular-waveguide transmission media.
 pub mod rectangular_waveguide;
 
 pub use circular_waveguide::*;
@@ -37,8 +55,8 @@ pub use media::*;
 pub use mline::*;
 pub use rectangular_waveguide::*;
 
-/// Upstream-compatible public type name for `skrf.media.CPW`.
+/// Conventional public alias for [`Cpw`].
 pub type CPW = Cpw;
 
-/// Upstream-compatible public type name for `skrf.media.MLine`.
+/// Conventional public alias for [`MicrostripLine`].
 pub type MLine = MicrostripLine;

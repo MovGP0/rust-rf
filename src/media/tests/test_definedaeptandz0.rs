@@ -1,5 +1,7 @@
 ﻿#![allow(unused_imports)]
 
+//! Regression tests for media defined by attenuation, permittivity, loss tangent, and impedance.
+
 use approx::assert_relative_eq;
 use ndarray::{Array1, Array2, Array3};
 use num_complex::Complex64;
@@ -16,6 +18,7 @@ use rust_rf::{Frequency, FrequencyUnit, Network, SweepType};
 
 const TOLERANCE: f64 = 1.0e-10;
 
+/// Checks scalar nominal impedance dispersion and the resulting lossy propagation constant.
 #[test]
 fn calculates_defined_attenuation_and_impedance_dispersion() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -56,6 +59,7 @@ fn calculates_defined_attenuation_and_impedance_dispersion() {
     assert_eq!(line.ports(), 2);
 }
 
+/// Checks that array-valued characteristic impedances remain raw values.
 #[test]
 fn preserves_raw_defined_characteristic_impedance() {
     let frequency = Frequency::new(1.0, 3.0, 3, FrequencyUnit::GHz, SweepType::Linear)
@@ -88,6 +92,7 @@ fn preserves_raw_defined_characteristic_impedance() {
     }
 }
 
+/// Compares a generated line with the AWR reference network.
 #[test]
 fn matches_awr_defined_attenuation_line() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -119,6 +124,7 @@ fn matches_awr_defined_attenuation_line() {
     }
 }
 
+/// Checks the Djordjevic-Svensson dielectric model at its specification frequency.
 #[test]
 fn matches_djordjevic_svensson_specification_point() {
     let frequency = Frequency::new(1.0, 1.0, 1, FrequencyUnit::GHz, SweepType::Linear)

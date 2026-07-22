@@ -1,3 +1,9 @@
+//! Agilent-style CSV input/output regressions.
+//!
+//! The fixtures exercise column parsing, comments, numeric data, frequency
+//! units, complex and scalar network conversion, and instrument-specific
+//! readers.
+
 use approx::assert_relative_eq;
 use num_complex::Complex64;
 use rust_rf::io::csv::{
@@ -14,6 +20,7 @@ Freq(Hz),\"A,1\"(REAL),\"A,1\"(IMAG),\"R1,1\"(REAL),\"R1,1\"(IMAG)\n\
 1100000000000,5,6,7,8\n\
 END\n";
 
+/// Reads column names, comment lines, data, and frequency from an Agilent CSV.
 #[test]
 fn parses_agilent_columns_comments_data_and_frequency() {
     let csv = AgilentCsv::parse(PNA_RI).unwrap();
@@ -28,14 +35,15 @@ fn parses_agilent_columns_comments_data_and_frequency() {
         ]
     );
     assert_eq!(csv.comments, "this is a comment\nline\n");
-    assert_eq!(csv.data[(0, 0)], 750_000_000_000.0);
-    assert_eq!(csv.data[(1, 4)], 8.0);
+    assert_relative_eq!(csv.data[(0, 0)], 750_000_000_000.0);
+    assert_relative_eq!(csv.data[(1, 4)], 8.0);
     assert_eq!(
         csv.frequency().unwrap().values_hz().to_vec(),
         vec![750_000_000_000.0, 1_100_000_000_000.0]
     );
 }
 
+/// Builds complex and scalar one-port networks from CSV trace columns.
 #[test]
 fn builds_complex_and_scalar_one_port_networks() {
     let csv = AgilentCsv::parse(PNA_RI).unwrap();
@@ -44,9 +52,10 @@ fn builds_complex_and_scalar_one_port_networks() {
     assert_eq!(networks[0].s[(0, 0, 0)], Complex64::new(1.0, 2.0));
     assert_eq!(networks[1].s[(1, 0, 0)], Complex64::new(7.0, 8.0));
     assert_eq!(csv.scalar_networks().unwrap().len(), 4);
-    assert_eq!(csv.as_columns()["Freq(Hz)"][0], 750_000_000_000.0);
+    assert_relative_eq!(csv.as_columns()["Freq(Hz)"][0], 750_000_000_000.0);
 }
 
+/// Decodes dB/degree pairs and scales the frequency unit to hertz.
 #[test]
 fn decodes_db_degree_pairs_and_frequency_units() {
     let text = "BEGIN DATA\nFreq(GHz),S11 Log Mag(dB),S11 Phase(deg)\n1,-20,90\n2,0,180\nEND\n";
@@ -57,12 +66,14 @@ fn decodes_db_degree_pairs_and_frequency_units() {
     assert_relative_eq!(network.s[(0, 0, 0)].im, 0.1, epsilon = 1.0e-12);
 }
 
+/// Rejects CSV input with missing block markers or inconsistent row widths.
 #[test]
 fn rejects_missing_markers_and_ragged_rows() {
     assert!(AgilentCsv::parse("Freq(Hz),S\n1,2\n").is_err());
     assert!(AgilentCsv::parse("BEGIN X\nFreq(Hz),A,B\n1,2,3\n2,4\nEND\n").is_err());
 }
 
+/// Reads a PNA CSV file and normalizes its frequency column to hertz.
 #[test]
 fn path_reader_normalizes_frequency_to_hertz() {
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -77,6 +88,7 @@ fn path_reader_normalizes_frequency_to_hertz() {
     assert_eq!(table.data.column(0).to_vec(), vec![1.0e6, 2.0e6]);
 }
 
+/// Converts representative PNA, ZVA, and `VectorStar` exports to networks.
 #[test]
 fn converts_two_port_pna_zva_and_vectorstar_files() {
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
